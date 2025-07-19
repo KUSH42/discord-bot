@@ -132,13 +132,13 @@ describe('Performance and Load Tests', () => {
       // Simulate concurrent additions
       for (let i = 0; i < numConcurrent; i++) {
         promises.push(
-          new Promise((resolve) => {
+          new Promise(resolve => {
             // Add some delay to simulate real work
             setTimeout(() => {
               sharedSet.add(`item${i}`);
               resolve(i);
             }, Math.random() * 10);
-          }),
+          })
         );
       }
 
@@ -151,15 +151,15 @@ describe('Performance and Load Tests', () => {
       const lookupPromises = [];
       for (let i = 0; i < numConcurrent; i++) {
         lookupPromises.push(
-          new Promise((resolve) => {
+          new Promise(resolve => {
             const exists = sharedSet.has(`item${i}`);
             resolve(exists);
-          }),
+          })
         );
       }
 
       const lookupResults = await Promise.all(lookupPromises);
-      expect(lookupResults.every((result) => result === true)).toBe(true);
+      expect(lookupResults.every(result => result === true)).toBe(true);
     });
   });
 
@@ -180,7 +180,7 @@ describe('Performance and Load Tests', () => {
       for (let i = 0; i < numUrls / 2; i++) {
         textSegments.push(
           `Text segment ${i} with YouTube: https://www.youtube.com/watch?v=video${i.toString().padStart(7, '0')} and`,
-          `Twitter: https://x.com/user/status/12345678901234567${i.toString().padStart(2, '0')} more text.`,
+          `Twitter: https://x.com/user/status/12345678901234567${i.toString().padStart(2, '0')} more text.`
         );
       }
 
@@ -201,8 +201,8 @@ describe('Performance and Load Tests', () => {
       // Test individual URL processing performance
       const processingStart = performance.now();
 
-      const videoIds = videoMatches.map((match) => match[1]);
-      const tweetIds = tweetMatches.map((match) => match[1]);
+      const videoIds = videoMatches.map(match => match[1]);
+      const tweetIds = tweetMatches.map(match => match[1]);
 
       const processingEnd = performance.now();
       const processingDuration = processingEnd - processingStart;
@@ -251,7 +251,7 @@ describe('Performance and Load Tests', () => {
 
       // Mock successful sends with realistic delay
       mockChannel.send.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 50)),
+        () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 50))
       );
 
       const sendStart = performance.now();
@@ -269,7 +269,7 @@ describe('Performance and Load Tests', () => {
 
         // Small delay between batches to simulate rate limiting
         if (i + batchSize < numMessages) {
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
       }
 
@@ -293,20 +293,20 @@ describe('Performance and Load Tests', () => {
     it('should handle concurrent channel operations', async () => {
       const numChannels = 50;
       const channels = Array.from({ length: numChannels }, (_, i) =>
-        createMockChannel({ id: `channel-${i}`, name: `test-channel-${i}` }),
+        createMockChannel({ id: `channel-${i}`, name: `test-channel-${i}` })
       );
 
       // Mock send operations with varying delays
-      channels.forEach((channel) => {
+      channels.forEach(channel => {
         channel.send.mockImplementation(
-          () => new Promise((resolve) => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 100)),
+          () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 100))
         );
       });
 
       const concurrentStart = performance.now();
 
       // Send messages to all channels simultaneously
-      const promises = channels.map((channel) => channel.send('Broadcast message to all channels'));
+      const promises = channels.map(channel => channel.send('Broadcast message to all channels'));
 
       const results = await Promise.all(promises);
       const concurrentEnd = performance.now();
@@ -315,7 +315,7 @@ describe('Performance and Load Tests', () => {
       expect(results).toHaveLength(numChannels);
 
       // All channels should have been called
-      channels.forEach((channel) => {
+      channels.forEach(channel => {
         expect(channel.send).toHaveBeenCalledWith('Broadcast message to all channels');
       });
 
@@ -346,11 +346,11 @@ describe('Performance and Load Tests', () => {
         const res = createMockResponse();
 
         promises.push(
-          new Promise((resolve) => {
+          new Promise(resolve => {
             webhookHandler(req, res);
             // Simulate async completion
             setTimeout(() => resolve({ req, res }), Math.random() * 20);
-          }),
+          })
         );
       }
 
@@ -370,7 +370,7 @@ describe('Performance and Load Tests', () => {
     });
 
     it('should handle large webhook payloads efficiently', async () => {
-      const createLargePayload = (size) => {
+      const createLargePayload = size => {
         return Array(size)
           .fill(0)
           .map((_, i) => `<entry><id>video${i}</id><title>Video Title ${i}</title></entry>`)
@@ -392,7 +392,7 @@ describe('Performance and Load Tests', () => {
         // Simulate XML parsing
         const entries = payload.match(/<entry>.*?<\/entry>/g) || [];
         const videoIds = entries
-          .map((entry) => {
+          .map(entry => {
             const match = entry.match(/<id>([^<]+)<\/id>/);
             return match ? match[1] : null;
           })
@@ -412,7 +412,7 @@ describe('Performance and Load Tests', () => {
       }
 
       // Performance should scale reasonably
-      results.forEach((result) => {
+      results.forEach(result => {
         console.log(`Size ${result.size}: ${result.throughput.toFixed(2)} entries/sec`);
         expect(result.throughput).toBeGreaterThan(100); // At least 100 entries per second
       });
@@ -538,7 +538,7 @@ describe('Performance and Load Tests', () => {
 
   describe('CPU Performance Under Load', () => {
     it('should handle CPU-intensive duplicate detection efficiently', () => {
-      const complexDuplicateDetection = (urls) => {
+      const complexDuplicateDetection = urls => {
         const videoIds = new Set();
         const tweetIds = new Set();
         const duplicates = [];
@@ -606,14 +606,14 @@ describe('Performance and Load Tests', () => {
       for (let iteration = 0; iteration < iterations; iteration++) {
         const urls = Array.from(
           { length: urlsPerIteration },
-          (_, i) => `https://www.youtube.com/watch?v=test${iteration * urlsPerIteration + i}`,
+          (_, i) => `https://www.youtube.com/watch?v=test${iteration * urlsPerIteration + i}`
         );
 
         const iterationStart = performance.now();
 
         // Simulate processing
         const videoIds = new Set();
-        urls.forEach((url) => {
+        urls.forEach(url => {
           const match = url.match(/watch\?v=([a-zA-Z0-9_-]+)/);
           if (match) {
             videoIds.add(match[1]);

@@ -42,7 +42,7 @@ export class DuplicateDetector {
     }
 
     const matches = [...content.matchAll(videoUrlRegex)];
-    return matches.map((match) => match[1]).filter((id) => id);
+    return matches.map(match => match[1]).filter(id => id);
   }
 
   /**
@@ -56,7 +56,7 @@ export class DuplicateDetector {
     }
 
     const matches = [...content.matchAll(tweetUrlRegex)];
-    return matches.map((match) => match[1]).filter((id) => id);
+    return matches.map(match => match[1]).filter(id => id);
   }
 
   /**
@@ -105,7 +105,7 @@ export class DuplicateDetector {
    */
   addVideoIds(videoIds) {
     if (Array.isArray(videoIds)) {
-      videoIds.forEach((id) => this.addVideoId(id));
+      videoIds.forEach(id => this.addVideoId(id));
     }
   }
 
@@ -115,7 +115,7 @@ export class DuplicateDetector {
    */
   addTweetIds(tweetIds) {
     if (Array.isArray(tweetIds)) {
-      tweetIds.forEach((id) => this.addTweetId(id));
+      tweetIds.forEach(id => this.addTweetId(id));
     }
   }
 
@@ -131,19 +131,19 @@ export class DuplicateDetector {
     const result = {
       videos: {
         found: videoIds,
-        duplicates: videoIds.filter((id) => this.isVideoIdKnown(id)),
-        new: videoIds.filter((id) => !this.isVideoIdKnown(id)),
+        duplicates: videoIds.filter(id => this.isVideoIdKnown(id)),
+        new: videoIds.filter(id => !this.isVideoIdKnown(id)),
       },
       tweets: {
         found: tweetIds,
-        duplicates: tweetIds.filter((id) => this.isTweetIdKnown(id)),
-        new: tweetIds.filter((id) => !this.isTweetIdKnown(id)),
+        duplicates: tweetIds.filter(id => this.isTweetIdKnown(id)),
+        new: tweetIds.filter(id => !this.isTweetIdKnown(id)),
       },
     };
 
     // Add new IDs to known sets
-    result.videos.new.forEach((id) => this.addVideoId(id));
-    result.tweets.new.forEach((id) => this.addTweetId(id));
+    result.videos.new.forEach(id => this.addVideoId(id));
+    result.tweets.new.forEach(id => this.addTweetId(id));
 
     return result;
   }
@@ -170,7 +170,7 @@ export class DuplicateDetector {
     const toKeep = array.slice(-keepCount);
 
     set.clear();
-    toKeep.forEach((item) => set.add(item));
+    toKeep.forEach(item => set.add(item));
   }
 
   /**
@@ -238,7 +238,7 @@ export class DuplicateDetector {
             results.videoIdsFound.push(...videoIds);
 
             // Add to known set
-            videoIds.forEach((id) => {
+            videoIds.forEach(id => {
               if (!this.isVideoIdKnown(id)) {
                 this.addVideoId(id);
                 results.videoIdsAdded++;
@@ -252,7 +252,7 @@ export class DuplicateDetector {
         }
 
         // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       results.errors.push({
@@ -307,7 +307,7 @@ export class DuplicateDetector {
             results.tweetIdsFound.push(...tweetIds);
 
             // Add to known set
-            tweetIds.forEach((id) => {
+            tweetIds.forEach(id => {
               if (!this.isTweetIdKnown(id)) {
                 this.addTweetId(id);
                 results.tweetIdsAdded++;
@@ -321,7 +321,7 @@ export class DuplicateDetector {
         }
 
         // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
       results.errors.push({
@@ -355,13 +355,13 @@ export class DuplicateDetector {
     // Check for video URLs
     const videoIds = this.extractVideoIds(url);
     if (videoIds.length > 0) {
-      return videoIds.some((id) => this.isVideoIdKnown(id));
+      return videoIds.some(id => this.isVideoIdKnown(id));
     }
 
     // Check for tweet URLs
     const tweetIds = this.extractTweetIds(url);
     if (tweetIds.length > 0) {
-      return tweetIds.some((id) => this.isTweetIdKnown(id));
+      return tweetIds.some(id => this.isTweetIdKnown(id));
     }
 
     return false;
@@ -378,11 +378,11 @@ export class DuplicateDetector {
 
     // Add video IDs if found
     const videoIds = this.extractVideoIds(url);
-    videoIds.forEach((id) => this.addVideoId(id));
+    videoIds.forEach(id => this.addVideoId(id));
 
     // Add tweet IDs if found
     const tweetIds = this.extractTweetIds(url);
-    tweetIds.forEach((id) => this.addTweetId(id));
+    tweetIds.forEach(id => this.addTweetId(id));
   }
 
   /**

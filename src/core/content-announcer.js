@@ -496,7 +496,7 @@ export class ContentAnnouncer {
         results.push({ content, result });
 
         if (delay > 0 && results.length < contentItems.length) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       } catch (error) {
         results.push({

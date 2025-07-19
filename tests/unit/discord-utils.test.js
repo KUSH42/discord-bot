@@ -68,7 +68,7 @@ describe('Discord Utils Tests', () => {
 
       mockClient = {
         channels: {
-          fetch: jest.fn().mockImplementation((id) => {
+          fetch: jest.fn().mockImplementation(id => {
             if (id === 'support123') {
               return Promise.resolve(mockSupportChannel);
             }

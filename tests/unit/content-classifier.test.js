@@ -32,7 +32,7 @@ describe('ContentClassifier', () => {
         const result = classifier.classifyXContent(
           'https://x.com/user/status/1234567890',
           'RT @someone This is a retweet',
-          { isRetweet: true },
+          { isRetweet: true }
         );
 
         expect(result.type).toBe('retweet');
@@ -43,7 +43,7 @@ describe('ContentClassifier', () => {
         const result = classifier.classifyXContent(
           'https://x.com/user/status/1234567890',
           'My comment https://x.com/other/status/0987654321',
-          { isQuote: true },
+          { isQuote: true }
         );
 
         expect(result.type).toBe('quote');
@@ -59,7 +59,7 @@ describe('ContentClassifier', () => {
           'http://x.com/user/status/1234567890',
         ];
 
-        urls.forEach((url) => {
+        urls.forEach(url => {
           const result = classifier.classifyXContent(url, 'test');
           expect(result.platform).toBe('x');
           expect(result.error).toBeUndefined();
@@ -178,7 +178,7 @@ describe('ContentClassifier', () => {
       it('should fallback to text-based detection when author metadata is missing', () => {
         const result = classifier.classifyXContent(
           'https://x.com/user/status/1234567890',
-          'RT @someone This is a retweet',
+          'RT @someone This is a retweet'
         );
 
         expect(result.type).toBe('retweet');
@@ -188,7 +188,7 @@ describe('ContentClassifier', () => {
         const result = classifier.classifyXContent(
           'https://x.com/user/status/1234567890',
           'RT @someone This is a retweet',
-          { author: 'differentuser' },
+          { author: 'differentuser' }
         );
 
         expect(result.type).toBe('retweet');
@@ -291,7 +291,7 @@ describe('ContentClassifier', () => {
       it('should handle invalid duration formats', () => {
         const invalidFormats = [null, undefined, '', 'invalid', 'P1D'];
 
-        invalidFormats.forEach((duration) => {
+        invalidFormats.forEach(duration => {
           const result = classifier.parseYouTubeDuration(duration);
           expect(result).toBe(0);
         });
@@ -352,7 +352,7 @@ describe('ContentClassifier', () => {
     it('should recognize X/Twitter URLs', () => {
       const urls = ['https://x.com/user/status/123', 'https://twitter.com/user/status/123', 'http://x.com/user'];
 
-      urls.forEach((url) => {
+      urls.forEach(url => {
         expect(classifier.isXUrl(url)).toBe(true);
       });
     });
@@ -360,7 +360,7 @@ describe('ContentClassifier', () => {
     it('should recognize YouTube URLs', () => {
       const urls = ['https://youtube.com/watch?v=123', 'https://www.youtube.com/watch?v=123', 'https://youtu.be/123'];
 
-      urls.forEach((url) => {
+      urls.forEach(url => {
         expect(classifier.isYouTubeUrl(url)).toBe(true);
       });
     });
@@ -368,7 +368,7 @@ describe('ContentClassifier', () => {
     it('should not recognize non-platform URLs', () => {
       const urls = ['https://google.com', 'https://facebook.com', 'invalid-url'];
 
-      urls.forEach((url) => {
+      urls.forEach(url => {
         expect(classifier.isXUrl(url)).toBe(false);
         expect(classifier.isYouTubeUrl(url)).toBe(false);
       });
@@ -383,7 +383,7 @@ describe('ContentClassifier', () => {
         'https://youtube.com/embed/dQw4w9WgXcQ',
       ];
 
-      urls.forEach((url) => {
+      urls.forEach(url => {
         const result = classifier.extractContentId(url);
         expect(result.platform).toBe('youtube');
         expect(result.type).toBe('video');

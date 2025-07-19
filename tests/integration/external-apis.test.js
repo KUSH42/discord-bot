@@ -39,7 +39,7 @@ describe('External API Integration Tests', () => {
         },
       });
 
-      const fetchVideoDetails = async (id) => {
+      const fetchVideoDetails = async id => {
         const response = await mockYouTubeAPI.videos.list({
           part: 'snippet,statistics,liveStreamingDetails',
           id,
@@ -96,7 +96,7 @@ describe('External API Integration Tests', () => {
         },
       });
 
-      const checkIfLiveStream = async (videoId) => {
+      const checkIfLiveStream = async videoId => {
         const response = await mockYouTubeAPI.videos.list({
           part: 'snippet,liveStreamingDetails',
           id: videoId,
@@ -121,7 +121,7 @@ describe('External API Integration Tests', () => {
         data: { items: [] },
       });
 
-      const fetchVideoDetails = async (videoId) => {
+      const fetchVideoDetails = async videoId => {
         const response = await mockYouTubeAPI.videos.list({
           part: 'snippet',
           id: videoId,
@@ -146,7 +146,7 @@ describe('External API Integration Tests', () => {
         data: { items: [invalidVideoData] },
       });
 
-      const validateVideoData = (video) => {
+      const validateVideoData = video => {
         const required = ['id', 'snippet'];
         const requiredSnippet = ['title', 'channelTitle', 'publishedAt'];
 
@@ -192,7 +192,7 @@ describe('External API Integration Tests', () => {
     });
 
     it('should parse PubSubHubbub notifications', () => {
-      const parseNotification = (xmlData) => {
+      const parseNotification = xmlData => {
         // Simplified XML parsing for testing - get entry-specific data
         const videoIdMatch = xmlData.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
         const channelIdMatch = xmlData.match(/<yt:channelId>([^<]+)<\/yt:channelId>/);
@@ -349,7 +349,7 @@ describe('External API Integration Tests', () => {
       const posts = await scrapePosts(page, 'testuser');
 
       expect(page.goto).toHaveBeenCalledWith(
-        'https://x.com/search?q=(from%3Atestuser)+exclude%3Areplies+exclude%3Aretweets&src=typed_query&f=live',
+        'https://x.com/search?q=(from%3Atestuser)+exclude%3Areplies+exclude%3Aretweets&src=typed_query&f=live'
       );
       expect(posts).toHaveLength(2);
       expect(posts[0].text).toBe('This is a test post');
@@ -359,13 +359,13 @@ describe('External API Integration Tests', () => {
       const page = createMockPage();
       page.cookies.mockResolvedValue(mockXCookies);
 
-      const manageCookies = async (page) => {
+      const manageCookies = async page => {
         // Get current cookies
         const cookies = await page.cookies();
 
         // Check if auth cookies are present
-        const authCookie = cookies.find((c) => c.name === 'auth_token');
-        const csrfCookie = cookies.find((c) => c.name === 'ct0');
+        const authCookie = cookies.find(c => c.name === 'auth_token');
+        const csrfCookie = cookies.find(c => c.name === 'ct0');
 
         if (!authCookie || !csrfCookie) {
           throw new Error('Missing authentication cookies');
@@ -388,7 +388,7 @@ describe('External API Integration Tests', () => {
     });
 
     it('should categorize different types of content', async () => {
-      const categorizeContent = (posts) => {
+      const categorizeContent = posts => {
         const categorized = {
           posts: [],
           replies: [],
@@ -396,7 +396,7 @@ describe('External API Integration Tests', () => {
           retweets: [],
         };
 
-        posts.forEach((post) => {
+        posts.forEach(post => {
           if (post.text.startsWith('RT @')) {
             categorized.retweets.push(post);
           } else if (post.text.includes('Replying to @')) {
@@ -515,7 +515,7 @@ describe('External API Integration Tests', () => {
         expect.objectContaining({
           status: 'healthy',
           components: expect.any(Object),
-        }),
+        })
       );
     });
 
@@ -543,7 +543,7 @@ describe('External API Integration Tests', () => {
       expect(res.set).toHaveBeenCalledWith(
         expect.objectContaining({
           'Access-Control-Allow-Origin': '*',
-        }),
+        })
       );
       expect(res.status).toHaveBeenCalledWith(200);
     });
@@ -564,11 +564,11 @@ describe('External API Integration Tests', () => {
 
           mockYouTubeAPI.videos
             .list({ id: videoId })
-            .then((result) => {
+            .then(result => {
               clearTimeout(timer);
               resolve(result);
             })
-            .catch((error) => {
+            .catch(error => {
               clearTimeout(timer);
               reject(error);
             });
@@ -584,7 +584,7 @@ describe('External API Integration Tests', () => {
 
       mockYouTubeAPI.videos.list.mockRejectedValue(authError);
 
-      const handleAuthError = async (videoId) => {
+      const handleAuthError = async videoId => {
         try {
           return await mockYouTubeAPI.videos.list({ id: videoId });
         } catch (error) {
@@ -604,7 +604,7 @@ describe('External API Integration Tests', () => {
         data: null, // Malformed response
       });
 
-      const safeApiCall = async (videoId) => {
+      const safeApiCall = async videoId => {
         try {
           const response = await mockYouTubeAPI.videos.list({ id: videoId });
 

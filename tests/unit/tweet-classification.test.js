@@ -29,7 +29,7 @@ describe('Tweet Category Classification', () => {
 
     // Mock config
     mockConfig = {
-      getRequired: jest.fn((key) => {
+      getRequired: jest.fn(key => {
         const values = {
           X_USER_HANDLE: 'testuser',
           TWITTER_USERNAME: 'testuser',

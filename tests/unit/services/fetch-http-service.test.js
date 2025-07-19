@@ -71,7 +71,7 @@ describe('FetchHttpService', () => {
         method: 'POST',
         body: JSON.stringify(body),
         headers: expect.objectContaining({ 'content-type': 'application/json' }),
-      }),
+      })
     );
   });
 

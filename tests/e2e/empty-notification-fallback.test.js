@@ -167,7 +167,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
       await mockYouTubeMonitor.handleFailedNotification(emptyBody, parseError);
 
       // 4d: After delay, API fallback should be triggered
-      await new Promise((resolve) => setTimeout(resolve, 150)); // Wait for fallback delay
+      await new Promise(resolve => setTimeout(resolve, 150)); // Wait for fallback delay
       await mockYouTubeMonitor.performApiFallback();
 
       // Step 5: Verify the complete workflow executed correctly
@@ -191,7 +191,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
           id: newVideoId,
           title: 'New Video: Important Announcement',
           channelTitle: 'Test Channel',
-        }),
+        })
       );
 
       // 5d: Verify metrics were updated
@@ -286,7 +286,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
 
       mockYouTubeAPI.videos.list.mockResolvedValue({
         data: {
-          items: newVideos.map((v) => ({
+          items: newVideos.map(v => ({
             id: v.id.videoId,
             snippet: v.snippet,
             contentDetails: { duration: 'PT5M' },
@@ -313,10 +313,10 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
 
       // Verify both specific videos were announced
       expect(mockYouTubeMonitor.announceYouTubeContent).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'newVideo1', title: 'First New Video' }),
+        expect.objectContaining({ id: 'newVideo1', title: 'First New Video' })
       );
       expect(mockYouTubeMonitor.announceYouTubeContent).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'newVideo2', title: 'Second New Video' }),
+        expect.objectContaining({ id: 'newVideo2', title: 'Second New Video' })
       );
 
       mockLogger.info('Successfully handled multiple new videos during fallback');
@@ -393,7 +393,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
         expect.objectContaining({
           id: 'whitespaceRecovery',
           title: 'Recovered from Whitespace Notification',
-        }),
+        })
       );
 
       mockLogger.info('Successfully handled whitespace-only notification');
@@ -446,7 +446,7 @@ function generateValidSignature(body, secret) {
 
 function setupMockImplementations(monitor) {
   // Mock signature verification
-  monitor.verifySignature.mockImplementation((request) => {
+  monitor.verifySignature.mockImplementation(request => {
     if (!request.headers['x-hub-signature']) {
       return false;
     }
@@ -486,10 +486,10 @@ function setupMockImplementations(monitor) {
     });
 
     this.recentFailures.push(now);
-    this.recentFailures = this.recentFailures.filter((timestamp) => now.getTime() - timestamp.getTime() < 30000);
+    this.recentFailures = this.recentFailures.filter(timestamp => now.getTime() - timestamp.getTime() < 30000);
 
     this.logger.warn(
-      `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}`,
+      `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}`
     );
 
     this.scheduleRetry(failureId);

@@ -54,7 +54,7 @@ describe('End-to-End Announcement Workflows', () => {
       const videoId = 'dQw4w9WgXcQ';
       const notification = createMockPubSubNotification(videoId);
 
-      const parseNotification = (xmlData) => {
+      const parseNotification = xmlData => {
         const videoIdMatch = xmlData.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
         const publishedMatch = xmlData.match(/<published>([^<]+)<\/published>/);
 
@@ -93,7 +93,7 @@ describe('End-to-End Announcement Workflows', () => {
       });
 
       // Step 5: Create Discord embed
-      const createVideoEmbed = (video) => ({
+      const createVideoEmbed = video => ({
         title: `🎥 New Video: ${video.snippet.title}`,
         url: `https://www.youtube.com/watch?v=${video.id}`,
         author: {
@@ -150,7 +150,7 @@ describe('End-to-End Announcement Workflows', () => {
         },
       });
 
-      const createLiveEmbed = (video) => ({
+      const createLiveEmbed = video => ({
         title: `🔴 LIVE NOW: ${video.snippet.title}`,
         url: `https://www.youtube.com/watch?v=${video.id}`,
         author: { name: video.snippet.channelTitle },
@@ -218,7 +218,7 @@ describe('End-to-End Announcement Workflows', () => {
       ];
 
       // Step 2: Filter by timestamp (after bot start)
-      const newPosts = scrapedPosts.filter((post) => {
+      const newPosts = scrapedPosts.filter(post => {
         const postTime = new Date(post.createdAt);
         return postTime > botStartTime;
       });
@@ -229,7 +229,7 @@ describe('End-to-End Announcement Workflows', () => {
       const knownTweetIds = new Set();
       const postUrlRegex = /https?:\/\/(?:[\w-]+\.)*(?:x\.com|twitter\.com)\/[^/]+\/status\/(\d+)/;
 
-      const processPost = (post) => {
+      const processPost = post => {
         const url = `https://x.com/${post.user.username}/status/${post.id}`;
         const match = url.match(postUrlRegex);
 
@@ -292,7 +292,7 @@ describe('End-to-End Announcement Workflows', () => {
         retweets: [createMockTweet({ text: 'RT @user: Original tweet', type: 'retweet' })],
       };
 
-      const routeContent = async (content) => {
+      const routeContent = async content => {
         const promises = [];
 
         if (content.posts.length > 0) {
@@ -329,7 +329,7 @@ describe('End-to-End Announcement Workflows', () => {
         user: { username: 'testuser' },
       });
 
-      const convertToVxTwitter = (twitterUrl) => {
+      const convertToVxTwitter = twitterUrl => {
         return twitterUrl.replace(/(https?:\/\/)?(?:www\.)?(twitter\.com|x\.com)/g, 'https://vxtwitter.com');
       };
 
@@ -430,7 +430,7 @@ describe('End-to-End Announcement Workflows', () => {
       expect(result2.duplicate).toBe(false); // Different text, but same video ID should be caught by video ID tracking
 
       // For proper duplicate detection, we need to extract and compare video IDs
-      const extractVideoId = (text) => {
+      const extractVideoId = text => {
         const match = text.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
         return match ? match[1] : null;
       };
@@ -543,7 +543,7 @@ describe('End-to-End Announcement Workflows', () => {
       expect(activityLogger.logs[2].level).toBe('warn');
 
       // Send logs to Discord support channel
-      const logSummary = activityLogger.logs.map((log) => `[${log.level.toUpperCase()}] ${log.message}`).join('\n');
+      const logSummary = activityLogger.logs.map(log => `[${log.level.toUpperCase()}] ${log.message}`).join('\n');
 
       await supportChannel.send({
         embeds: [
@@ -589,7 +589,7 @@ describe('End-to-End Announcement Workflows', () => {
       recordMetric('twitter', true);
       recordMetric('twitter', false);
 
-      const calculateSuccessRate = (platform) => {
+      const calculateSuccessRate = platform => {
         const platformMetrics = metrics[platform];
         return platformMetrics.total > 0 ? (platformMetrics.success / platformMetrics.total) * 100 : 0;
       };
@@ -686,7 +686,7 @@ describe('End-to-End Announcement Workflows', () => {
             {
               title: '🚨 System Anomaly Detected',
               description: alerts
-                .map((alert) => `**${alert.type}**: ${alert.value} (threshold: ${alert.threshold})`)
+                .map(alert => `**${alert.type}**: ${alert.value} (threshold: ${alert.threshold})`)
                 .join('\n'),
               color: 0xff0000,
               timestamp: new Date().toISOString(),

@@ -193,7 +193,7 @@ export class HttpService {
     for (const [key, value] of Object.entries(params)) {
       if (value !== null && value !== undefined) {
         if (Array.isArray(value)) {
-          value.forEach((v) => searchParams.append(key, v));
+          value.forEach(v => searchParams.append(key, v));
         } else {
           searchParams.append(key, value);
         }
@@ -210,8 +210,8 @@ export class HttpService {
    */
   joinUrlPath(...segments) {
     return segments
-      .filter((segment) => segment)
-      .map((segment) => segment.toString().replace(/^\/+|\/+$/g, ''))
+      .filter(segment => segment)
+      .map(segment => segment.toString().replace(/^\/+|\/+$/g, ''))
       .join('/');
   }
 

@@ -314,12 +314,12 @@ describe('Production Setup Validation', () => {
 
       // Should have file transport (check for DailyRotateFile name or similar)
       const fileTransport = logger.transports.find(
-        (t) => t.name === 'DailyRotateFile' || t.name === 'file' || t.constructor.name === 'DailyRotateFile',
+        t => t.name === 'DailyRotateFile' || t.name === 'file' || t.constructor.name === 'DailyRotateFile'
       );
       expect(fileTransport).toBeDefined();
 
       // Should have console transport
-      const consoleTransport = logger.transports.find((t) => t.name === 'console');
+      const consoleTransport = logger.transports.find(t => t.name === 'console');
       expect(consoleTransport).toBeDefined();
     });
 

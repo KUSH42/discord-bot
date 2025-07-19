@@ -85,7 +85,7 @@ export class YouTubeApiService extends YouTubeService {
       });
 
       // Get detailed info for each video
-      const videoIds = playlistResponse.data.items.map((item) => item.snippet.resourceId.videoId);
+      const videoIds = playlistResponse.data.items.map(item => item.snippet.resourceId.videoId);
 
       if (videoIds.length === 0) {
         return [];

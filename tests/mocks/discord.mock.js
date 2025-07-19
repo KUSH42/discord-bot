@@ -63,7 +63,7 @@ export const mockClient = {
   }),
   emit: jest.fn((event, ...args) => {
     if (eventHandlers.has(event)) {
-      eventHandlers.get(event).forEach((handler) => handler(...args));
+      eventHandlers.get(event).forEach(handler => handler(...args));
     }
   }),
   isReady: () => true,
@@ -112,7 +112,7 @@ export const createMockClient = () => {
     }),
     emit: jest.fn((event, ...args) => {
       if (freshEventHandlers.has(event)) {
-        freshEventHandlers.get(event).forEach((handler) => handler(...args));
+        freshEventHandlers.get(event).forEach(handler => handler(...args));
       }
     }),
   };

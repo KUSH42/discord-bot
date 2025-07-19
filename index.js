@@ -169,7 +169,7 @@ function setupGracefulShutdown(container) {
   process.on('SIGUSR2', () => shutdownHandler('SIGUSR2'));
 
   // Handle uncaught exceptions
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', error => {
     const logger = container.resolve('logger');
     logger.error('Uncaught Exception:', error);
     shutdownHandler('uncaughtException');
@@ -185,7 +185,7 @@ function setupGracefulShutdown(container) {
 
 // Only run when executed directly (not imported in tests)
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

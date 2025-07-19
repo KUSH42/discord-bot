@@ -46,7 +46,7 @@ export class DiscordClientService extends DiscordService {
    * Register a message event handler
    */
   onMessage(handler) {
-    const wrappedHandler = (message) => {
+    const wrappedHandler = message => {
       try {
         handler(message);
       } catch (error) {
@@ -86,7 +86,7 @@ export class DiscordClientService extends DiscordService {
    * Register an error event handler
    */
   onError(handler) {
-    const wrappedHandler = (error) => {
+    const wrappedHandler = error => {
       try {
         handler(error);
       } catch (handlerError) {

@@ -157,6 +157,7 @@ dist
 
 # Temporary documentation
 merge-strategies.md
+testing-gap-analysis.md
 
 # Secrets and credentials
 xush.env

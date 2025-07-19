@@ -65,7 +65,7 @@ export class BotApplication {
    */
   getAllowedUserIds() {
     const allowedUserIdsStr = this.config.get('ALLOWED_USER_IDS', '');
-    return allowedUserIdsStr ? allowedUserIdsStr.split(',').map((id) => id.trim()) : [];
+    return allowedUserIdsStr ? allowedUserIdsStr.split(',').map(id => id.trim()) : [];
   }
 
   /**
@@ -165,7 +165,7 @@ export class BotApplication {
 
       // Delay restart to ensure the message is sent
       setTimeout(() => {
-        this.exec(`sudo systemctl restart ${serviceName}`, (restartError) => {
+        this.exec(`sudo systemctl restart ${serviceName}`, restartError => {
           if (restartError) {
             this.logger.error(`systemctl restart failed: ${restartError}`);
             // We cannot reply here as the bot might be down
@@ -187,7 +187,7 @@ export class BotApplication {
    */
   setupEventHandlers() {
     // Message handler
-    const messageHandler = async (message) => {
+    const messageHandler = async message => {
       await this.handleMessage(message);
     };
 
@@ -197,7 +197,7 @@ export class BotApplication {
     };
 
     // Error handler
-    const errorHandler = (error) => {
+    const errorHandler = error => {
       this.handleError(error);
     };
 
@@ -208,9 +208,9 @@ export class BotApplication {
 
     // State change handlers
     this.eventCleanup.push(
-      this.state.subscribe('logLevel', (newLevel) => {
+      this.state.subscribe('logLevel', newLevel => {
         this.handleLogLevelChange(newLevel);
-      }),
+      })
     );
   }
 
@@ -259,7 +259,7 @@ export class BotApplication {
       if (!this.commandRateLimit.isAllowed(user.id)) {
         const remainingTime = Math.ceil(this.commandRateLimit.getRemainingTime(user.id) / 1000);
         await message.reply(
-          `🚫 Rate limit exceeded. Please wait ${remainingTime} seconds before using another command.`,
+          `🚫 Rate limit exceeded. Please wait ${remainingTime} seconds before using another command.`
         );
         this.logger.warn(`Rate limit exceeded for user ${user.tag} (${user.id})`);
         return;
@@ -320,7 +320,7 @@ export class BotApplication {
       // Log command execution
       if (result.logMessage && result.userId) {
         this.logger.warn(
-          `${user.tag} (${user.id}) executed ${this.commandPrefix}${command} command. ${result.logMessage}`,
+          `${user.tag} (${user.id}) executed ${this.commandPrefix}${command} command. ${result.logMessage}`
         );
       }
 
@@ -404,7 +404,7 @@ export class BotApplication {
   createDetailedHealthEmbed(healthData) {
     const { bot, scraper, monitor, system } = healthData;
     const uptimeStr = new Date(system.uptime * 1000).toISOString().substr(11, 8);
-    const formatMemory = (bytes) => `${Math.round(bytes / 1024 / 1024)} MB`;
+    const formatMemory = bytes => `${Math.round(bytes / 1024 / 1024)} MB`;
     const nextPoll = scraper.pollingInterval.next;
     let nextPollStr = 'Not scheduled';
     if (scraper.isRunning) {
@@ -498,7 +498,7 @@ export class BotApplication {
             const videoResults = await duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 1000);
 
             this.logger.info(
-              `YouTube channel scan completed: ${videoResults.messagesScanned} messages, ${videoResults.videoIdsAdded} new video IDs found`,
+              `YouTube channel scan completed: ${videoResults.messagesScanned} messages, ${videoResults.videoIdsAdded} new video IDs found`
             );
 
             if (videoResults.errors.length > 0) {
@@ -533,7 +533,7 @@ export class BotApplication {
                 const tweetResults = await scraperDuplicateDetector.scanDiscordChannelForTweets(channel, 1000);
 
                 this.logger.info(
-                  `${channelConfig.name} channel scan completed: ${tweetResults.messagesScanned} messages, ${tweetResults.tweetIdsAdded} new tweet IDs found`,
+                  `${channelConfig.name} channel scan completed: ${tweetResults.messagesScanned} messages, ${tweetResults.tweetIdsAdded} new tweet IDs found`
                 );
 
                 if (tweetResults.errors.length > 0) {
@@ -584,7 +584,7 @@ export class BotApplication {
 
         // Update transport levels
         if (this.logger.transports) {
-          this.logger.transports.forEach((transport) => {
+          this.logger.transports.forEach(transport => {
             transport.level = newLevel;
           });
         }

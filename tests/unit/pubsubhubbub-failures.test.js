@@ -143,7 +143,7 @@ describe('PubSubHubbub Failure Handling Tests', () => {
 
       expect(mockYouTubeMonitor.handleFailedNotification).toHaveBeenCalledWith(
         malformedXML,
-        expect.objectContaining({ message: 'Invalid XML structure: missing feed element' }),
+        expect.objectContaining({ message: 'Invalid XML structure: missing feed element' })
       );
     });
 
@@ -206,7 +206,7 @@ describe('PubSubHubbub Failure Handling Tests', () => {
       }
 
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Received PubSubHubbub notification without X-Hub-Signature header. Rejecting.',
+        'Received PubSubHubbub notification without X-Hub-Signature header. Rejecting.'
       );
       expect(mockResponse.status).toHaveBeenCalledWith(403);
     });
@@ -230,7 +230,7 @@ describe('PubSubHubbub Failure Handling Tests', () => {
       try {
         isValidSignature = crypto.timingSafeEqual(
           Buffer.from(expectedSignature, 'hex'),
-          Buffer.from(providedSignature, 'hex'),
+          Buffer.from(providedSignature, 'hex')
         );
       } catch (error) {
         // Different lengths will cause timingSafeEqual to throw
@@ -271,7 +271,7 @@ describe('PubSubHubbub Failure Handling Tests', () => {
 
       const isValidSignature = crypto.timingSafeEqual(
         Buffer.from(expectedSignature, 'hex'),
-        Buffer.from(providedSignature, 'hex'),
+        Buffer.from(providedSignature, 'hex')
       );
 
       expect(isValidSignature).toBe(false);
@@ -326,10 +326,10 @@ describe('PubSubHubbub Failure Handling Tests', () => {
         });
 
         this.recentFailures.push(now);
-        this.recentFailures = this.recentFailures.filter((timestamp) => now.getTime() - timestamp.getTime() < 30000);
+        this.recentFailures = this.recentFailures.filter(timestamp => now.getTime() - timestamp.getTime() < 30000);
 
         this.logger.warn(
-          `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}, Total failures: ${this.fallbackMetrics.totalNotificationFailures}`,
+          `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}, Total failures: ${this.fallbackMetrics.totalNotificationFailures}`
         );
 
         this.scheduleRetry(failureId);

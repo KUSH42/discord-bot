@@ -104,7 +104,7 @@ export class DependencyContainer {
   createInstance(token, service) {
     try {
       // Resolve dependencies
-      const resolvedDependencies = service.dependencies.map((dep) => this.resolve(dep));
+      const resolvedDependencies = service.dependencies.map(dep => this.resolve(dep));
 
       // Call factory with dependencies
       const instance = service.factory(this, ...resolvedDependencies);
@@ -190,7 +190,7 @@ export class DependencyContainer {
     const visited = new Set();
     const visiting = new Set();
 
-    const visitService = (token) => {
+    const visitService = token => {
       if (visiting.has(token)) {
         throw new Error(`Circular dependency detected involving '${token}'`);
       }

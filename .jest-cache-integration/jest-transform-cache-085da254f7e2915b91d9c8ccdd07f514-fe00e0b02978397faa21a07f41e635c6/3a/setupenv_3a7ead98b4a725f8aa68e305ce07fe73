@@ -1,0 +1,8 @@
+6024db55de2fb829e24bb88181c1ce82
+// This script runs before your tests, loading the correct environment file.
+// Note: I'm putting this in a `scripts` directory for organization.
+import { config } from '@dotenvx/dotenvx';
+config({
+  path: './tests/test.env'
+});
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJjb25maWciLCJwYXRoIl0sInNvdXJjZXMiOlsic2V0dXAtZW52LmpzIl0sInNvdXJjZXNDb250ZW50IjpbIi8vIFRoaXMgc2NyaXB0IHJ1bnMgYmVmb3JlIHlvdXIgdGVzdHMsIGxvYWRpbmcgdGhlIGNvcnJlY3QgZW52aXJvbm1lbnQgZmlsZS5cbi8vIE5vdGU6IEknbSBwdXR0aW5nIHRoaXMgaW4gYSBgc2NyaXB0c2AgZGlyZWN0b3J5IGZvciBvcmdhbml6YXRpb24uXG5pbXBvcnQgeyBjb25maWcgfSBmcm9tICdAZG90ZW52eC9kb3RlbnZ4JztcbmNvbmZpZyh7IHBhdGg6ICcuL3Rlc3RzL3Rlc3QuZW52JyB9KTtcbiJdLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBLFNBQVNBLE1BQU0sUUFBUSxrQkFBa0I7QUFDekNBLE1BQU0sQ0FBQztFQUFFQyxJQUFJLEVBQUU7QUFBbUIsQ0FBQyxDQUFDIiwiaWdub3JlTGlzdCI6W119

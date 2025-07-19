@@ -59,7 +59,7 @@ describe('Logger Utils Tests', () => {
       }
 
       // Wait for flush
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
       expect(mockChannel.send).toHaveBeenCalled();
     });
 
@@ -125,7 +125,7 @@ describe('Logger Utils Tests', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         '[DiscordTransport] Failed to flush log buffer to Discord:',
-        expect.any(Error),
+        expect.any(Error)
       );
 
       consoleSpy.mockRestore();
@@ -152,7 +152,7 @@ describe('Logger Utils Tests', () => {
       await transport.log({ level: 'info', message: 'Periodic test' }, callback);
 
       // Wait for periodic flush
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 150));
       expect(mockChannel.send).toHaveBeenCalled();
     });
   });

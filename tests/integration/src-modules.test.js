@@ -237,7 +237,7 @@ describe('Source Module Integration Tests', () => {
           level: 'info',
           message: longLogMessage,
         },
-        callback,
+        callback
       );
 
       // Manually trigger flush since periodic flushing is disabled in test mode

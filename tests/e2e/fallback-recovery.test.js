@@ -88,7 +88,7 @@ describe('End-to-End Fallback Recovery Tests', () => {
 
     // Clear all scheduled timers to prevent open handles
     if (mockYouTubeMonitor.timers) {
-      mockYouTubeMonitor.timers.forEach((timer) => clearTimeout(timer));
+      mockYouTubeMonitor.timers.forEach(timer => clearTimeout(timer));
       mockYouTubeMonitor.timers = [];
     }
 
@@ -147,7 +147,7 @@ describe('End-to-End Fallback Recovery Tests', () => {
         await mockYouTubeMonitor.handleFailedNotification(failure.xml, failure.error);
 
         // Small delay to simulate realistic timing
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
 
       // Should have triggered API fallback after multiple failures
@@ -188,7 +188,7 @@ describe('End-to-End Fallback Recovery Tests', () => {
 
       mockYouTubeAPI.videos.list.mockResolvedValue({
         data: {
-          items: missedVideos.map((v) => ({
+          items: missedVideos.map(v => ({
             id: v.id.videoId,
             snippet: v.snippet,
             contentDetails: { duration: 'PT5M' },
@@ -419,10 +419,10 @@ async function handleFailedNotificationImpl(rawXML, error) {
   });
 
   this.recentFailures.push(now);
-  this.recentFailures = this.recentFailures.filter((timestamp) => now.getTime() - timestamp.getTime() < 30000);
+  this.recentFailures = this.recentFailures.filter(timestamp => now.getTime() - timestamp.getTime() < 30000);
 
   this.logger.warn(
-    `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}, Total failures: ${this.fallbackMetrics.totalNotificationFailures}`,
+    `Failed notification queued for retry. Failure ID: ${failureId}, Recent failures: ${this.recentFailures.length}, Total failures: ${this.fallbackMetrics.totalNotificationFailures}`
   );
 
   this.scheduleRetry(failureId);

@@ -70,7 +70,7 @@ export const mockPage = {
   press: jest.fn().mockResolvedValue(),
   screenshot: jest.fn().mockResolvedValue(Buffer.from('mock-screenshot')),
   content: jest.fn().mockResolvedValue('<html>Mock page content</html>'),
-  evaluate: jest.fn().mockImplementation((fn) => fn()),
+  evaluate: jest.fn().mockImplementation(fn => fn()),
   locator: jest.fn().mockReturnValue({
     textContent: jest.fn().mockResolvedValue('Mock text'),
     getAttribute: jest.fn().mockResolvedValue('mock-attribute'),

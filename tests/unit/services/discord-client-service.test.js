@@ -52,7 +52,7 @@ describe('Discord Client Service', () => {
     const message = 'This should fail';
 
     await expect(discordClientService.sendMessage(channelId, message)).rejects.toThrow(
-      'Channel 54321 is not a valid text channel',
+      'Channel 54321 is not a valid text channel'
     );
   });
 
@@ -63,7 +63,7 @@ describe('Discord Client Service', () => {
     const message = 'This should also fail';
 
     await expect(discordClientService.sendMessage(channelId, message)).rejects.toThrow(
-      'Channel nonexistent is not a valid text channel',
+      'Channel nonexistent is not a valid text channel'
     );
   });
 });

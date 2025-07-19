@@ -179,7 +179,7 @@ describe('BotApplication', () => {
       botApplication.buildInfo = { version: '1.0', build: '123' };
 
       const embed = botApplication.createDetailedHealthEmbed(healthData);
-      const nextPollField = embed.fields.find((f) => f.name === '⏳ Next X Poll');
+      const nextPollField = embed.fields.find(f => f.name === '⏳ Next X Poll');
 
       expect(nextPollField).toBeDefined();
       expect(nextPollField.value).toBe('In progress...');

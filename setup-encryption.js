@@ -16,8 +16,8 @@ function question(prompt) {
     output: process.stdout,
   });
 
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
+  return new Promise(resolve => {
+    rl.question(prompt, answer => {
       rl.close();
       resolve(answer);
     });
@@ -25,9 +25,9 @@ function question(prompt) {
 }
 
 async function checkDotenvxInstalled() {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const child = spawn('npx', ['dotenvx', '--version'], { stdio: 'pipe' });
-    child.on('close', (code) => {
+    child.on('close', code => {
       resolve(code === 0);
     });
   });
@@ -36,7 +36,7 @@ async function checkDotenvxInstalled() {
 async function runCommand(command, args = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: 'inherit' });
-    child.on('close', (code) => {
+    child.on('close', code => {
       if (code === 0) {
         resolve();
       } else {

@@ -81,7 +81,7 @@ describe('URL Regex Pattern Tests', () => {
         'https://not-youtube.com/watch?v=dQw4w9WgXcQ',
       ];
 
-      invalidUrls.forEach((url) => {
+      invalidUrls.forEach(url => {
         const matches = [...url.matchAll(videoUrlRegex)];
         expect(matches).toHaveLength(0);
       });
@@ -91,14 +91,14 @@ describe('URL Regex Pattern Tests', () => {
       const validIds = ['dQw4w9WgXcQ', 'abc123456_7', 'DEF-9876543'];
       const invalidIds = ['short', 'toolongvideoid1', 'invalid@id'];
 
-      validIds.forEach((id) => {
+      validIds.forEach(id => {
         const url = `https://www.youtube.com/watch?v=${id}`;
         const matches = [...url.matchAll(videoUrlRegex)];
         expect(matches).toHaveLength(1);
         expect(matches[0][1]).toBe(id);
       });
 
-      invalidIds.forEach((id) => {
+      invalidIds.forEach(id => {
         const url = `https://www.youtube.com/watch?v=${id}`;
         const matches = [...url.matchAll(videoUrlRegex)];
         // Invalid IDs should not match or match with different length
@@ -182,7 +182,7 @@ describe('URL Regex Pattern Tests', () => {
         'https://not-twitter.com/user/status/123',
       ];
 
-      invalidUrls.forEach((url) => {
+      invalidUrls.forEach(url => {
         const matches = [...url.matchAll(tweetUrlRegex)];
         expect(matches).toHaveLength(0);
       });
@@ -192,14 +192,14 @@ describe('URL Regex Pattern Tests', () => {
       const validIds = ['1234567890123456789', '1234567890', '999999999999999999'];
       const invalidIds = ['abc123', '123abc', '123-456', '123', '1']; // Short IDs are invalid
 
-      validIds.forEach((id) => {
+      validIds.forEach(id => {
         const url = `https://x.com/user/status/${id}`;
         const matches = [...url.matchAll(tweetUrlRegex)];
         expect(matches).toHaveLength(1);
         expect(matches[0][1]).toBe(id);
       });
 
-      invalidIds.forEach((id) => {
+      invalidIds.forEach(id => {
         const url = `https://x.com/user/status/${id}`;
         const matches = [...url.matchAll(tweetUrlRegex)];
         // Invalid IDs should not match (non-numeric or too short IDs won't match)

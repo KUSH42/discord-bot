@@ -8,7 +8,7 @@ import { jest } from '@jest/globals';
 // Test timing utilities
 export const timing = {
   // Measure execution time of a function
-  measure: async (fn) => {
+  measure: async fn => {
     const start = performance.now();
     const result = await fn();
     const end = performance.now();
@@ -20,7 +20,7 @@ export const timing = {
   },
 
   // Wait for a specified time
-  wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
 
   // Wait for a condition to be true
   waitFor: async (condition, timeout = 5000, interval = 100) => {
@@ -67,7 +67,7 @@ export const memory = {
   },
 
   // Monitor memory usage during test execution
-  monitor: async (testFn) => {
+  monitor: async testFn => {
     const initialMemory = memory.getUsage();
 
     // Force garbage collection if available
@@ -94,7 +94,7 @@ export const memory = {
   },
 
   // Format memory size for display
-  formatBytes: (bytes) => {
+  formatBytes: bytes => {
     if (bytes === 0) {
       return '0 B';
     }
@@ -119,7 +119,7 @@ export const mocks = {
       return callIndex >= 0 ? calls[callIndex] : calls[calls.length - 1];
     };
     mockFn.wasCalledWith = (...args) => {
-      return mockFn.mock.calls.some((call) => call.length === args.length && call.every((arg, i) => arg === args[i]));
+      return mockFn.mock.calls.some(call => call.length === args.length && call.every((arg, i) => arg === args[i]));
     };
 
     return mockFn;
@@ -134,7 +134,7 @@ export const mocks = {
           await timing.wait(delay);
         }
         return resolveValue;
-      }),
+      })
     );
   },
 
@@ -149,13 +149,13 @@ export const mocks = {
           throw new Error(errorMessage);
         }
         return { success: true, callCount };
-      }),
+      })
     );
   },
 
   // Reset all mocks in an object
-  resetAllMocks: (mockObject) => {
-    Object.values(mockObject).forEach((mock) => {
+  resetAllMocks: mockObject => {
+    Object.values(mockObject).forEach(mock => {
       if (jest.isMockFunction(mock)) {
         mock.mockReset();
       }
@@ -237,8 +237,8 @@ export const assertions = {
       }
     }
 
-    const successful = results.filter((r) => r.success);
-    const failed = results.filter((r) => !r.success);
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
 
     expect(successful.length).toBeLessThanOrEqual(maxRequests);
     expect(failed.length).toBeGreaterThan(0);
@@ -248,22 +248,22 @@ export const assertions = {
 // Test data validation
 export const validation = {
   // Validate Discord snowflake ID format
-  isValidDiscordId: (id) => {
+  isValidDiscordId: id => {
     return typeof id === 'string' && /^\d{17,19}$/.test(id);
   },
 
   // Validate YouTube video ID format
-  isValidYouTubeId: (id) => {
+  isValidYouTubeId: id => {
     return typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id);
   },
 
   // Validate Twitter/X status ID format
-  isValidTwitterId: (id) => {
+  isValidTwitterId: id => {
     return typeof id === 'string' && /^\d{1,19}$/.test(id);
   },
 
   // Validate timestamp format
-  isValidTimestamp: (timestamp) => {
+  isValidTimestamp: timestamp => {
     if (typeof timestamp !== 'string') {
       return false;
     }
@@ -333,7 +333,7 @@ export const environment = {
     const originalEnv = { ...process.env };
 
     // Clear relevant environment variables
-    Object.keys(process.env).forEach((key) => {
+    Object.keys(process.env).forEach(key => {
       if (
         key.startsWith('DISCORD_') ||
         key.startsWith('YOUTUBE_') ||
@@ -364,18 +364,18 @@ export const environment = {
 
     return {
       addMock: (name, mock) => mocks.set(name, mock),
-      getMock: (name) => mocks.get(name),
-      addTimer: (timer) => timers.push(timer),
+      getMock: name => mocks.get(name),
+      addTimer: timer => timers.push(timer),
       cleanup: () => {
         // Clear all mocks
-        mocks.forEach((mock) => {
+        mocks.forEach(mock => {
           if (jest.isMockFunction(mock)) {
             mock.mockRestore();
           }
         });
 
         // Clear all timers
-        timers.forEach((timer) => clearTimeout(timer));
+        timers.forEach(timer => clearTimeout(timer));
 
         mocks.clear();
         timers.length = 0;
@@ -400,13 +400,13 @@ export const logging = {
         });
       },
       getLogs: (level = null) => {
-        return level ? logs.filter((log) => log.level === level) : logs;
+        return level ? logs.filter(log => log.level === level) : logs;
       },
       clear: () => {
         logs.length = 0;
       },
       getLogCount: (level = null) => {
-        return level ? logs.filter((log) => log.level === level).length : logs.length;
+        return level ? logs.filter(log => log.level === level).length : logs.length;
       },
     };
   },
@@ -421,7 +421,7 @@ export const logging = {
       debug: console.debug,
     };
 
-    Object.keys(originalMethods).forEach((method) => {
+    Object.keys(originalMethods).forEach(method => {
       console[method] = jest.fn();
     });
 
@@ -470,7 +470,7 @@ export const network = {
         const windowStart = now - windowMs;
 
         // Remove old requests
-        const validRequests = requests.filter((timestamp) => timestamp > windowStart);
+        const validRequests = requests.filter(timestamp => timestamp > windowStart);
         requests.length = 0;
         requests.push(...validRequests);
 
@@ -491,11 +491,11 @@ export const network = {
 // Test reporting utilities
 export const reporting = {
   // Generate test summary
-  generateSummary: (testResults) => {
+  generateSummary: testResults => {
     const summary = {
       total: testResults.length,
-      passed: testResults.filter((r) => r.passed).length,
-      failed: testResults.filter((r) => !r.passed).length,
+      passed: testResults.filter(r => r.passed).length,
+      failed: testResults.filter(r => !r.passed).length,
       duration: testResults.reduce((sum, r) => sum + (r.duration || 0), 0),
       coverage: {
         statements: 0,
@@ -511,7 +511,7 @@ export const reporting = {
   },
 
   // Format test results for display
-  formatResults: (summary) => {
+  formatResults: summary => {
     return `
 Test Summary:
   Total: ${summary.total}

@@ -26,8 +26,8 @@ describe('Retweet Workflows Integration', () => {
     };
 
     return {
-      get: jest.fn((key) => defaultValues[key]),
-      getRequired: jest.fn((key) => defaultValues[key]),
+      get: jest.fn(key => defaultValues[key]),
+      getRequired: jest.fn(key => defaultValues[key]),
       getBoolean: jest.fn((key, defaultValue) => {
         const value = defaultValues[key];
         return value !== undefined ? value : defaultValue;
@@ -66,7 +66,7 @@ describe('Retweet Workflows Integration', () => {
     it('should detect retweets using socialContext and route to correct channel', async () => {
       // Mock tweet element with socialContext
       const mockTweetElement = {
-        querySelector: jest.fn((selector) => {
+        querySelector: jest.fn(selector => {
           if (selector === '[data-testid="socialContext"]') {
             return {
               textContent: 'The Enforcer reposted',
@@ -142,7 +142,7 @@ describe('Retweet Workflows Integration', () => {
         {
           name: 'socialContext detection',
           mockElement: {
-            querySelector: jest.fn((selector) => {
+            querySelector: jest.fn(selector => {
               if (selector === '[data-testid="socialContext"]') {
                 return { textContent: 'User reposted' };
               }
@@ -154,7 +154,7 @@ describe('Retweet Workflows Integration', () => {
         {
           name: 'text pattern detection',
           mockElement: {
-            querySelector: jest.fn((selector) => {
+            querySelector: jest.fn(selector => {
               if (selector === '[data-testid="tweetText"], [lang] span, div[dir="ltr"]') {
                 return { textContent: 'RT @user This is a retweet' };
               }
@@ -252,7 +252,7 @@ describe('Retweet Workflows Integration', () => {
     it('should handle invalid DOM elements in enhanced detection', () => {
       const invalidElements = [null, undefined, {}, { querySelector: null }];
 
-      invalidElements.forEach((element) => {
+      invalidElements.forEach(element => {
         const result = classifier.enhancedRetweetDetection(element);
 
         expect(result.isRetweet).toBe(false);
@@ -267,7 +267,7 @@ describe('Retweet Workflows Integration', () => {
       const mockElements = Array(10)
         .fill(null)
         .map((_, i) => ({
-          querySelector: jest.fn((selector) => {
+          querySelector: jest.fn(selector => {
             if (selector === '[data-testid="socialContext"]') {
               return { textContent: `User${i} reposted` };
             }
@@ -275,14 +275,14 @@ describe('Retweet Workflows Integration', () => {
           }),
         }));
 
-      const detectionPromises = mockElements.map((element) =>
-        Promise.resolve(classifier.enhancedRetweetDetection(element)),
+      const detectionPromises = mockElements.map(element =>
+        Promise.resolve(classifier.enhancedRetweetDetection(element))
       );
 
       const results = await Promise.all(detectionPromises);
 
       expect(results).toHaveLength(10);
-      results.forEach((result) => {
+      results.forEach(result => {
         expect(result.isRetweet).toBe(true);
         expect(result.method).toBe('socialContext');
       });
@@ -301,12 +301,12 @@ describe('Retweet Workflows Integration', () => {
           tweetCategory: 'Retweet',
         }));
 
-      const announcePromises = retweetContents.map((content) => announcer.announceContent(content));
+      const announcePromises = retweetContents.map(content => announcer.announceContent(content));
 
       const results = await Promise.all(announcePromises);
 
       expect(results).toHaveLength(5);
-      results.forEach((result) => {
+      results.forEach(result => {
         expect(result.success).toBe(true);
       });
 

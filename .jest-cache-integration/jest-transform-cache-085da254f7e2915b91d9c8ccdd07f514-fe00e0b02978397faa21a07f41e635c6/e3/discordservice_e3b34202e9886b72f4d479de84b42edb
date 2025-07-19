@@ -1,0 +1,173 @@
+845469f2af9c69feaa445d8bdc22f71a
+/**
+ * Abstract Discord service interface
+ * Defines the contract for Discord operations that can be mocked in tests
+ */
+export class DiscordService {
+  /**
+   * Login to Discord with bot token
+   * @param {string} token - Discord bot token
+   * @returns {Promise<void>}
+   */
+  async login(token) {
+    throw new Error('Abstract method: login must be implemented');
+  }
+
+  /**
+   * Send a message to a Discord channel
+   * @param {string} channelId - Discord channel ID
+   * @param {string|Object} content - Message content (string or embed object)
+   * @returns {Promise<Object>} Message object
+   */
+  async sendMessage(channelId, content) {
+    throw new Error('Abstract method: sendMessage must be implemented');
+  }
+
+  /**
+   * Fetch a Discord channel
+   * @param {string} channelId - Discord channel ID
+   * @returns {Promise<Object>} Channel object
+   */
+  async fetchChannel(channelId) {
+    throw new Error('Abstract method: fetchChannel must be implemented');
+  }
+
+  /**
+   * Fetch a Discord guild
+   * @param {string} guildId - Discord guild ID
+   * @returns {Promise<Object>} Guild object
+   */
+  async fetchGuild(guildId) {
+    throw new Error('Abstract method: fetchGuild must be implemented');
+  }
+
+  /**
+   * Register a message event handler
+   * @param {Function} handler - Message handler function
+   * @returns {Function} Unregister function
+   */
+  onMessage(handler) {
+    throw new Error('Abstract method: onMessage must be implemented');
+  }
+
+  /**
+   * Register a ready event handler
+   * @param {Function} handler - Ready handler function
+   * @returns {Function} Unregister function
+   */
+  onReady(handler) {
+    throw new Error('Abstract method: onReady must be implemented');
+  }
+
+  /**
+   * Register an error event handler
+   * @param {Function} handler - Error handler function
+   * @returns {Function} Unregister function
+   */
+  onError(handler) {
+    throw new Error('Abstract method: onError must be implemented');
+  }
+
+  /**
+   * Get current user information
+   * @returns {Promise<Object>} User object
+   */
+  async getCurrentUser() {
+    throw new Error('Abstract method: getCurrentUser must be implemented');
+  }
+
+  /**
+   * Check if the bot is logged in and ready
+   * @returns {boolean} True if ready
+   */
+  isReady() {
+    throw new Error('Abstract method: isReady must be implemented');
+  }
+
+  /**
+   * Get bot latency/ping
+   * @returns {number} Latency in milliseconds
+   */
+  getLatency() {
+    throw new Error('Abstract method: getLatency must be implemented');
+  }
+
+  /**
+   * Destroy the Discord client connection
+   * @returns {Promise<void>}
+   */
+  async destroy() {
+    throw new Error('Abstract method: destroy must be implemented');
+  }
+
+  /**
+   * Edit a message
+   * @param {string} channelId - Discord channel ID
+   * @param {string} messageId - Message ID to edit
+   * @param {string|Object} newContent - New message content
+   * @returns {Promise<Object>} Updated message object
+   */
+  async editMessage(channelId, messageId, newContent) {
+    throw new Error('Abstract method: editMessage must be implemented');
+  }
+
+  /**
+   * Delete a message
+   * @param {string} channelId - Discord channel ID
+   * @param {string} messageId - Message ID to delete
+   * @returns {Promise<void>}
+   */
+  async deleteMessage(channelId, messageId) {
+    throw new Error('Abstract method: deleteMessage must be implemented');
+  }
+
+  /**
+   * Add a reaction to a message
+   * @param {string} channelId - Discord channel ID
+   * @param {string} messageId - Message ID
+   * @param {string} emoji - Emoji to add
+   * @returns {Promise<void>}
+   */
+  async addReaction(channelId, messageId, emoji) {
+    throw new Error('Abstract method: addReaction must be implemented');
+  }
+
+  /**
+   * Get user from guild
+   * @param {string} guildId - Guild ID
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Guild member object
+   */
+  async getGuildMember(guildId, userId) {
+    throw new Error('Abstract method: getGuildMember must be implemented');
+  }
+
+  /**
+   * Check if user has permission in channel
+   * @param {string} channelId - Channel ID
+   * @param {string} userId - User ID
+   * @param {string} permission - Permission to check
+   * @returns {Promise<boolean>} True if user has permission
+   */
+  async hasPermission(channelId, userId, permission) {
+    throw new Error('Abstract method: hasPermission must be implemented');
+  }
+
+  /**
+   * Set bot presence/status
+   * @param {Object} presence - Presence object
+   * @returns {Promise<void>}
+   */
+  async setPresence(presence) {
+    throw new Error('Abstract method: setPresence must be implemented');
+  }
+
+  /**
+   * Dispose of resources
+   * @returns {Promise<void>}
+   */
+  async dispose() {
+    await this.destroy();
+  }
+}
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJEaXNjb3JkU2VydmljZSIsImxvZ2luIiwidG9rZW4iLCJFcnJvciIsInNlbmRNZXNzYWdlIiwiY2hhbm5lbElkIiwiY29udGVudCIsImZldGNoQ2hhbm5lbCIsImZldGNoR3VpbGQiLCJndWlsZElkIiwib25NZXNzYWdlIiwiaGFuZGxlciIsIm9uUmVhZHkiLCJvbkVycm9yIiwiZ2V0Q3VycmVudFVzZXIiLCJpc1JlYWR5IiwiZ2V0TGF0ZW5jeSIsImRlc3Ryb3kiLCJlZGl0TWVzc2FnZSIsIm1lc3NhZ2VJZCIsIm5ld0NvbnRlbnQiLCJkZWxldGVNZXNzYWdlIiwiYWRkUmVhY3Rpb24iLCJlbW9qaSIsImdldEd1aWxkTWVtYmVyIiwidXNlcklkIiwiaGFzUGVybWlzc2lvbiIsInBlcm1pc3Npb24iLCJzZXRQcmVzZW5jZSIsInByZXNlbmNlIiwiZGlzcG9zZSJdLCJzb3VyY2VzIjpbImRpc2NvcmQtc2VydmljZS5qcyJdLCJzb3VyY2VzQ29udGVudCI6WyIvKipcbiAqIEFic3RyYWN0IERpc2NvcmQgc2VydmljZSBpbnRlcmZhY2VcbiAqIERlZmluZXMgdGhlIGNvbnRyYWN0IGZvciBEaXNjb3JkIG9wZXJhdGlvbnMgdGhhdCBjYW4gYmUgbW9ja2VkIGluIHRlc3RzXG4gKi9cbmV4cG9ydCBjbGFzcyBEaXNjb3JkU2VydmljZSB7XG4gIC8qKlxuICAgKiBMb2dpbiB0byBEaXNjb3JkIHdpdGggYm90IHRva2VuXG4gICAqIEBwYXJhbSB7c3RyaW5nfSB0b2tlbiAtIERpc2NvcmQgYm90IHRva2VuXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPHZvaWQ+fVxuICAgKi9cbiAgYXN5bmMgbG9naW4odG9rZW4pIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogbG9naW4gbXVzdCBiZSBpbXBsZW1lbnRlZCcpO1xuICB9XG5cbiAgLyoqXG4gICAqIFNlbmQgYSBtZXNzYWdlIHRvIGEgRGlzY29yZCBjaGFubmVsXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBjaGFubmVsSWQgLSBEaXNjb3JkIGNoYW5uZWwgSURcbiAgICogQHBhcmFtIHtzdHJpbmd8T2JqZWN0fSBjb250ZW50IC0gTWVzc2FnZSBjb250ZW50IChzdHJpbmcgb3IgZW1iZWQgb2JqZWN0KVxuICAgKiBAcmV0dXJucyB7UHJvbWlzZTxPYmplY3Q+fSBNZXNzYWdlIG9iamVjdFxuICAgKi9cbiAgYXN5bmMgc2VuZE1lc3NhZ2UoY2hhbm5lbElkLCBjb250ZW50KSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdBYnN0cmFjdCBtZXRob2Q6IHNlbmRNZXNzYWdlIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBGZXRjaCBhIERpc2NvcmQgY2hhbm5lbFxuICAgKiBAcGFyYW0ge3N0cmluZ30gY2hhbm5lbElkIC0gRGlzY29yZCBjaGFubmVsIElEXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPE9iamVjdD59IENoYW5uZWwgb2JqZWN0XG4gICAqL1xuICBhc3luYyBmZXRjaENoYW5uZWwoY2hhbm5lbElkKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdBYnN0cmFjdCBtZXRob2Q6IGZldGNoQ2hhbm5lbCBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogRmV0Y2ggYSBEaXNjb3JkIGd1aWxkXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBndWlsZElkIC0gRGlzY29yZCBndWlsZCBJRFxuICAgKiBAcmV0dXJucyB7UHJvbWlzZTxPYmplY3Q+fSBHdWlsZCBvYmplY3RcbiAgICovXG4gIGFzeW5jIGZldGNoR3VpbGQoZ3VpbGRJZCkge1xuICAgIHRocm93IG5ldyBFcnJvcignQWJzdHJhY3QgbWV0aG9kOiBmZXRjaEd1aWxkIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBSZWdpc3RlciBhIG1lc3NhZ2UgZXZlbnQgaGFuZGxlclxuICAgKiBAcGFyYW0ge0Z1bmN0aW9ufSBoYW5kbGVyIC0gTWVzc2FnZSBoYW5kbGVyIGZ1bmN0aW9uXG4gICAqIEByZXR1cm5zIHtGdW5jdGlvbn0gVW5yZWdpc3RlciBmdW5jdGlvblxuICAgKi9cbiAgb25NZXNzYWdlKGhhbmRsZXIpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogb25NZXNzYWdlIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBSZWdpc3RlciBhIHJlYWR5IGV2ZW50IGhhbmRsZXJcbiAgICogQHBhcmFtIHtGdW5jdGlvbn0gaGFuZGxlciAtIFJlYWR5IGhhbmRsZXIgZnVuY3Rpb25cbiAgICogQHJldHVybnMge0Z1bmN0aW9ufSBVbnJlZ2lzdGVyIGZ1bmN0aW9uXG4gICAqL1xuICBvblJlYWR5KGhhbmRsZXIpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogb25SZWFkeSBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogUmVnaXN0ZXIgYW4gZXJyb3IgZXZlbnQgaGFuZGxlclxuICAgKiBAcGFyYW0ge0Z1bmN0aW9ufSBoYW5kbGVyIC0gRXJyb3IgaGFuZGxlciBmdW5jdGlvblxuICAgKiBAcmV0dXJucyB7RnVuY3Rpb259IFVucmVnaXN0ZXIgZnVuY3Rpb25cbiAgICovXG4gIG9uRXJyb3IoaGFuZGxlcikge1xuICAgIHRocm93IG5ldyBFcnJvcignQWJzdHJhY3QgbWV0aG9kOiBvbkVycm9yIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBHZXQgY3VycmVudCB1c2VyIGluZm9ybWF0aW9uXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPE9iamVjdD59IFVzZXIgb2JqZWN0XG4gICAqL1xuICBhc3luYyBnZXRDdXJyZW50VXNlcigpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogZ2V0Q3VycmVudFVzZXIgbXVzdCBiZSBpbXBsZW1lbnRlZCcpO1xuICB9XG5cbiAgLyoqXG4gICAqIENoZWNrIGlmIHRoZSBib3QgaXMgbG9nZ2VkIGluIGFuZCByZWFkeVxuICAgKiBAcmV0dXJucyB7Ym9vbGVhbn0gVHJ1ZSBpZiByZWFkeVxuICAgKi9cbiAgaXNSZWFkeSgpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogaXNSZWFkeSBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogR2V0IGJvdCBsYXRlbmN5L3BpbmdcbiAgICogQHJldHVybnMge251bWJlcn0gTGF0ZW5jeSBpbiBtaWxsaXNlY29uZHNcbiAgICovXG4gIGdldExhdGVuY3koKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdBYnN0cmFjdCBtZXRob2Q6IGdldExhdGVuY3kgbXVzdCBiZSBpbXBsZW1lbnRlZCcpO1xuICB9XG5cbiAgLyoqXG4gICAqIERlc3Ryb3kgdGhlIERpc2NvcmQgY2xpZW50IGNvbm5lY3Rpb25cbiAgICogQHJldHVybnMge1Byb21pc2U8dm9pZD59XG4gICAqL1xuICBhc3luYyBkZXN0cm95KCkge1xuICAgIHRocm93IG5ldyBFcnJvcignQWJzdHJhY3QgbWV0aG9kOiBkZXN0cm95IG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBFZGl0IGEgbWVzc2FnZVxuICAgKiBAcGFyYW0ge3N0cmluZ30gY2hhbm5lbElkIC0gRGlzY29yZCBjaGFubmVsIElEXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBtZXNzYWdlSWQgLSBNZXNzYWdlIElEIHRvIGVkaXRcbiAgICogQHBhcmFtIHtzdHJpbmd8T2JqZWN0fSBuZXdDb250ZW50IC0gTmV3IG1lc3NhZ2UgY29udGVudFxuICAgKiBAcmV0dXJucyB7UHJvbWlzZTxPYmplY3Q+fSBVcGRhdGVkIG1lc3NhZ2Ugb2JqZWN0XG4gICAqL1xuICBhc3luYyBlZGl0TWVzc2FnZShjaGFubmVsSWQsIG1lc3NhZ2VJZCwgbmV3Q29udGVudCkge1xuICAgIHRocm93IG5ldyBFcnJvcignQWJzdHJhY3QgbWV0aG9kOiBlZGl0TWVzc2FnZSBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogRGVsZXRlIGEgbWVzc2FnZVxuICAgKiBAcGFyYW0ge3N0cmluZ30gY2hhbm5lbElkIC0gRGlzY29yZCBjaGFubmVsIElEXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBtZXNzYWdlSWQgLSBNZXNzYWdlIElEIHRvIGRlbGV0ZVxuICAgKiBAcmV0dXJucyB7UHJvbWlzZTx2b2lkPn1cbiAgICovXG4gIGFzeW5jIGRlbGV0ZU1lc3NhZ2UoY2hhbm5lbElkLCBtZXNzYWdlSWQpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogZGVsZXRlTWVzc2FnZSBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogQWRkIGEgcmVhY3Rpb24gdG8gYSBtZXNzYWdlXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBjaGFubmVsSWQgLSBEaXNjb3JkIGNoYW5uZWwgSURcbiAgICogQHBhcmFtIHtzdHJpbmd9IG1lc3NhZ2VJZCAtIE1lc3NhZ2UgSURcbiAgICogQHBhcmFtIHtzdHJpbmd9IGVtb2ppIC0gRW1vamkgdG8gYWRkXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPHZvaWQ+fVxuICAgKi9cbiAgYXN5bmMgYWRkUmVhY3Rpb24oY2hhbm5lbElkLCBtZXNzYWdlSWQsIGVtb2ppKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdBYnN0cmFjdCBtZXRob2Q6IGFkZFJlYWN0aW9uIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBHZXQgdXNlciBmcm9tIGd1aWxkXG4gICAqIEBwYXJhbSB7c3RyaW5nfSBndWlsZElkIC0gR3VpbGQgSURcbiAgICogQHBhcmFtIHtzdHJpbmd9IHVzZXJJZCAtIFVzZXIgSURcbiAgICogQHJldHVybnMge1Byb21pc2U8T2JqZWN0Pn0gR3VpbGQgbWVtYmVyIG9iamVjdFxuICAgKi9cbiAgYXN5bmMgZ2V0R3VpbGRNZW1iZXIoZ3VpbGRJZCwgdXNlcklkKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdBYnN0cmFjdCBtZXRob2Q6IGdldEd1aWxkTWVtYmVyIG11c3QgYmUgaW1wbGVtZW50ZWQnKTtcbiAgfVxuXG4gIC8qKlxuICAgKiBDaGVjayBpZiB1c2VyIGhhcyBwZXJtaXNzaW9uIGluIGNoYW5uZWxcbiAgICogQHBhcmFtIHtzdHJpbmd9IGNoYW5uZWxJZCAtIENoYW5uZWwgSURcbiAgICogQHBhcmFtIHtzdHJpbmd9IHVzZXJJZCAtIFVzZXIgSURcbiAgICogQHBhcmFtIHtzdHJpbmd9IHBlcm1pc3Npb24gLSBQZXJtaXNzaW9uIHRvIGNoZWNrXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPGJvb2xlYW4+fSBUcnVlIGlmIHVzZXIgaGFzIHBlcm1pc3Npb25cbiAgICovXG4gIGFzeW5jIGhhc1Blcm1pc3Npb24oY2hhbm5lbElkLCB1c2VySWQsIHBlcm1pc3Npb24pIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogaGFzUGVybWlzc2lvbiBtdXN0IGJlIGltcGxlbWVudGVkJyk7XG4gIH1cblxuICAvKipcbiAgICogU2V0IGJvdCBwcmVzZW5jZS9zdGF0dXNcbiAgICogQHBhcmFtIHtPYmplY3R9IHByZXNlbmNlIC0gUHJlc2VuY2Ugb2JqZWN0XG4gICAqIEByZXR1cm5zIHtQcm9taXNlPHZvaWQ+fVxuICAgKi9cbiAgYXN5bmMgc2V0UHJlc2VuY2UocHJlc2VuY2UpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ0Fic3RyYWN0IG1ldGhvZDogc2V0UHJlc2VuY2UgbXVzdCBiZSBpbXBsZW1lbnRlZCcpO1xuICB9XG5cbiAgLyoqXG4gICAqIERpc3Bvc2Ugb2YgcmVzb3VyY2VzXG4gICAqIEByZXR1cm5zIHtQcm9taXNlPHZvaWQ+fVxuICAgKi9cbiAgYXN5bmMgZGlzcG9zZSgpIHtcbiAgICBhd2FpdCB0aGlzLmRlc3Ryb3koKTtcbiAgfVxufVxuIl0sIm1hcHBpbmdzIjoiQUFBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLE9BQU8sTUFBTUEsY0FBYyxDQUFDO0VBQzFCO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7RUFDRSxNQUFNQyxLQUFLQSxDQUFDQyxLQUFLLEVBQUU7SUFDakIsTUFBTSxJQUFJQyxLQUFLLENBQUMsNENBQTRDLENBQUM7RUFDL0Q7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0VBQ0UsTUFBTUMsV0FBV0EsQ0FBQ0MsU0FBUyxFQUFFQyxPQUFPLEVBQUU7SUFDcEMsTUFBTSxJQUFJSCxLQUFLLENBQUMsa0RBQWtELENBQUM7RUFDckU7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtFQUNFLE1BQU1JLFlBQVlBLENBQUNGLFNBQVMsRUFBRTtJQUM1QixNQUFNLElBQUlGLEtBQUssQ0FBQyxtREFBbUQsQ0FBQztFQUN0RTs7RUFFQTtBQUNGO0FBQ0E7QUFDQTtBQUNBO0VBQ0UsTUFBTUssVUFBVUEsQ0FBQ0MsT0FBTyxFQUFFO0lBQ3hCLE1BQU0sSUFBSU4sS0FBSyxDQUFDLGlEQUFpRCxDQUFDO0VBQ3BFOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7RUFDRU8sU0FBU0EsQ0FBQ0MsT0FBTyxFQUFFO0lBQ2pCLE1BQU0sSUFBSVIsS0FBSyxDQUFDLGdEQUFnRCxDQUFDO0VBQ25FOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7RUFDRVMsT0FBT0EsQ0FBQ0QsT0FBTyxFQUFFO0lBQ2YsTUFBTSxJQUFJUixLQUFLLENBQUMsOENBQThDLENBQUM7RUFDakU7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtFQUNFVSxPQUFPQSxDQUFDRixPQUFPLEVBQUU7SUFDZixNQUFNLElBQUlSLEtBQUssQ0FBQyw4Q0FBOEMsQ0FBQztFQUNqRTs7RUFFQTtBQUNGO0FBQ0E7QUFDQTtFQUNFLE1BQU1XLGNBQWNBLENBQUEsRUFBRztJQUNyQixNQUFNLElBQUlYLEtBQUssQ0FBQyxxREFBcUQsQ0FBQztFQUN4RTs7RUFFQTtBQUNGO0FBQ0E7QUFDQTtFQUNFWSxPQUFPQSxDQUFBLEVBQUc7SUFDUixNQUFNLElBQUlaLEtBQUssQ0FBQyw4Q0FBOEMsQ0FBQztFQUNqRTs7RUFFQTtBQUNGO0FBQ0E7QUFDQTtFQUNFYSxVQUFVQSxDQUFBLEVBQUc7SUFDWCxNQUFNLElBQUliLEtBQUssQ0FBQyxpREFBaUQsQ0FBQztFQUNwRTs7RUFFQTtBQUNGO0FBQ0E7QUFDQTtFQUNFLE1BQU1jLE9BQU9BLENBQUEsRUFBRztJQUNkLE1BQU0sSUFBSWQsS0FBSyxDQUFDLDhDQUE4QyxDQUFDO0VBQ2pFOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0VBQ0UsTUFBTWUsV0FBV0EsQ0FBQ2IsU0FBUyxFQUFFYyxTQUFTLEVBQUVDLFVBQVUsRUFBRTtJQUNsRCxNQUFNLElBQUlqQixLQUFLLENBQUMsa0RBQWtELENBQUM7RUFDckU7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0VBQ0UsTUFBTWtCLGFBQWFBLENBQUNoQixTQUFTLEVBQUVjLFNBQVMsRUFBRTtJQUN4QyxNQUFNLElBQUloQixLQUFLLENBQUMsb0RBQW9ELENBQUM7RUFDdkU7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7RUFDRSxNQUFNbUIsV0FBV0EsQ0FBQ2pCLFNBQVMsRUFBRWMsU0FBUyxFQUFFSSxLQUFLLEVBQUU7SUFDN0MsTUFBTSxJQUFJcEIsS0FBSyxDQUFDLGtEQUFrRCxDQUFDO0VBQ3JFOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7QUFDQTtFQUNFLE1BQU1xQixjQUFjQSxDQUFDZixPQUFPLEVBQUVnQixNQUFNLEVBQUU7SUFDcEMsTUFBTSxJQUFJdEIsS0FBSyxDQUFDLHFEQUFxRCxDQUFDO0VBQ3hFOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0VBQ0UsTUFBTXVCLGFBQWFBLENBQUNyQixTQUFTLEVBQUVvQixNQUFNLEVBQUVFLFVBQVUsRUFBRTtJQUNqRCxNQUFNLElBQUl4QixLQUFLLENBQUMsb0RBQW9ELENBQUM7RUFDdkU7O0VBRUE7QUFDRjtBQUNBO0FBQ0E7QUFDQTtFQUNFLE1BQU15QixXQUFXQSxDQUFDQyxRQUFRLEVBQUU7SUFDMUIsTUFBTSxJQUFJMUIsS0FBSyxDQUFDLGtEQUFrRCxDQUFDO0VBQ3JFOztFQUVBO0FBQ0Y7QUFDQTtBQUNBO0VBQ0UsTUFBTTJCLE9BQU9BLENBQUEsRUFBRztJQUNkLE1BQU0sSUFBSSxDQUFDYixPQUFPLENBQUMsQ0FBQztFQUN0QjtBQUNGIiwiaWdub3JlTGlzdCI6W119

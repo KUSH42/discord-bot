@@ -67,18 +67,18 @@ describe('Discord Transport Error Handling', () => {
       await transport.log({ level: 'info', message: 'test message' }, callback);
 
       // Give time for async operations
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(callback).toHaveBeenCalled();
       // Check that console.error was called with error information
       expect(consoleErrorSpy).toHaveBeenCalled();
       const consoleErrorCalls = consoleErrorSpy.mock.calls;
-      const hasDiscordTransportError = consoleErrorCalls.some((call) =>
+      const hasDiscordTransportError = consoleErrorCalls.some(call =>
         call.some(
-          (arg) =>
+          arg =>
             (typeof arg === 'string' && arg.includes('[DiscordTransport]')) ||
-            (arg instanceof Error && arg.message.includes('Expected token to be set')),
-        ),
+            (arg instanceof Error && arg.message.includes('Expected token to be set'))
+        )
       );
       expect(hasDiscordTransportError).toBe(true);
     });
@@ -101,7 +101,7 @@ describe('Discord Transport Error Handling', () => {
       expect(callback).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[DiscordTransport] Failed to fetch channel 123456789012345678:'),
-        expect.any(Error),
+        expect.any(Error)
       );
     });
 
@@ -121,7 +121,7 @@ describe('Discord Transport Error Handling', () => {
 
       expect(callback).toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[DiscordTransport] Channel 123456789012345678 is not a valid text channel.'),
+        expect.stringContaining('[DiscordTransport] Channel 123456789012345678 is not a valid text channel.')
       );
     });
   });
@@ -148,18 +148,18 @@ describe('Discord Transport Error Handling', () => {
       await transport.log({ level: 'info', message: 'test message' }, callback);
 
       // Wait for first flush attempt (should fail)
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Verify error was logged
       // Check that console.error was called with error information
       expect(consoleErrorSpy).toHaveBeenCalled();
       const consoleErrorCalls = consoleErrorSpy.mock.calls;
-      const hasDiscordTransportError = consoleErrorCalls.some((call) =>
+      const hasDiscordTransportError = consoleErrorCalls.some(call =>
         call.some(
-          (arg) =>
+          arg =>
             (typeof arg === 'string' && arg.includes('[DiscordTransport]')) ||
-            (arg instanceof Error && arg.message.includes('Expected token to be set')),
-        ),
+            (arg instanceof Error && arg.message.includes('Expected token to be set'))
+        )
       );
       expect(hasDiscordTransportError).toBe(true);
 
@@ -192,7 +192,7 @@ describe('Discord Transport Error Handling', () => {
       transport.close();
 
       // Wait a bit to ensure any timers would have fired
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Should not send messages after close
       expect(mockChannel.send).not.toHaveBeenCalled();
@@ -238,14 +238,14 @@ describe('Discord Transport Error Handling', () => {
       await transport.log({ level: 'info', message: 'message 1' }, callback1);
 
       // Wait for first flush attempt
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Send second message (should succeed)
       const callback2 = jest.fn();
       await transport.log({ level: 'info', message: 'message 2' }, callback2);
 
       // Wait for second flush attempt
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Both callbacks should have been called
       expect(callback1).toHaveBeenCalled();
@@ -255,12 +255,12 @@ describe('Discord Transport Error Handling', () => {
       // Check that console.error was called with error information
       expect(consoleErrorSpy).toHaveBeenCalled();
       const consoleErrorCalls = consoleErrorSpy.mock.calls;
-      const hasDiscordTransportError = consoleErrorCalls.some((call) =>
+      const hasDiscordTransportError = consoleErrorCalls.some(call =>
         call.some(
-          (arg) =>
+          arg =>
             (typeof arg === 'string' && arg.includes('[DiscordTransport]')) ||
-            (arg instanceof Error && arg.message.includes('Expected token to be set')),
-        ),
+            (arg instanceof Error && arg.message.includes('Expected token to be set'))
+        )
       );
       expect(hasDiscordTransportError).toBe(true);
     });

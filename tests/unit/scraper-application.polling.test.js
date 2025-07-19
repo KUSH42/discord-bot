@@ -42,7 +42,7 @@ describe('Polling Logic', () => {
 
     // Mock config
     mockConfig = {
-      getRequired: jest.fn((key) => {
+      getRequired: jest.fn(key => {
         const values = {
           X_USER_HANDLE: 'testuser',
           TWITTER_USERNAME: 'testuser',
@@ -67,7 +67,7 @@ describe('Polling Logic', () => {
 
     // Mock state manager
     mockStateManager = {
-      get: jest.fn((key) => {
+      get: jest.fn(key => {
         const values = {
           botStartTime: new Date('2024-01-01T00:00:00Z'),
         };

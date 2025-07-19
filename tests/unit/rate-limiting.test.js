@@ -89,7 +89,7 @@ describe('Rate Limiting Tests', () => {
           'X-RateLimit-Limit': expect.any(Number),
           'X-RateLimit-Remaining': expect.any(Number),
           'X-RateLimit-Reset': expect.any(String),
-        }),
+        })
       );
     });
   });
@@ -224,14 +224,14 @@ describe('Rate Limiting Tests', () => {
         const next = jest.fn();
 
         promises.push(
-          new Promise((resolve) => {
+          new Promise(resolve => {
             rateLimit(req, res, next);
             resolve({ req, res, next, index: i });
-          }),
+          })
         );
       }
 
-      return Promise.all(promises).then((results) => {
+      return Promise.all(promises).then(results => {
         // First 3 should pass
         for (let i = 0; i < 3; i++) {
           expect(results[i].next).toHaveBeenCalledWith();
@@ -251,7 +251,7 @@ describe('Rate Limiting Tests', () => {
       const commandRateLimit = createCommandRateLimit({
         windowMs: 60 * 1000, // 1 minute
         max: 5,
-        keyGenerator: (req) => req.user?.id || req.ip,
+        keyGenerator: req => req.user?.id || req.ip,
       });
 
       const userId = 'user123';
@@ -282,7 +282,7 @@ describe('Rate Limiting Tests', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.stringContaining('rate limit'),
-        }),
+        })
       );
     });
 
@@ -290,7 +290,7 @@ describe('Rate Limiting Tests', () => {
       const commandRateLimit = createCommandRateLimit({
         windowMs: 60 * 1000,
         max: 2,
-        keyGenerator: (req) => req.user?.id || req.ip,
+        keyGenerator: req => req.user?.id || req.ip,
       });
 
       const user1 = 'user123';
@@ -409,7 +409,7 @@ describe('Rate Limiting Tests', () => {
       const rateLimit = createMockRateLimit({
         ...rateLimitConfig,
         max: 1,
-        skip: (req) => trustedIPs.includes(req.ip),
+        skip: req => trustedIPs.includes(req.ip),
       });
 
       // Trusted IP should bypass rate limit
@@ -442,7 +442,7 @@ describe('Rate Limiting Tests', () => {
         createMockRateLimit({
           windowMs: 60 * 1000,
           max,
-          keyGenerator: (req) => `${req.ip}:${endpoint}`,
+          keyGenerator: req => `${req.ip}:${endpoint}`,
         });
 
       const healthRateLimit = createEndpointRateLimit('/health', 60); // 1 per second

@@ -46,7 +46,7 @@ async function main() {
     logger.info('✅ YouTube Monitor started successfully');
 
     // Keep the process alive
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
       logger.error('Uncaught Exception:', error);
       shutdownHandler('uncaughtException');
     });
@@ -77,7 +77,7 @@ async function main() {
 
 // Only run when executed directly (not imported)
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

@@ -26,7 +26,7 @@ describe('Configuration Validation Tests', () => {
     };
 
     // Clear environment variables
-    Object.keys(process.env).forEach((key) => {
+    Object.keys(process.env).forEach(key => {
       if (
         key.startsWith('DISCORD_') ||
         key.startsWith('YOUTUBE_') ||
@@ -48,7 +48,7 @@ describe('Configuration Validation Tests', () => {
     process.env = originalEnv;
 
     // Restore console methods
-    Object.values(consoleSpy).forEach((spy) => spy.mockRestore());
+    Object.values(consoleSpy).forEach(spy => spy.mockRestore());
   });
 
   describe('Required Environment Variables', () => {
@@ -72,7 +72,7 @@ describe('Configuration Validation Tests', () => {
 
     it('should pass validation when all required variables are set', () => {
       // Set all required variables
-      requiredVars.forEach((varName) => {
+      requiredVars.forEach(varName => {
         process.env[varName] = `test-${varName.toLowerCase()}`;
       });
 
@@ -99,7 +99,7 @@ describe('Configuration Validation Tests', () => {
     it('should detect partially missing required variables', () => {
       // Set only half the required variables
       const halfVars = requiredVars.slice(0, Math.floor(requiredVars.length / 2));
-      halfVars.forEach((varName) => {
+      halfVars.forEach(varName => {
         process.env[varName] = `test-${varName.toLowerCase()}`;
       });
 
@@ -110,12 +110,12 @@ describe('Configuration Validation Tests', () => {
       expect(missing).toEqual(expect.arrayContaining(expectedMissing));
     });
 
-    requiredVars.forEach((varName) => {
+    requiredVars.forEach(varName => {
       it(`should detect when ${varName} is missing`, () => {
         // Set all except this one
         requiredVars
-          .filter((v) => v !== varName)
-          .forEach((v) => {
+          .filter(v => v !== varName)
+          .forEach(v => {
             process.env[v] = `test-${v.toLowerCase()}`;
           });
 
@@ -201,13 +201,13 @@ describe('Configuration Validation Tests', () => {
         'DISCORD_BOT_SUPPORT_LOG_CHANNEL',
       ];
 
-      requiredVars.forEach((varName) => {
+      requiredVars.forEach(varName => {
         process.env[varName] = `test-${varName.toLowerCase()}`;
       });
 
       const validateEnvironmentVariables = () => {
         const warnings = [];
-        securityVars.forEach((name) => {
+        securityVars.forEach(name => {
           if (!process.env[name]) {
             warnings.push(`${name} not set - using default value (consider setting for security)`);
           }
@@ -218,8 +218,8 @@ describe('Configuration Validation Tests', () => {
       const { warnings } = validateEnvironmentVariables();
 
       expect(warnings).toHaveLength(securityVars.length);
-      securityVars.forEach((varName) => {
-        expect(warnings.some((w) => w.includes(varName))).toBe(true);
+      securityVars.forEach(varName => {
+        expect(warnings.some(w => w.includes(varName))).toBe(true);
       });
     });
 
@@ -240,7 +240,7 @@ describe('Configuration Validation Tests', () => {
         'DISCORD_BOT_SUPPORT_LOG_CHANNEL',
       ];
 
-      requiredVars.forEach((varName) => {
+      requiredVars.forEach(varName => {
         process.env[varName] = `test-${varName.toLowerCase()}`;
       });
 
@@ -250,7 +250,7 @@ describe('Configuration Validation Tests', () => {
 
       const validateEnvironmentVariables = () => {
         const warnings = [];
-        securityVars.forEach((name) => {
+        securityVars.forEach(name => {
           if (!process.env[name]) {
             warnings.push(`${name} not set - using default value (consider setting for security)`);
           }
@@ -269,8 +269,8 @@ describe('Configuration Validation Tests', () => {
       const booleanVars = ['ANNOUNCEMENT_ENABLED', 'X_VX_TWITTER_CONVERSION', 'ANNOUNCE_OLD_TWEETS'];
       const validBooleanValues = ['true', 'false', '1', '0', 'yes', 'no'];
 
-      booleanVars.forEach((varName) => {
-        validBooleanValues.forEach((value) => {
+      booleanVars.forEach(varName => {
+        validBooleanValues.forEach(value => {
           process.env[varName] = value;
 
           // Test parsing logic
@@ -283,7 +283,7 @@ describe('Configuration Validation Tests', () => {
     it('should handle numeric environment variables', () => {
       const numericVars = ['PSH_PORT', 'X_QUERY_INTERVAL_MIN', 'X_QUERY_INTERVAL_MAX'];
 
-      numericVars.forEach((varName) => {
+      numericVars.forEach(varName => {
         process.env[varName] = '12345';
         const parsedValue = parseInt(process.env[varName], 10);
 
@@ -296,7 +296,7 @@ describe('Configuration Validation Tests', () => {
     it('should handle comma-separated list variables', () => {
       process.env.ALLOWED_USER_IDS = '123456789,987654321,555666777';
 
-      const userIds = process.env.ALLOWED_USER_IDS.split(',').map((id) => id.trim());
+      const userIds = process.env.ALLOWED_USER_IDS.split(',').map(id => id.trim());
 
       expect(userIds).toHaveLength(3);
       expect(userIds).toEqual(['123456789', '987654321', '555666777']);
@@ -316,14 +316,14 @@ describe('Configuration Validation Tests', () => {
       const validChannelId = '123456789012345678';
       const invalidChannelIds = ['123', 'abc123def', '123456789012345678901234'];
 
-      channelIdVars.forEach((varName) => {
+      channelIdVars.forEach(varName => {
         // Test valid ID
         process.env[varName] = validChannelId;
         const isValidFormat = /^\d{17,19}$/.test(process.env[varName]);
         expect(isValidFormat).toBe(true);
 
         // Test invalid IDs
-        invalidChannelIds.forEach((invalidId) => {
+        invalidChannelIds.forEach(invalidId => {
           process.env[varName] = invalidId;
           const isValidFormat = /^\d{17,19}$/.test(process.env[varName]);
           expect(isValidFormat).toBe(false);
@@ -340,7 +340,7 @@ describe('Configuration Validation Tests', () => {
 
       // Test invalid formats
       const invalidIds = ['123456', 'UCshort', 'notuc123456789012345678901234'];
-      invalidIds.forEach((invalidId) => {
+      invalidIds.forEach(invalidId => {
         process.env.YOUTUBE_CHANNEL_ID = invalidId;
         const isValidFormat = /^UC[a-zA-Z0-9_-]{22}$/.test(process.env.YOUTUBE_CHANNEL_ID);
         expect(isValidFormat).toBe(false);
@@ -356,12 +356,12 @@ describe('Configuration Validation Tests', () => {
 
       const invalidUrls = ['not-a-url', 'invalid-url-format', 'http://', 'https://'];
 
-      validUrls.forEach((url) => {
+      validUrls.forEach(url => {
         process.env.PSH_CALLBACK_URL = url;
         expect(() => new URL(process.env.PSH_CALLBACK_URL)).not.toThrow();
       });
 
-      invalidUrls.forEach((url) => {
+      invalidUrls.forEach(url => {
         process.env.PSH_CALLBACK_URL = url;
         expect(() => new URL(process.env.PSH_CALLBACK_URL)).toThrow();
       });
@@ -373,14 +373,14 @@ describe('Configuration Validation Tests', () => {
       const validPorts = ['1', '80', '443', '3000', '8080', '65535'];
       const invalidPorts = ['0', '65536', '100000', '-1', 'abc'];
 
-      validPorts.forEach((port) => {
+      validPorts.forEach(port => {
         process.env.PSH_PORT = port;
         const portNum = parseInt(process.env.PSH_PORT, 10);
         expect(portNum).toBeGreaterThan(0);
         expect(portNum).toBeLessThanOrEqual(65535);
       });
 
-      invalidPorts.forEach((port) => {
+      invalidPorts.forEach(port => {
         process.env.PSH_PORT = port;
         const portNum = parseInt(process.env.PSH_PORT, 10);
         if (!Number.isNaN(portNum)) {
@@ -408,12 +408,12 @@ describe('Configuration Validation Tests', () => {
       const validLogLevels = ['error', 'warn', 'info', 'debug', 'silly'];
       const invalidLogLevels = ['invalid', 'trace', 'verbose'];
 
-      validLogLevels.forEach((level) => {
+      validLogLevels.forEach(level => {
         process.env.LOG_LEVEL = level;
         expect(validLogLevels).toContain(process.env.LOG_LEVEL);
       });
 
-      invalidLogLevels.forEach((level) => {
+      invalidLogLevels.forEach(level => {
         process.env.LOG_LEVEL = level;
         expect(validLogLevels).not.toContain(process.env.LOG_LEVEL);
       });

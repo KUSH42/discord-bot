@@ -47,10 +47,10 @@ describe('CommandProcessor', () => {
     it('should set up state validators correctly', () => {
       const validatorCalls = mockState.setValidator.mock.calls;
 
-      expect(validatorCalls.some((call) => call[0] === 'postingEnabled')).toBe(true);
-      expect(validatorCalls.some((call) => call[0] === 'announcementEnabled')).toBe(true);
-      expect(validatorCalls.some((call) => call[0] === 'vxTwitterConversionEnabled')).toBe(true);
-      expect(validatorCalls.some((call) => call[0] === 'logLevel')).toBe(true);
+      expect(validatorCalls.some(call => call[0] === 'postingEnabled')).toBe(true);
+      expect(validatorCalls.some(call => call[0] === 'announcementEnabled')).toBe(true);
+      expect(validatorCalls.some(call => call[0] === 'vxTwitterConversionEnabled')).toBe(true);
+      expect(validatorCalls.some(call => call[0] === 'logLevel')).toBe(true);
     });
   });
 
@@ -246,7 +246,7 @@ describe('CommandProcessor', () => {
   describe('State Validators', () => {
     it('should validate posting enabled state', () => {
       // Get the validator function for postingEnabled
-      const validatorCall = mockState.setValidator.mock.calls.find((call) => call[0] === 'postingEnabled');
+      const validatorCall = mockState.setValidator.mock.calls.find(call => call[0] === 'postingEnabled');
       const validator = validatorCall[1];
 
       expect(validator(true)).toBe(true);
@@ -256,7 +256,7 @@ describe('CommandProcessor', () => {
 
     it('should validate log level state', () => {
       // Get the validator function for logLevel
-      const validatorCall = mockState.setValidator.mock.calls.find((call) => call[0] === 'logLevel');
+      const validatorCall = mockState.setValidator.mock.calls.find(call => call[0] === 'logLevel');
       const validator = validatorCall[1];
 
       expect(validator('info')).toBe(true);

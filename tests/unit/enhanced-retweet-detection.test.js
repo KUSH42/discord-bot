@@ -15,7 +15,7 @@ describe('Enhanced Retweet Detection', () => {
     it('should detect retweet using socialContext testid', () => {
       // Mock DOM element with socialContext
       const mockElement = {
-        querySelector: jest.fn((selector) => {
+        querySelector: jest.fn(selector => {
           if (selector === '[data-testid="socialContext"]') {
             return {
               textContent: 'The Enforcer reposted',
@@ -35,7 +35,7 @@ describe('Enhanced Retweet Detection', () => {
 
     it('should detect retweet using text patterns', () => {
       const mockElement = {
-        querySelector: jest.fn((selector) => {
+        querySelector: jest.fn(selector => {
           if (selector === '[data-testid="socialContext"]') {
             return null;
           }
@@ -58,7 +58,7 @@ describe('Enhanced Retweet Detection', () => {
 
     it('should detect retweet using contextual text', () => {
       const mockElement = {
-        querySelector: jest.fn((selector) => {
+        querySelector: jest.fn(selector => {
           return null; // No specific selectors match
         }),
         textContent: 'User retweeted this content',
@@ -115,7 +115,7 @@ describe('Enhanced Retweet Detection', () => {
         'Another User retweeted this post',
       ];
 
-      testCases.forEach((textContent) => {
+      testCases.forEach(textContent => {
         const mockElement = {
           querySelector: jest.fn(() => ({ textContent })),
         };

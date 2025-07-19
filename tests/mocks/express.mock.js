@@ -12,8 +12,8 @@ export const mockRequest = {
   body: '',
   rawBody: Buffer.from(''),
   ip: '127.0.0.1',
-  get: jest.fn((header) => mockRequest.headers[header.toLowerCase()]),
-  header: jest.fn((header) => mockRequest.headers[header.toLowerCase()]),
+  get: jest.fn(header => mockRequest.headers[header.toLowerCase()]),
+  header: jest.fn(header => mockRequest.headers[header.toLowerCase()]),
 };
 
 // Mock Express response object
@@ -51,7 +51,7 @@ export const mockApp = {
 
 // Mock Express server
 export const mockServer = {
-  close: jest.fn().mockImplementation((callback) => {
+  close: jest.fn().mockImplementation(callback => {
     if (callback) {
       callback();
     }
@@ -65,7 +65,7 @@ export const mockServer = {
 };
 
 // Mock rate limiter
-export const mockRateLimit = jest.fn().mockImplementation((options) => {
+export const mockRateLimit = jest.fn().mockImplementation(options => {
   return jest.fn((req, res, next) => {
     // Simulate rate limiting logic
     const rateLimitInfo = {
@@ -111,7 +111,7 @@ export const createMockRequest = (overrides = {}) => ({
     ...mockRequest.headers,
     ...(overrides.headers || {}),
   },
-  get: jest.fn((header) => {
+  get: jest.fn(header => {
     const headers = { ...mockRequest.headers, ...(overrides.headers || {}) };
     return headers[header.toLowerCase()];
   }),

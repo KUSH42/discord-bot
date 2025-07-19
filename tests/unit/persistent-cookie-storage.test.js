@@ -20,11 +20,11 @@ describe('Persistent Cookie Storage', () => {
 
     mockConfig = {
       getRequired: jest.fn(
-        (key) =>
+        key =>
           ({
             TWITTER_USERNAME: 'testuser',
             TWITTER_PASSWORD: 'testpassword',
-          })[key],
+          })[key]
       ),
     };
 
@@ -159,7 +159,7 @@ describe('Persistent Cookie Storage', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error validating saved cookies, falling back to login:',
-        expect.any(Error),
+        expect.any(Error)
       );
       expect(loginSpy).toHaveBeenCalled();
     });

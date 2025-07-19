@@ -16,19 +16,19 @@ export class CommandProcessor {
    * Set up state validators for command-managed state
    */
   setupStateValidators() {
-    this.state.setValidator('postingEnabled', (value) => {
+    this.state.setValidator('postingEnabled', value => {
       return typeof value === 'boolean' ? true : 'postingEnabled must be a boolean';
     });
 
-    this.state.setValidator('announcementEnabled', (value) => {
+    this.state.setValidator('announcementEnabled', value => {
       return typeof value === 'boolean' ? true : 'announcementEnabled must be a boolean';
     });
 
-    this.state.setValidator('vxTwitterConversionEnabled', (value) => {
+    this.state.setValidator('vxTwitterConversionEnabled', value => {
       return typeof value === 'boolean' ? true : 'vxTwitterConversionEnabled must be a boolean';
     });
 
-    this.state.setValidator('logLevel', (value) => {
+    this.state.setValidator('logLevel', value => {
       const validLevels = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
       return validLevels.includes(value) ? true : `logLevel must be one of: ${validLevels.join(', ')}`;
     });
@@ -57,7 +57,7 @@ export class CommandProcessor {
    */
   getAllowedUserIds() {
     const allowedUserIdsStr = this.config.get('ALLOWED_USER_IDS', '');
-    return allowedUserIdsStr ? allowedUserIdsStr.split(',').map((id) => id.trim()) : [];
+    return allowedUserIdsStr ? allowedUserIdsStr.split(',').map(id => id.trim()) : [];
   }
 
   /**

@@ -15,7 +15,7 @@ try {
     process.exit(0);
   } else {
     console.error('❌ Environment validation failed:');
-    validation.issues.forEach((issue) => {
+    validation.issues.forEach(issue => {
       console.error(`  - ${issue}`);
     });
     process.exit(1);

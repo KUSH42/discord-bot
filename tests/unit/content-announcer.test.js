@@ -16,7 +16,7 @@ describe('ContentAnnouncer', () => {
 
     // Mock config
     mockConfig = {
-      getRequired: jest.fn((key) => {
+      getRequired: jest.fn(key => {
         const values = {
           DISCORD_YOUTUBE_CHANNEL_ID: 'youtube-channel-123',
           DISCORD_X_POSTS_CHANNEL_ID: 'x-posts-channel-123',
@@ -84,7 +84,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         'x-posts-channel-123',
-        '🐦 **testuser** posted:\nhttps://x.com/testuser/status/1234567890',
+        '🐦 **testuser** posted:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -105,7 +105,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         'x-replies-channel-123',
-        '↩️ **testuser** replied:\nhttps://x.com/testuser/status/1234567890',
+        '↩️ **testuser** replied:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -126,7 +126,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         'x-quotes-channel-123',
-        '💬 **testuser** quoted:\nhttps://x.com/testuser/status/1234567890',
+        '💬 **testuser** quoted:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -147,7 +147,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         'x-retweets-channel-123',
-        '🔄 **testuser** retweeted:\nhttps://x.com/testuser/status/1234567890',
+        '🔄 **testuser** retweeted:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -170,7 +170,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         'x-posts-channel-123',
-        '🐦 **testuser** posted:\nhttps://vxtwitter.com/testuser/status/1234567890',
+        '🐦 **testuser** posted:\nhttps://vxtwitter.com/testuser/status/1234567890'
       );
     });
   });

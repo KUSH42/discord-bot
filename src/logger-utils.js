@@ -73,7 +73,7 @@ export class DiscordTransport extends Transport {
         if (fetchedChannel && fetchedChannel.isTextBased()) {
           this.channel = fetchedChannel;
           // Send initialization message immediately, not buffered
-          this.channel.send('✅ **Winston logging transport initialized for this channel.**').catch((error) => {
+          this.channel.send('✅ **Winston logging transport initialized for this channel.**').catch(error => {
             console.error('[DiscordTransport] Failed to send initialization message:', error);
           });
         } else {
