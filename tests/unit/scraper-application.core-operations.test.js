@@ -393,9 +393,10 @@ describe('ScraperApplication Core Operations', () => {
 
       expect(mockBrowserService.close).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Browser closed',
+        'Browser closed successfully',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
         })
       );
     });
@@ -413,12 +414,14 @@ describe('ScraperApplication Core Operations', () => {
       const closeError = new Error('Close failed');
       mockBrowserService.close.mockRejectedValue(closeError);
 
-      await scraperApp.closeBrowser();
+      await expect(scraperApp.closeBrowser()).rejects.toThrow('Close failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error closing browser:',
+        'Failed to close browser',
         expect.objectContaining({
+          error: 'Close failed',
           module: 'scraper',
+          outcome: 'error',
         })
       );
     });
