@@ -9,29 +9,31 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// TODO: Fix skipped tests
-describe.skip('Timezone Safety ESLint Rules', () => {
+describe('Timezone Safety ESLint Rules', () => {
   let eslint;
 
   beforeAll(async () => {
     // Import the timezone safety plugin
     const timezoneSafety = await import(path.resolve(__dirname, '../../../eslint-plugins/timezone-safety.js'));
 
-    // Create one shared ESLint instance
+    // Create ESLint instance with flat config format
     eslint = new ESLint({
-      baseConfig: {
-        plugins: {
-          'timezone-safety': timezoneSafety.default,
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          plugins: {
+            'timezone-safety': timezoneSafety.default,
+          },
+          rules: {
+            'timezone-safety/enforce-utc-timestamps': 'error',
+            'timezone-safety/require-utc-imports': 'warn',
+          },
+          languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+          },
         },
-        rules: {
-          'timezone-safety/enforce-utc-timestamps': 'error',
-          'timezone-safety/require-utc-imports': 'warn',
-        },
-        languageOptions: {
-          ecmaVersion: 'latest',
-          sourceType: 'module',
-        },
-      },
+      ],
     });
   });
 
