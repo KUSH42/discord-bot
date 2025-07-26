@@ -937,7 +937,7 @@ jobs:
           # Install coverage tools with retry logic
           for i in {1..3}; do
             echo "Attempt $i to install coverage tools..."
-            if npm install -g nyc; then
+            if npm install -g nyc lcov-result-merger; then
               echo "Coverage tools installed successfully on attempt $i"
               break
             else
@@ -975,52 +975,113 @@ jobs:
           merge-multiple: true
           path: test-results/
 
-      - name: Merge coverage reports (simplified)
+      - name: Collect and merge coverage reports
         id: coverage
         run: |
-          mkdir -p coverage/merged
+          mkdir -p coverage/merged coverage/collected
 
-          echo "Collecting coverage files..."
-
-          # Find primary coverage file (Node 18 unit tests)
-          PRIMARY_COVERAGE=""
-          if [ -f "test-results/unit/node18/coverage/unit/lcov.info" ]; then
-            PRIMARY_COVERAGE="test-results/unit/node18/coverage/unit/lcov.info"
-            echo "Found primary unit test coverage"
-          elif [ -f "test-results/unit/node20/coverage/unit/lcov.info" ]; then
-            PRIMARY_COVERAGE="test-results/unit/node20/coverage/unit/lcov.info"
-            echo "Using Node 20 coverage as primary"
+          echo "🔍 Collecting coverage files from all test suites..."
+          
+          # Find all available lcov.info files from different test suites
+          COVERAGE_FILES=()
+          
+          # Unit test coverage (Node 18 and 20)
+          if [ -f "test-results/unit/node18/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node18/coverage/unit/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/unit/node18/coverage/unit/lcov.info")
+            echo "✅ Found unit test coverage (Node 18)"
           fi
-
-          if [ -n "$PRIMARY_COVERAGE" ] && [ -s "$PRIMARY_COVERAGE" ]; then
-            # Use primary coverage as baseline
-            cp "$PRIMARY_COVERAGE" coverage/merged/lcov.info
-            
-            echo "Using primary coverage file with $(wc -l < coverage/merged/lcov.info) lines"
-            
-            # Extract coverage metrics
-            LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            
-            # Calculate percentages
-            LINES_PCT=$(awk -v hit="$LINES_HIT" -v found="$LINES_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            FUNCTIONS_PCT=$(awk -v hit="$FUNCTIONS_HIT" -v found="$FUNCTIONS_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            BRANCHES_PCT=$(awk -v hit="$BRANCHES_HIT" -v found="$BRANCHES_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            
-            echo "Coverage: Lines ${LINES_PCT}%, Functions ${FUNCTIONS_PCT}%, Branches ${BRANCHES_PCT}%"
-            
-            # Generate simplified coverage summary
-            cat > coverage-summary.json << EOF
+          
+          if [ -f "test-results/unit/node20/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node20/coverage/unit/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/unit/node20/coverage/unit/lcov.info")
+            echo "✅ Found unit test coverage (Node 20)"
+          fi
+          
+          # Integration test coverage
+          if [ -f "test-results/integration-test-results/coverage/integration/lcov.info" ] && [ -s "test-results/integration-test-results/coverage/integration/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/integration-test-results/coverage/integration/lcov.info")
+            echo "✅ Found integration test coverage"
+          fi
+          
+          # E2E test coverage
+          if [ -f "test-results/e2e-test-results/coverage/e2e/lcov.info" ] && [ -s "test-results/e2e-test-results/coverage/e2e/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/e2e-test-results/coverage/e2e/lcov.info")
+            echo "✅ Found e2e test coverage"
+          fi
+          
+          # Performance test coverage
+          if [ -f "test-results/performance-test-results/coverage/performance/lcov.info" ] && [ -s "test-results/performance-test-results/coverage/performance/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/performance-test-results/coverage/performance/lcov.info")
+            echo "✅ Found performance test coverage"
+          fi
+          
+          # Security test coverage (if it generates coverage)
+          if [ -f "test-results/security-test-results/coverage/security/lcov.info" ] && [ -s "test-results/security-test-results/coverage/security/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/security-test-results/coverage/security/lcov.info")
+            echo "✅ Found security test coverage"
+          fi
+          
+          echo "📊 Found ${#COVERAGE_FILES[@]} coverage files to merge"
+          
+          if [ ${#COVERAGE_FILES[@]} -eq 0 ]; then
+            echo "❌ No coverage files found"
+            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
+            echo "coverage_pct=0" >> $GITHUB_OUTPUT
+            echo "status=missing" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Copy coverage files to collected directory for merging
+          for i in "${!COVERAGE_FILES[@]}"; do
+            cp "${COVERAGE_FILES[$i]}" "coverage/collected/lcov-$i.info"
+            echo "📋 Copied ${COVERAGE_FILES[$i]} -> coverage/collected/lcov-$i.info"
+          done
+          
+          # Merge coverage files
+          echo "🔄 Merging coverage reports..."
+          if [ ${#COVERAGE_FILES[@]} -eq 1 ]; then
+            # Only one file, just copy it
+            cp "${COVERAGE_FILES[0]}" coverage/merged/lcov.info
+            echo "📝 Single coverage file used directly"
+          else
+            # Multiple files, use lcov-result-merger
+            lcov-result-merger 'coverage/collected/*.info' coverage/merged/lcov.info
+            echo "🔗 Merged ${#COVERAGE_FILES[@]} coverage files using lcov-result-merger"
+          fi
+          
+          # Verify merged file exists and has content
+          if [ ! -f "coverage/merged/lcov.info" ] || [ ! -s "coverage/merged/lcov.info" ]; then
+            echo "❌ Failed to create merged coverage file"
+            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
+            echo "coverage_pct=0" >> $GITHUB_OUTPUT
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "✅ Merged coverage file created with $(wc -l < coverage/merged/lcov.info) lines"
+          
+          # Extract coverage metrics from merged file
+          LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          
+          # Calculate percentages
+          LINES_PCT=$(awk -v hit="$LINES_HIT" -v found="$LINES_FOUND" 'BEGIN {
+            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
+          }')
+          FUNCTIONS_PCT=$(awk -v hit="$FUNCTIONS_HIT" -v found="$FUNCTIONS_FOUND" 'BEGIN {
+            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
+          }')
+          BRANCHES_PCT=$(awk -v hit="$BRANCHES_HIT" -v found="$BRANCHES_FOUND" 'BEGIN {
+            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
+          }')
+          
+          echo "📈 Merged Coverage: Lines ${LINES_PCT}%, Functions ${FUNCTIONS_PCT}%, Branches ${BRANCHES_PCT}%"
+          
+          # Generate comprehensive coverage summary
+          cat > coverage-summary.json << EOF
           {
             "total": {
               "lines": {
@@ -1043,18 +1104,16 @@ jobs:
                 "covered": ${BRANCHES_HIT},
                 "pct": ${BRANCHES_PCT}
               }
-            }
+            },
+            "merged_from": [
+              $(printf '"%s",' "${COVERAGE_FILES[@]}" | sed 's/,$//')
+            ]
           }
           EOF
-            
-            echo "coverage_pct=${LINES_PCT}" >> $GITHUB_OUTPUT
-            echo "status=available" >> $GITHUB_OUTPUT
-          else
-            echo "No coverage files found"
-            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
-            echo "coverage_pct=0" >> $GITHUB_OUTPUT
-            echo "status=missing" >> $GITHUB_OUTPUT
-          fi
+          
+          echo "coverage_pct=${LINES_PCT}" >> $GITHUB_OUTPUT
+          echo "status=available" >> $GITHUB_OUTPUT
+          echo "files_merged=${#COVERAGE_FILES[@]}" >> $GITHUB_OUTPUT
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
@@ -1151,6 +1210,7 @@ jobs:
           path: |
             reports/
             coverage/merged/
+            coverage/collected/
             coverage-summary.json
             coverage-metrics.json
             test-results/
@@ -1198,6 +1258,7 @@ jobs:
           path: |
             reports/
             coverage/merged/
+            coverage/collected/
             coverage-summary.json
             coverage-metrics.json
             test-results/

@@ -172,6 +172,7 @@ async function generateReport() {
   const overallCoverage = coverageSummary?.total?.lines?.pct || 0;
   const branchCoverage = coverageSummary?.total?.branches?.pct || 0;
   const functionCoverage = coverageSummary?.total?.functions?.pct || 0;
+  const mergedFrom = coverageSummary?.merged_from || [];
 
   // Get test results
   const testResults = await getTestResults();
@@ -222,7 +223,7 @@ async function generateReport() {
 **Trigger:** ${GITHUB_EVENT_NAME}
 
 ## 🎯 Overall Merged Coverage: ${formatPercentage(overallCoverage)}%
-*This is the accumulated coverage from all test suites that ran.*
+*This is the true merged coverage from ${mergedFrom.length} test suite(s): ${mergedFrom.map(f => f.split('/').pop().replace('.info', '')).join(', ') || 'unit tests'}*
 
 ---
 
@@ -290,6 +291,9 @@ ${(() => {
   const quality = getCoverageQuality(overallCoverage);
   return `${quality.emoji} **Coverage Quality:** ${quality.text}`;
 })()}
+
+### Coverage Sources Merged
+${mergedFrom.length > 0 ? mergedFrom.map(f => `- \`${f}\``).join('\n') : '- No source files information available'}
 `
     : ''
 }`;
