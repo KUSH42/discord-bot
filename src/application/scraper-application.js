@@ -138,28 +138,35 @@ export class ScraperApplication {
       return;
     }
 
-    try {
-      this.logger.info('Stopping X scraper application...');
+    const operation = this.logger.startOperation('stopScraperApplication', {
+      isRunning: this.isRunning,
+      stats: this.getStats(),
+    });
 
-      // Stop health monitoring
+    try {
+      operation.progress('Stopping health monitoring');
       this.stopHealthMonitoring();
 
-      // Stop polling
+      operation.progress('Stopping polling timer');
       this.stopPolling();
 
-      // Close browser
+      operation.progress('Closing browser session');
       await this.closeBrowser();
 
       this.isRunning = false;
-      this.logger.info('X scraper application stopped');
 
       // Emit stop event
       this.eventBus.emit('scraper.stopped', {
         stopTime: nowUTC(),
         stats: this.getStats(),
       });
+
+      operation.success('X scraper application stopped successfully', {
+        finalStats: this.getStats(),
+      });
     } catch (error) {
-      this.logger.error('Error stopping scraper application:', error);
+      operation.error(error, 'Error stopping scraper application');
+      throw error;
     }
   }
 
@@ -173,29 +180,45 @@ export class ScraperApplication {
   async restart(options = {}) {
     const { maxRetries = 3, baseDelay = 5000 } = options;
 
-    this.logger.info('Restarting X scraper application...');
+    const operation = this.logger.startOperation('restartScraperApplication', {
+      maxRetries,
+      baseDelay,
+      currentStats: this.getStats(),
+    });
 
-    // Stop current instance
-    await this.stop();
+    try {
+      operation.progress('Stopping current scraper instance');
+      await this.stop();
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        this.logger.info(`Restart attempt ${attempt}/${maxRetries}`);
-        await this.start();
-        this.logger.info('✅ Scraper application restarted successfully');
-        return;
-      } catch (error) {
-        this.logger.error(`Restart attempt ${attempt} failed:`, error.message);
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          operation.progress(`Starting restart attempt ${attempt}/${maxRetries}`);
+          await this.start();
+          operation.success('X scraper application restarted successfully', {
+            attempt,
+            totalAttempts: maxRetries,
+          });
+          return;
+        } catch (error) {
+          operation.progress(`Restart attempt ${attempt} failed: ${error.message}`);
 
-        if (attempt === maxRetries) {
-          this.logger.error(`Failed to restart scraper after ${maxRetries} attempts`);
-          throw new Error(`Scraper restart failed after ${maxRetries} attempts: ${error.message}`);
+          if (attempt === maxRetries) {
+            operation.error(
+              new Error(`Scraper restart failed after ${maxRetries} attempts: ${error.message}`),
+              `Failed to restart scraper after ${maxRetries} attempts`,
+              { finalAttempt: attempt, originalError: error.message }
+            );
+            throw new Error(`Scraper restart failed after ${maxRetries} attempts: ${error.message}`);
+          }
+
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          operation.progress(`Waiting ${delay}ms before next restart attempt`);
+          await this.delay(delay);
         }
-
-        const delay = baseDelay * Math.pow(2, attempt - 1);
-        this.logger.info(`Waiting ${delay}ms before next restart attempt...`);
-        await this.delay(delay);
       }
+    } catch (error) {
+      operation.error(error, 'Restart operation failed');
+      throw error;
     }
   }
 
@@ -208,16 +231,38 @@ export class ScraperApplication {
       clearInterval(this.healthCheckInterval);
     }
 
-    this.logger.info(`Starting health monitoring (check every ${intervalMs / 1000}s)`);
+    const operation = this.logger.startOperation('startHealthMonitoring', {
+      intervalMs,
+      intervalSeconds: intervalMs / 1000,
+    });
 
     this.healthCheckInterval = setInterval(async () => {
+      const healthOperation = this.logger.startOperation('performHealthCheck', {
+        timestamp: nowUTC(),
+      });
+
       try {
-        await this.performHealthCheck();
+        const health = await this.performHealthCheck();
+        if (health.errors.length === 0) {
+          healthOperation.success('Health check passed', health);
+        } else {
+          healthOperation.error(
+            new Error(`Health check found issues: ${health.errors.join(', ')}`),
+            'Health check detected problems',
+            health
+          );
+          await this.handleHealthCheckFailure(new Error(health.errors.join(', ')));
+        }
       } catch (error) {
-        this.logger.error('Health check failed:', error.message);
+        healthOperation.error(error, 'Health check failed');
         await this.handleHealthCheckFailure(error);
       }
     }, intervalMs);
+
+    operation.success('Health monitoring started', {
+      intervalMs,
+      intervalSeconds: intervalMs / 1000,
+    });
   }
 
   /**
@@ -227,7 +272,9 @@ export class ScraperApplication {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
-      this.logger.info('Health monitoring stopped');
+
+      const operation = this.logger.startOperation('stopHealthMonitoring', {});
+      operation.success('Health monitoring stopped');
     }
   }
 
@@ -282,20 +329,29 @@ export class ScraperApplication {
    * @param {Error} error - The health check error
    */
   async handleHealthCheckFailure(error) {
-    this.logger.warn('Attempting automatic recovery due to health check failure');
+    const operation = this.logger.startOperation('handleHealthCheckFailure', {
+      originalError: error.message,
+    });
 
     try {
-      // Attempt to restart the scraper
+      operation.progress('Attempting automatic recovery via restart');
       await this.restart({ maxRetries: 2, baseDelay: 3000 });
-      this.logger.info('✅ Automatic recovery successful');
-    } catch (recoveryError) {
-      this.logger.error('❌ Automatic recovery failed:', recoveryError.message);
 
+      operation.success('Automatic recovery successful', {
+        recoveryMethod: 'restart',
+        maxRetries: 2,
+      });
+    } catch (recoveryError) {
       // Emit event for external monitoring
       this.eventBus.emit('scraper.recovery.failed', {
         originalError: error.message,
         recoveryError: recoveryError.message,
         timestamp: nowUTC(),
+      });
+
+      operation.error(recoveryError, 'Automatic recovery failed', {
+        originalError: error.message,
+        recoveryMethod: 'restart',
       });
     }
   }
@@ -346,13 +402,21 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async closeBrowser() {
+    const operation = this.logger.startOperation('closeBrowser', {
+      isRunning: this.browser.isRunning(),
+    });
+
     try {
       if (this.browser.isRunning()) {
+        operation.progress('Closing browser instance');
         await this.browser.close();
-        this.logger.info('Browser closed');
+        operation.success('Browser closed successfully');
+      } else {
+        operation.success('Browser was not running, no action needed');
       }
     } catch (error) {
-      this.logger.error('Error closing browser:', error);
+      operation.error(error, 'Failed to close browser');
+      throw error;
     }
   }
 
@@ -361,7 +425,19 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async loginToX() {
-    return this.authManager.login();
+    const operation = this.logger.startOperation('loginToX', {
+      xUser: this.xUser,
+    });
+
+    try {
+      operation.progress('Delegating to AuthManager for X login');
+      const result = await this.authManager.login();
+      operation.success('X login completed via AuthManager');
+      return result;
+    } catch (error) {
+      operation.error(error, 'X login failed');
+      throw error;
+    }
   }
 
   /**
@@ -607,18 +683,29 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async performEnhancedRetweetDetection() {
+    const operation = this.logger.startOperation('performEnhancedRetweetDetection', {
+      xUser: this.xUser,
+      retweetProcessingEnabled: this.shouldProcessRetweets(),
+    });
+
     try {
       if (!this.shouldProcessRetweets()) {
+        operation.success('Enhanced retweet detection skipped - retweet processing disabled');
         return;
       }
-      this.logger.debug('Performing enhanced retweet detection...');
+
+      operation.progress('Navigating to user profile timeline for retweet detection');
       await this.navigateToProfileTimeline(this.xUser);
 
+      operation.progress('Extracting tweets from profile page');
       const tweets = await this.extractTweets();
-      this.logger.info(`Found ${tweets.length} potential retweets on profile page.`);
 
+      operation.progress(`Filtering ${tweets.length} potential retweets`);
       const newTweets = await this.filterNewTweets(tweets);
-      this.logger.info(`Found ${newTweets.length} new tweets during enhanced retweet detection.`);
+
+      operation.progress(`Processing ${newTweets.length} new tweets from enhanced detection`);
+      let processedCount = 0;
+      let skippedCount = 0;
 
       for (const tweet of newTweets) {
         // Reduce debug frequency for tweet checking
@@ -629,15 +716,26 @@ export class ScraperApplication {
           this.logger.info(`✅ Found new tweet to process: ${tweet.url} (${tweet.tweetCategory})`);
           await this.processNewTweet(tweet);
           this.stats.totalTweetsAnnounced++;
+          processedCount++;
         } else {
           // Reduce frequency of old tweet skip logs
           if (this.shouldLogVerbose()) {
             this.logger.debug(`Skipping tweet ${tweet.tweetID} as it is old.`);
           }
+          skippedCount++;
         }
       }
+
+      operation.success('Enhanced retweet detection completed', {
+        totalTweetsFound: tweets.length,
+        newTweetsFound: newTweets.length,
+        tweetsProcessed: processedCount,
+        tweetsSkipped: skippedCount,
+      });
     } catch (error) {
-      this.logger.error('Error during enhanced retweet detection:', error);
+      operation.error(error, 'Error during enhanced retweet detection', {
+        note: 'This error is non-fatal and will not stop the main polling cycle',
+      });
       // Do not rethrow, as a failure here should not stop the main polling cycle.
     }
   }
@@ -647,8 +745,14 @@ export class ScraperApplication {
    * @returns {Promise<Array>} Array of tweet objects
    */
   async extractTweets() {
+    const operation = this.logger.startOperation('extractTweets', {
+      xUser: this.xUser,
+      pageUrl: 'current_page',
+    });
+
     const monitoredUser = this.xUser; // Pass the monitored user to browser context
     try {
+      operation.progress('Executing tweet extraction script in browser context');
       const result = await this.browser.evaluate(monitoredUser => {
         /* eslint-disable no-undef */
         const tweets = [];
@@ -794,9 +898,22 @@ export class ScraperApplication {
       }, monitoredUser);
 
       // Ensure we always return an array, even if browser.evaluate returns undefined
-      return Array.isArray(result) ? result : [];
+      const tweets = Array.isArray(result) ? result : [];
+
+      operation.success('Tweet extraction completed', {
+        tweetsFound: tweets.length,
+        categories: tweets.reduce((acc, tweet) => {
+          acc[tweet.tweetCategory] = (acc[tweet.tweetCategory] || 0) + 1;
+          return acc;
+        }, {}),
+      });
+
+      return tweets;
     } catch (error) {
-      this.logger.error('Error extracting tweets', { error: error.message, stack: error.stack });
+      operation.error(error, 'Error extracting tweets', {
+        browserAvailable: !!this.browser,
+        errorType: error.constructor.name,
+      });
       // Return empty array on error to prevent undefined issues
       return [];
     }
@@ -808,38 +925,50 @@ export class ScraperApplication {
    * @returns {Promise<Array>} New tweets only
    */
   async filterNewTweets(tweets) {
+    const operation = this.logger.startOperation('filterNewTweets', {
+      totalTweets: tweets.length,
+    });
+
     const newTweets = [];
     let duplicateCount = 0;
     let oldContentCount = 0;
 
-    this.logger.debug(`Starting to filter ${tweets.length} tweets`);
+    try {
+      operation.progress(`Processing ${tweets.length} tweets for filtering`);
 
-    for (const tweet of tweets) {
-      if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
-        // Mark as seen immediately to prevent future duplicates
-        this.duplicateDetector.markAsSeen(tweet.url);
+      for (const tweet of tweets) {
+        if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
+          // Mark as seen immediately to prevent future duplicates
+          this.duplicateDetector.markAsSeen(tweet.url);
 
-        // Check if tweet is new enough based on bot start time
-        if (await this.isNewContent(tweet)) {
-          newTweets.push(tweet);
-          this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${tweet.text.substring(0, 50)}...`);
+          // Check if tweet is new enough based on bot start time
+          if (await this.isNewContent(tweet)) {
+            newTweets.push(tweet);
+            this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${tweet.text.substring(0, 50)}...`);
+          } else {
+            oldContentCount++;
+            // Reduce frequency of old tweet filtering logs
+            this.logger.verbose(`Filtered out old tweet: ${tweet.tweetID} - timestamp: ${tweet.timestamp}`);
+          }
         } else {
-          oldContentCount++;
-          // Reduce frequency of old tweet filtering logs
-          this.logger.verbose(`Filtered out old tweet: ${tweet.tweetID} - timestamp: ${tweet.timestamp}`);
+          duplicateCount++;
+          // Reduce frequency of duplicate filtering logs
+          this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID}`);
         }
-      } else {
-        duplicateCount++;
-        // Reduce frequency of duplicate filtering logs
-        this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID}`);
       }
+
+      operation.success('Tweet filtering completed', {
+        newTweets: newTweets.length,
+        duplicates: duplicateCount,
+        oldContent: oldContentCount,
+        filterEfficiency: Math.round(((duplicateCount + oldContentCount) / tweets.length) * 100),
+      });
+
+      return newTweets;
+    } catch (error) {
+      operation.error(error, 'Error filtering tweets');
+      return [];
     }
-
-    this.logger.debug(
-      `Filtering results: ${newTweets.length} new, ${duplicateCount} duplicates, ${oldContentCount} old content`
-    );
-
-    return newTweets;
   }
 
   /**
@@ -1097,20 +1226,35 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async verifyAuthentication() {
+    const operation = this.logger.startOperation('verifyAuthentication', {
+      xUser: this.xUser,
+    });
+
     try {
-      this.logger.info('Verifying X authentication status...');
+      operation.progress('Checking authentication status with AuthManager');
       const isAuthenticated = await this.authManager.isAuthenticated();
+
       if (isAuthenticated) {
-        this.logger.info('✅ Authentication verified successfully');
+        operation.success('Authentication verified successfully', {
+          authStatus: 'valid',
+        });
         return;
       }
 
-      this.logger.warn('Authentication check failed, re-authenticating...');
+      operation.progress('Authentication check failed, re-authenticating');
       await this.ensureAuthenticated();
+      operation.success('Re-authentication completed after verification failure');
     } catch (error) {
-      this.logger.error('Authentication verification failed:', error);
-      this.logger.info('Attempting to re-authenticate after verification failure...');
-      await this.ensureAuthenticated();
+      operation.error(error, 'Authentication verification failed, attempting recovery');
+
+      try {
+        operation.progress('Attempting recovery authentication after verification failure');
+        await this.ensureAuthenticated();
+        operation.success('Recovery authentication successful');
+      } catch (recoveryError) {
+        operation.error(recoveryError, 'Recovery authentication also failed');
+        throw recoveryError;
+      }
     }
   }
 
@@ -1119,13 +1263,15 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async refreshAuth() {
-    try {
-      this.logger.info('Refreshing X authentication...');
+    const operation = this.logger.startOperation('refreshAuth', {
+      currentUrl: 'unknown',
+    });
 
-      // Navigate to home page to refresh session
+    try {
+      operation.progress('Navigating to X home page for session refresh');
       await this.browser.goto('https://x.com/home');
 
-      // Check if we're still logged in
+      operation.progress('Checking if user is still logged in');
       const isLoggedIn = await this.browser.evaluate(() => {
         /* eslint-disable no-undef */
         return !document.querySelector('[data-testid="login"]');
@@ -1133,13 +1279,16 @@ export class ScraperApplication {
       });
 
       if (!isLoggedIn) {
-        this.logger.warn('Authentication expired, re-logging in...');
+        operation.progress('Authentication expired, performing full login');
         await this.loginToX();
       }
 
-      this.logger.info('Authentication refreshed successfully');
+      operation.success('Authentication refreshed successfully', {
+        wasLoggedIn: isLoggedIn,
+        actionTaken: isLoggedIn ? 'session_refresh' : 'full_login',
+      });
     } catch (error) {
-      this.logger.error('Failed to refresh authentication:', error);
+      operation.error(error, 'Failed to refresh authentication');
       throw error;
     }
   }
@@ -1262,21 +1411,24 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async initializeRecentContent() {
+    const initializationHours = parseInt(this.config.get('INITIALIZATION_WINDOW_HOURS', '24'), 10);
+    const initializationWindow = initializationHours * 60 * 60 * 1000;
+    const cutoffTime = new Date(Date.now() - initializationWindow);
+
+    const operation = this.logger.startOperation('initializeRecentContent', {
+      xUser: this.xUser,
+      initializationHours,
+      cutoffTime: cutoffTime.toISOString(),
+    });
+
     try {
-      this.logger.info('Initializing with recent content to prevent old post announcements...');
-
-      // Scan recent content based on configuration to mark as seen
-      const initializationHours = parseInt(this.config.get('INITIALIZATION_WINDOW_HOURS', '24'), 10);
-      const initializationWindow = initializationHours * 60 * 60 * 1000; // Convert hours to milliseconds
-      const cutoffTime = new Date(Date.now() - initializationWindow);
-
-      // Navigate to user's profile to get recent content
+      operation.progress('Navigating to user profile for recent content scan');
       await this.navigateToProfileTimeline(this.xUser);
 
-      // Extract recent tweets
+      operation.progress('Extracting recent tweets from profile');
       const tweets = await this.extractTweets();
-      this.logger.info(`Found ${tweets.length} recent tweets during initialization scan`);
 
+      operation.progress(`Marking recent tweets as seen within ${initializationHours}h window`);
       let markedAsSeen = 0;
       for (const tweet of tweets) {
         // Only mark tweets that are within our initialization window
@@ -1294,6 +1446,7 @@ export class ScraperApplication {
 
       // Also scan for retweets separately to ensure we catch them
       if (this.shouldProcessRetweets()) {
+        operation.progress('Processing retweets during initialization');
         try {
           const retweetTweets = await this.extractTweets();
           for (const tweet of retweetTweets) {
@@ -1308,16 +1461,22 @@ export class ScraperApplication {
             }
           }
         } catch (error) {
-          this.logger.warn('Error during retweet initialization scan:', error.message);
+          operation.progress(`Error during retweet initialization scan: ${error.message}`);
         }
       }
 
-      this.logger.info(`✅ Initialization complete: marked ${markedAsSeen} recent posts as seen`);
-      this.logger.info(`Content posted after ${toISOStringUTC()} will be announced`);
+      operation.success('Recent content initialization completed', {
+        totalTweetsScanned: tweets.length,
+        markedAsSeen,
+        cutoffTime: cutoffTime.toISOString(),
+        announcementStartTime: toISOStringUTC(),
+      });
     } catch (error) {
-      this.logger.error('Error during recent content initialization:', error);
+      operation.error(error, 'Error during recent content initialization', {
+        note: 'This is non-fatal, continuing with normal operation',
+        initializationHours,
+      });
       // Don't throw - this is a best-effort initialization
-      this.logger.warn('Continuing with normal operation despite initialization error');
     }
   }
 

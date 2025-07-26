@@ -4,14 +4,22 @@
  */
 
 import { nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 export class CommandProcessor {
-  constructor(config, stateManager, debugFlagManager = null, metricsManager = null) {
+  constructor(config, stateManager, debugFlagManager = null, metricsManager = null, baseLogger = null) {
     this.config = config;
     this.state = stateManager;
     this.debugManager = debugFlagManager;
     this.metricsManager = metricsManager;
     this.commandPrefix = config.get('COMMAND_PREFIX', '!');
+
+    // Create enhanced logger if components are available
+    if (baseLogger && debugFlagManager && metricsManager) {
+      this.logger = createEnhancedLogger('api', baseLogger, debugFlagManager, metricsManager);
+    } else {
+      this.logger = baseLogger || console;
+    }
 
     // Set up validators for state keys this processor manages
     this.setupStateValidators();
@@ -226,102 +234,158 @@ export class CommandProcessor {
    * @returns {Promise<Object>} Command result object
    */
   async processCommand(command, args = [], userId, appStats = null) {
-    // Validate command
-    const validation = this.validateCommand(command, args, userId);
-    if (!validation.success) {
-      return {
-        success: false,
-        message: `❌ ${validation.error}`,
-        requiresRestart: false,
-      };
-    }
+    const operation = this.logger.startOperation
+      ? this.logger.startOperation('processCommand', {
+          command,
+          argsCount: args.length,
+          userId: `${userId?.substring(0, 8)}...`, // Truncate for privacy
+          hasAppStats: !!appStats,
+        })
+      : null;
 
-    // Check authorization
-    if (!this.isUserAuthorized(userId, command)) {
-      return {
-        success: false,
-        message: '🚫 You are not authorized to use this command.',
-        requiresRestart: false,
-      };
-    }
-
-    // Process specific commands
-    switch (command) {
-      case 'restart':
-        return await this.handleRestart(userId);
-
-      case 'kill':
-        return await this.handleKill(userId);
-
-      case 'announce':
-        return await this.handleAnnounce(args);
-
-      case 'vxtwitter':
-        return await this.handleVxTwitter(args);
-
-      case 'loglevel':
-        return await this.handleLogLevel(args);
-
-      case 'health':
-        return await this.handleHealth();
-
-      case 'health-detailed':
-        return await this.handleHealthDetailed(appStats);
-
-      case 'hd':
-        return await this.handleHealthDetailed(appStats);
-
-      case 'readme':
-        return await this.handleReadme();
-
-      case 'update':
-        return await this.handleUpdate(userId);
-
-      case 'restart-scraper':
-        return await this.handleRestartScraper(userId);
-
-      case 'stop-scraper':
-        return await this.handleStopScraper(userId);
-
-      case 'start-scraper':
-        return await this.handleStartScraper(userId);
-
-      case 'auth-status':
-        return await this.handleAuthStatus(userId);
-
-      case 'force-reauth':
-        return await this.handleForceReauth(userId);
-
-      case 'scraper-health':
-        return await this.handleScraperHealth(userId);
-
-      case 'youtube-health':
-        return await this.handleYoutubeHealth(appStats);
-
-      case 'x-health':
-        return await this.handleXHealth(appStats);
-
-      case 'debug':
-        return await this.handleDebugToggle(args);
-
-      case 'debug-status':
-        return await this.handleDebugStatus();
-
-      case 'debug-level':
-        return await this.handleDebugLevel(args);
-
-      case 'metrics':
-        return await this.handleMetrics();
-
-      case 'log-pipeline':
-        return await this.handleLogPipeline();
-
-      default:
-        return {
+    try {
+      // Validate command
+      if (operation) {
+        operation.progress('Validating command and arguments');
+      }
+      const validation = this.validateCommand(command, args, userId);
+      if (!validation.success) {
+        const result = {
           success: false,
-          message: `❓ Unknown command: \`${command}\`. Use \`${this.commandPrefix}readme\` for help.`,
+          message: `❌ ${validation.error}`,
           requiresRestart: false,
         };
+        if (operation) {
+          operation.error(new Error(validation.error), 'Command validation failed');
+        }
+        return result;
+      }
+
+      // Check authorization
+      if (operation) {
+        operation.progress('Checking user authorization');
+      }
+      if (!this.isUserAuthorized(userId, command)) {
+        const result = {
+          success: false,
+          message: '🚫 You are not authorized to use this command.',
+          requiresRestart: false,
+        };
+        if (operation) {
+          operation.error(new Error('Unauthorized'), 'User not authorized for command');
+        }
+        return result;
+      }
+
+      // Process specific commands
+      if (operation) {
+        operation.progress(`Executing ${command} command`);
+      }
+      let result;
+      switch (command) {
+        case 'restart':
+          result = await this.handleRestart(userId);
+          break;
+
+        case 'kill':
+          result = await this.handleKill(userId);
+          break;
+
+        case 'announce':
+          result = await this.handleAnnounce(args);
+          break;
+
+        case 'vxtwitter':
+          result = await this.handleVxTwitter(args);
+          break;
+
+        case 'loglevel':
+          return await this.handleLogLevel(args);
+
+        case 'health':
+          return await this.handleHealth();
+
+        case 'health-detailed':
+          return await this.handleHealthDetailed(appStats);
+
+        case 'hd':
+          return await this.handleHealthDetailed(appStats);
+
+        case 'readme':
+          return await this.handleReadme();
+
+        case 'update':
+          return await this.handleUpdate(userId);
+
+        case 'restart-scraper':
+          return await this.handleRestartScraper(userId);
+
+        case 'stop-scraper':
+          return await this.handleStopScraper(userId);
+
+        case 'start-scraper':
+          return await this.handleStartScraper(userId);
+
+        case 'auth-status':
+          return await this.handleAuthStatus(userId);
+
+        case 'force-reauth':
+          return await this.handleForceReauth(userId);
+
+        case 'scraper-health':
+          return await this.handleScraperHealth(userId);
+
+        case 'youtube-health':
+          return await this.handleYoutubeHealth(appStats);
+
+        case 'x-health':
+          return await this.handleXHealth(appStats);
+
+        case 'debug':
+          return await this.handleDebugToggle(args);
+
+        case 'debug-status':
+          return await this.handleDebugStatus();
+
+        case 'debug-level':
+          return await this.handleDebugLevel(args);
+
+        case 'metrics':
+          return await this.handleMetrics();
+
+        case 'log-pipeline':
+          return await this.handleLogPipeline();
+
+        default:
+          result = {
+            success: false,
+            message: `❓ Unknown command: \`${command}\`. Use \`${this.commandPrefix}readme\` for help.`,
+            requiresRestart: false,
+          };
+          break;
+      }
+
+      if (operation) {
+        if (result.success) {
+          operation.success(`Command ${command} executed successfully`, {
+            commandResult: result.message ? 'with_message' : 'without_message',
+            requiresRestart: result.requiresRestart,
+          });
+        } else {
+          operation.error(new Error(result.message || 'Command failed'), `Command ${command} failed`);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      if (operation) {
+        operation.error(error, 'Unexpected error during command processing');
+      }
+      return {
+        success: false,
+        message: '❌ An unexpected error occurred while processing the command.',
+        requiresRestart: false,
+      };
     }
   }
 

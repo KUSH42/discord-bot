@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { MonitorApplication } from '../../src/application/monitor-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('MonitorApplication - Core Operations', () => {
   let monitorApp;
@@ -11,6 +12,8 @@ describe('MonitorApplication - Core Operations', () => {
   let mockStateManager;
   let mockEventBus;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
   let mockContentStateManager;
   let mockLivestreamStateMachine;
   let mockContentCoordinator;
@@ -18,6 +21,9 @@ describe('MonitorApplication - Core Operations', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockYoutubeService = {
       getChannelDetails: jest.fn(),
@@ -75,13 +81,9 @@ describe('MonitorApplication - Core Operations', () => {
       emit: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
+    mockDebugManager = enhancedLoggingMocks.debugManager;
+    mockMetricsManager = enhancedLoggingMocks.metricsManager;
 
     mockContentStateManager = {
       hasContent: jest.fn(),
@@ -117,6 +119,8 @@ describe('MonitorApplication - Core Operations', () => {
       livestreamStateMachine: mockLivestreamStateMachine,
       contentCoordinator: mockContentCoordinator,
       persistentStorage: mockPersistentStorage,
+      debugManager: mockDebugManager,
+      metricsManager: mockMetricsManager,
     };
 
     monitorApp = new MonitorApplication(dependencies);

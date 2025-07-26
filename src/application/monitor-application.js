@@ -1,6 +1,7 @@
 import { DuplicateDetector } from '../duplicate-detector.js';
 import crypto from 'crypto';
 import { nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
  * YouTube monitoring application orchestrator
@@ -15,7 +16,13 @@ export class MonitorApplication {
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
     this.eventBus = dependencies.eventBus;
-    this.logger = dependencies.logger;
+    // Create enhanced logger for this module
+    this.logger = createEnhancedLogger(
+      'youtube',
+      dependencies.logger,
+      dependencies.debugManager,
+      dependencies.metricsManager
+    );
     this.contentStateManager = dependencies.contentStateManager;
     this.livestreamStateMachine = dependencies.livestreamStateMachine;
     this.contentCoordinator = dependencies.contentCoordinator;
@@ -77,22 +84,23 @@ export class MonitorApplication {
       throw new Error('Monitor application is already running');
     }
 
-    try {
-      this.logger.info('Starting YouTube monitor application...');
+    const operation = this.logger.startOperation('startMonitorApplication', {
+      youtubeChannelId: this.youtubeChannelId,
+      callbackUrl: this.callbackUrl,
+      scheduledPollInterval: this.scheduledContentPollInterval,
+    });
 
-      // Validate YouTube API access
+    try {
+      operation.progress('Validating YouTube API access');
       await this.validateYouTubeAccess();
 
-      // Subscribe to PubSubHubbub
+      operation.progress('Subscribing to PubSubHubbub notifications');
       await this.subscribeToPubSubHubbub();
 
-      // Fallback system is only triggered on notification processing failures
-
-      // Start scheduled content polling
+      operation.progress('Starting scheduled content polling');
       this.startScheduledContentPolling();
 
       this.isRunning = true;
-      this.logger.info('✅ YouTube monitor application started successfully');
 
       // Emit start event
       this.eventBus.emit('monitor.started', {
@@ -101,8 +109,14 @@ export class MonitorApplication {
         callbackUrl: this.callbackUrl,
         fallbackEnabled: this.fallbackEnabled,
       });
+
+      operation.success('YouTube monitor application started successfully', {
+        youtubeChannelId: this.youtubeChannelId,
+        scheduledPollInterval: this.scheduledContentPollInterval,
+        subscriptionActive: this.subscriptionActive,
+      });
     } catch (error) {
-      this.logger.error('Failed to start monitor application:', error);
+      operation.error(error, 'Failed to start monitor application');
       await this.stop();
       throw error;
     }
@@ -117,29 +131,37 @@ export class MonitorApplication {
       return;
     }
 
-    try {
-      this.logger.info('Stopping YouTube monitor application...');
+    const operation = this.logger.startOperation('stopMonitorApplication', {
+      isRunning: this.isRunning,
+      subscriptionActive: this.subscriptionActive,
+      stats: this.getStats(),
+    });
 
-      // Stop fallback polling
+    try {
+      operation.progress('Stopping fallback polling');
       this.stopFallbackPolling();
 
-      // Unsubscribe from PubSubHubbub
+      operation.progress('Unsubscribing from PubSubHubbub');
       await this.unsubscribeFromPubSubHubbub();
 
-      // Stop all polling timers
+      operation.progress('Stopping all polling timers');
       this.stopScheduledContentPolling();
       this.stopLiveStatePolling();
 
       this.isRunning = false;
-      this.logger.info('YouTube monitor application stopped');
 
       // Emit stop event
       this.eventBus.emit('monitor.stopped', {
         stopTime: nowUTC(),
         stats: this.getStats(),
       });
+
+      operation.success('YouTube monitor application stopped successfully', {
+        finalStats: this.getStats(),
+      });
     } catch (error) {
-      this.logger.error('Error stopping monitor application:', error);
+      operation.error(error, 'Error stopping monitor application');
+      throw error;
     }
   }
 
@@ -148,8 +170,12 @@ export class MonitorApplication {
    * @returns {Promise<void>}
    */
   async validateYouTubeAccess() {
+    const operation = this.logger.startOperation('validateYouTubeAccess', {
+      youtubeChannelId: this.youtubeChannelId,
+    });
+
     try {
-      this.logger.info('Validating YouTube API access...');
+      operation.progress('Testing YouTube API connectivity');
 
       // Test API key by fetching channel details
       const channelDetails = await this.youtube.getChannelDetails(this.youtubeChannelId);
@@ -158,9 +184,13 @@ export class MonitorApplication {
         throw new Error('Failed to fetch YouTube channel details');
       }
 
-      this.logger.info(`YouTube API validated. Monitoring channel: ${channelDetails.snippet?.title || 'Unknown'}`);
+      operation.success('YouTube API validation successful', {
+        channelTitle: channelDetails.snippet?.title || 'Unknown',
+        channelId: this.youtubeChannelId,
+        subscriberCount: channelDetails.statistics?.subscriberCount,
+      });
     } catch (error) {
-      this.logger.error('YouTube API validation failed:', error);
+      operation.error(error, 'YouTube API validation failed');
       throw new Error(`YouTube API validation failed: ${error.message}`);
     }
   }
@@ -367,7 +397,12 @@ export class MonitorApplication {
    * @returns {Promise<Object>} Response object
    */
   async handleWebhook(request) {
-    const startTime = Date.now();
+    const operation = this.logger.startOperation('handleWebhook', {
+      method: request.method,
+      contentType: request.headers['content-type'],
+      bodyLength: request.body ? request.body.length : 0,
+      remoteAddress: request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || 'unknown',
+    });
 
     try {
       this.stats.webhooksReceived++;
@@ -384,30 +419,31 @@ export class MonitorApplication {
         remoteAddress: request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || 'unknown',
       });
 
-      this.logger.info('Received PubSubHubbub webhook notification', {
-        method: request.method,
-        contentType: request.headers['content-type'],
-        bodyLength: request.body ? request.body.length : 0,
-      });
-
       // Handle verification request (GET requests don't require signature verification)
       if (request.method === 'GET') {
+        operation.progress('Processing webhook verification request');
         const verificationResult = this.handleVerificationRequest(request.query);
         this.logWebhookDebug('WEBHOOK VERIFICATION REQUEST', {
           query: request.query,
           result: verificationResult,
         });
+        operation.success('Webhook verification request processed', verificationResult);
         return verificationResult;
       }
 
       // Handle notification (POST requests require signature verification)
       if (request.method === 'POST') {
-        // Verify webhook signature for POST requests only
+        operation.progress('Verifying webhook signature');
         const signatureResult = this.verifyWebhookSignatureDebug(request.body, request.headers);
         if (!signatureResult.isValid) {
           this.logWebhookDebug('WEBHOOK SIGNATURE VERIFICATION FAILED', signatureResult.details);
-          this.logger.warn('Webhook signature verification failed', signatureResult.details);
-          return { status: 403, message: 'Invalid signature' };
+          const errorResult = { status: 403, message: 'Invalid signature' };
+          operation.error(
+            new Error('Webhook signature verification failed'),
+            'Invalid webhook signature',
+            signatureResult.details
+          );
+          return errorResult;
         }
 
         this.logWebhookDebug('WEBHOOK SIGNATURE VERIFIED', {
@@ -415,29 +451,35 @@ export class MonitorApplication {
           secretLength: this.webhookSecret.length,
         });
 
+        operation.progress('Processing notification payload');
         const notificationResult = await this.handleNotification(request.body);
         this.logWebhookDebug('WEBHOOK NOTIFICATION PROCESSED', {
           bodyPreview: this.getBodyPreview(request.body),
-          processingTime: Date.now() - startTime,
           result: notificationResult,
         });
+        operation.success('Webhook notification processed successfully', notificationResult);
         return notificationResult;
       }
 
       this.logWebhookDebug('WEBHOOK METHOD NOT ALLOWED', { method: request.method });
-      return { status: 405, message: 'Method not allowed' };
+      const methodNotAllowedResult = { status: 405, message: 'Method not allowed' };
+      operation.error(new Error(`Method ${request.method} not allowed`), 'Unsupported HTTP method', {
+        method: request.method,
+      });
+      return methodNotAllowedResult;
     } catch (error) {
-      const processingTime = Date.now() - startTime;
       this.logWebhookDebug('WEBHOOK ERROR', {
         error: error.message,
         stack: error.stack,
-        processingTime,
         requestMethod: request.method,
         bodyLength: request.body ? request.body.length : 0,
       });
 
-      this.logger.error('Webhook handling error:', error);
       this.stats.lastError = error.message;
+      operation.error(error, 'Webhook handling error', {
+        requestMethod: request.method,
+        bodyLength: request.body ? request.body.length : 0,
+      });
       return { status: 500, message: 'Internal server error' };
     }
   }

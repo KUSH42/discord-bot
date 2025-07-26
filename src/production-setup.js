@@ -12,8 +12,6 @@ import 'winston-daily-rotate-file';
 import { EventBus } from '../infrastructure/event-bus.js';
 import { StateManager } from '../infrastructure/state-manager.js';
 import { PersistentStorage } from '../infrastructure/persistent-storage.js';
-import { DebugFlagManager } from '../infrastructure/debug-flag-manager.js';
-import { MetricsManager } from '../infrastructure/metrics-manager.js';
 
 // Core Logic
 import { DuplicateDetector } from '../duplicate-detector.js';
@@ -100,20 +98,6 @@ async function setupInfrastructureServices(container, config) {
   container.registerSingleton('persistentStorage', c => {
     return new PersistentStorage(c.resolve('logger').child({ service: 'PersistentStorage' }));
   });
-
-  // Debug Flag Manager for enhanced logging control
-  container.registerSingleton('debugFlagManager', c => {
-    return new DebugFlagManager(c.resolve('stateManager'), c.resolve('logger').child({ service: 'DebugFlagManager' }));
-  });
-
-  // Metrics Manager for performance tracking
-  container.registerSingleton('metricsManager', c => {
-    return new MetricsManager({
-      retentionHours: 24,
-      maxSamplesPerMetric: 10000,
-      aggregationWindows: [60, 300, 900, 3600], // 1min, 5min, 15min, 1hour
-    });
-  });
 }
 
 /**
@@ -184,13 +168,7 @@ async function setupExternalServices(container, config) {
 async function setupCoreServices(container, _config) {
   // Command Processor
   container.registerSingleton('commandProcessor', c => {
-    return new CommandProcessor(
-      c.resolve('config'),
-      c.resolve('stateManager'),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager'),
-      c.resolve('logger').child({ service: 'CommandProcessor' })
-    );
+    return new CommandProcessor(c.resolve('config'), c.resolve('stateManager'));
   });
 
   // Content Classifier
@@ -200,14 +178,7 @@ async function setupCoreServices(container, _config) {
 
   // Content Announcer
   container.registerSingleton('contentAnnouncer', c => {
-    return new ContentAnnouncer(
-      c.resolve('discordService'),
-      c.resolve('config'),
-      c.resolve('stateManager'),
-      c.resolve('logger').child({ service: 'ContentAnnouncer' }),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager')
-    );
+    return new ContentAnnouncer(c.resolve('discordService'), c.resolve('config'), c.resolve('stateManager'));
   });
 
   // Duplicate Detector
@@ -264,8 +235,6 @@ async function setupApplicationServices(container, _config) {
       scraperApplication: c.resolve('scraperApplication'),
       monitorApplication: c.resolve('monitorApplication'),
       youtubeScraperService: c.resolve('youtubeScraperService'),
-      debugManager: c.resolve('debugFlagManager'),
-      metricsManager: c.resolve('metricsManager'),
     });
   });
 
@@ -276,8 +245,6 @@ async function setupApplicationServices(container, _config) {
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
       logger: c.resolve('logger').child({ service: 'AuthManager' }),
-      debugManager: c.resolve('debugFlagManager'),
-      metricsManager: c.resolve('metricsManager'),
     });
   });
 
@@ -295,8 +262,6 @@ async function setupApplicationServices(container, _config) {
       authManager: c.resolve('authManager'),
       duplicateDetector: c.resolve('duplicateDetector'),
       persistentStorage: c.resolve('persistentStorage'),
-      debugManager: c.resolve('debugFlagManager'),
-      metricsManager: c.resolve('metricsManager'),
     });
   });
 
@@ -316,8 +281,6 @@ async function setupApplicationServices(container, _config) {
       contentCoordinator: c.resolve('contentCoordinator'),
       duplicateDetector: c.resolve('duplicateDetector'),
       persistentStorage: c.resolve('persistentStorage'),
-      debugManager: c.resolve('debugFlagManager'),
-      metricsManager: c.resolve('metricsManager'),
     });
   });
 
@@ -327,8 +290,6 @@ async function setupApplicationServices(container, _config) {
       logger: c.resolve('logger').child({ service: 'YouTubeScraperService' }),
       config: c.resolve('config'),
       contentCoordinator: c.resolve('contentCoordinator'),
-      debugManager: c.resolve('debugFlagManager'),
-      metricsManager: c.resolve('metricsManager'),
     });
   });
 }
@@ -379,23 +340,19 @@ async function setupDiscordLogging(container, config) {
   if (supportChannelId && process.env.NODE_ENV !== 'test') {
     const logger = container.resolve('logger');
     const discordService = container.resolve('discordService');
-    const debugFlagManager = container.resolve('debugFlagManager');
-    const metricsManager = container.resolve('metricsManager');
     const logLevel = config.get('LOG_LEVEL', 'info');
 
     // Add Discord transport to existing logger with balanced rate limiting
     // Only log warn and above to Discord to reduce spam
     const discordTransport = new DiscordTransport({
-      level: config.get('LOG_LEVEL', 'info'), // Only log warnings, errors, and above to Discord
+      level: 'warn', // Only log warnings, errors, and above to Discord
       client: discordService.client,
       channelId: supportChannelId,
-      debugFlagManager,
-      metricsManager,
-      flushInterval: 1000, // 1 second to match send delay
-      maxBufferSize: 20, // Match burst allowance
-      burstAllowance: 30, // Allow reasonable burst for startup logging
-      burstResetTime: 60000, // 1 minute - longer reset for better recovery
-      baseSendDelay: 1000, // 1 seconds between sends - functional
+      flushInterval: 3000, // 3 seconds to match send delay
+      maxBufferSize: 15, // Match burst allowance
+      burstAllowance: 15, // Allow reasonable burst for startup logging
+      burstResetTime: 120000, // 2 minutes - longer reset for better recovery
+      baseSendDelay: 3000, // 3 seconds between sends - conservative but functional
       testMode: false, // Ensure production mode rate limiting
     });
 
