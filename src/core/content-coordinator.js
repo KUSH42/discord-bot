@@ -1,3 +1,5 @@
+import { nowUTC } from '../utilities/utc-time.js';
+
 /**
  * Content Coordinator
  * Prevents race conditions between webhook and scraper systems
@@ -93,24 +95,46 @@ export class ContentCoordinator {
    */
   async doProcessContent(contentId, source, contentData) {
     const startTime = Date.now();
+    const contentSummary = {
+      contentId,
+      source,
+      platform: contentData.platform,
+      type: contentData.type,
+      title: contentData.title?.substring(0, 50) || 'Unknown',
+      publishedAt: contentData.publishedAt,
+      url: contentData.url,
+    };
 
     try {
-      this.logger.debug('Starting content processing', {
-        contentId,
-        source,
-        title: contentData.title || 'Unknown',
-        publishedAt: contentData.publishedAt,
+      this.logger.info('🔄 Starting content coordination', {
+        ...contentSummary,
+        timestamp: nowUTC().toISOString(),
       });
 
       // Check if content already exists in state management
+      this.logger.debug('🔍 Checking existing content state', { contentId, source });
       const existingState = this.contentStateManager.getContentState(contentId);
 
       if (existingState) {
+        this.logger.debug('📋 Content already exists in state', {
+          contentId,
+          existingSource: existingState.source,
+          newSource: source,
+          announced: existingState.announced,
+          existingState,
+        });
+
         // Content already known - check if we should still process based on source priority
         const shouldProcess = this.shouldProcessFromSource(existingState, source);
 
         if (!shouldProcess) {
           this.metrics.sourcePrioritySkips++;
+          this.logger.info('⏭️ Skipping due to source priority', {
+            contentId,
+            existingSource: existingState.source,
+            newSource: source,
+            sourcePriority: this.sourcePriority,
+          });
           return {
             action: 'skip',
             reason: 'source_priority',
@@ -123,6 +147,12 @@ export class ContentCoordinator {
         // Check if already announced
         if (existingState.announced) {
           this.metrics.duplicatesSkipped++;
+          this.logger.debug('⏭️ Content already announced, skipping', {
+            contentId,
+            existingSource: existingState.source,
+            newSource: source,
+            announcedAt: existingState.lastUpdated,
+          });
           return {
             action: 'skip',
             reason: 'already_announced',
@@ -131,13 +161,21 @@ export class ContentCoordinator {
             contentId,
           };
         }
+      } else {
+        this.logger.debug('✨ New content detected', { contentId, source });
       }
 
       // Check for duplicates using enhanced detection
+      this.logger.debug('🔍 Checking for duplicates', { contentId, url: contentData.url });
       const isDuplicate = await this.checkForDuplicates(contentData);
 
       if (isDuplicate) {
         this.metrics.duplicatesSkipped++;
+        this.logger.debug('⏭️ Duplicate content detected, skipping', {
+          contentId,
+          source,
+          url: contentData.url,
+        });
         return {
           action: 'skip',
           reason: 'duplicate_detected',
@@ -145,11 +183,23 @@ export class ContentCoordinator {
           contentId,
         };
       }
+      this.logger.debug('✅ No duplicates found', { contentId });
 
       // Check if content is new enough to announce
-      const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, new Date());
+      this.logger.debug('📅 Checking content age', {
+        contentId,
+        publishedAt: contentData.publishedAt,
+        currentTime: nowUTC().toISOString(),
+      });
+      const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, nowUTC());
 
       if (!isNew) {
+        this.logger.debug('⏭️ Content too old, skipping', {
+          contentId,
+          source,
+          publishedAt: contentData.publishedAt,
+          currentTime: nowUTC().toISOString(),
+        });
         return {
           action: 'skip',
           reason: 'content_too_old',
@@ -158,9 +208,16 @@ export class ContentCoordinator {
           publishedAt: contentData.publishedAt,
         };
       }
+      this.logger.debug('✅ Content is new enough', { contentId, publishedAt: contentData.publishedAt });
 
       // Add to content state management if not exists
       if (!existingState) {
+        this.logger.debug('📝 Adding new content to state management', {
+          contentId,
+          type: this.determineContentType(contentData),
+          state: this.determineInitialState(contentData),
+          source,
+        });
         await this.contentStateManager.addContent(contentId, {
           type: this.determineContentType(contentData),
           state: this.determineInitialState(contentData),
@@ -170,42 +227,94 @@ export class ContentCoordinator {
           title: contentData.title,
           metadata: contentData.metadata || {},
         });
+        this.logger.debug('✅ Content added to state management', { contentId });
       } else {
         // Update existing state with new source information
-        await this.contentStateManager.updateContentState(contentId, {
-          source: this.selectBestSource(existingState.source, source),
-          lastUpdated: new Date(),
+        const bestSource = this.selectBestSource(existingState.source, source);
+        this.logger.debug('🔄 Updating existing content state', {
+          contentId,
+          oldSource: existingState.source,
+          newSource: source,
+          bestSource,
         });
+        await this.contentStateManager.updateContentState(contentId, {
+          source: bestSource,
+          lastUpdated: nowUTC(),
+        });
+        this.logger.debug('✅ Content state updated', { contentId });
       }
 
       // Process and announce content
+      this.logger.info('📢 Proceeding with content announcement', {
+        contentId,
+        source,
+        platform: contentData.platform,
+        type: contentData.type,
+      });
       const announcementResult = await this.announceContent(contentId, contentData, source);
 
-      // Mark as announced in state management
-      await this.contentStateManager.markAsAnnounced(contentId);
+      if (announcementResult && announcementResult.success) {
+        this.logger.info('✅ Content announcement successful', {
+          contentId,
+          source,
+          channelId: announcementResult.channelId,
+          messageId: announcementResult.messageId,
+        });
 
-      // Mark as seen in duplicate detector
-      await this.markContentAsSeen(contentData);
+        // Mark as announced in state management
+        this.logger.debug('📝 Marking content as announced in state', { contentId });
+        await this.contentStateManager.markAsAnnounced(contentId);
 
-      this.metrics.totalProcessed++;
+        // Mark as seen in duplicate detector
+        this.logger.debug('📝 Marking content as seen in duplicate detector', { contentId, url: contentData.url });
+        await this.markContentAsSeen(contentData);
 
-      const processingTime = Date.now() - startTime;
+        this.metrics.totalProcessed++;
 
-      this.logger.info('Content processed successfully', {
-        contentId,
-        source,
-        action: 'announced',
-        processingTimeMs: processingTime,
-        title: contentData.title,
-      });
+        const processingTime = Date.now() - startTime;
 
-      return {
-        action: 'announced',
-        source,
-        contentId,
-        processingTimeMs: processingTime,
-        announcementResult,
-      };
+        this.logger.info('🎉 Content processing completed successfully', {
+          contentId,
+          source,
+          action: 'announced',
+          processingTimeMs: processingTime,
+          title: contentData.title,
+          channelId: announcementResult.channelId,
+          messageId: announcementResult.messageId,
+        });
+
+        return {
+          action: 'announced',
+          source,
+          contentId,
+          processingTimeMs: processingTime,
+          announcementResult,
+        };
+      } else {
+        this.logger.warn('⚠️ Content announcement failed or was skipped', {
+          contentId,
+          source,
+          reason: announcementResult?.reason || 'Unknown error',
+          skipped: announcementResult?.skipped || false,
+          announcementResult,
+        });
+
+        // Still mark as processed even if announcement failed to prevent retry loops
+        if (!announcementResult?.skipped) {
+          await this.contentStateManager.markAsAnnounced(contentId);
+        }
+
+        const processingTime = Date.now() - startTime;
+
+        return {
+          action: announcementResult?.skipped ? 'skip' : 'failed',
+          reason: announcementResult?.reason || 'Content announcement failed',
+          source,
+          contentId,
+          processingTimeMs: processingTime,
+          announcementResult,
+        };
+      }
     } catch (error) {
       this.metrics.processingErrors++;
 
@@ -316,7 +425,7 @@ export class ContentCoordinator {
 
     if (contentData.url) {
       if (contentData.url.includes('youtube.com') || contentData.url.includes('youtu.be')) {
-        return contentData.isLive ? 'youtube_livestream' : 'youtube_video';
+        return contentData.isLive ? 'livestream' : 'video';
       }
 
       if (contentData.url.includes('x.com') || contentData.url.includes('twitter.com')) {
@@ -342,7 +451,7 @@ export class ContentCoordinator {
     }
 
     if (contentData.scheduledStartTime) {
-      const now = new Date();
+      const now = nowUTC();
       const scheduledStart = new Date(contentData.scheduledStartTime);
       return now < scheduledStart ? 'scheduled' : 'live';
     }
@@ -362,11 +471,11 @@ export class ContentCoordinator {
       ...contentData,
       id: contentId,
       source,
-      detectionTime: new Date(),
+      detectionTime: nowUTC(),
       contentType: this.determineContentType(contentData),
     };
 
-    return await this.contentAnnouncer.announce(announcementData);
+    return await this.contentAnnouncer.announceContent(announcementData);
   }
 
   /**

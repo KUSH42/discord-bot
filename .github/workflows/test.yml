@@ -246,6 +246,7 @@ jobs:
           mkdir -p coverage/unit
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
+            --config=jest.ci.config.js \
             --coverage \
             --coverageDirectory=coverage/unit \
             --coverageReporters=lcov \
@@ -253,9 +254,7 @@ jobs:
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
-            --passWithNoTests \
-            --coverageThreshold='{}' \
-            --verbose=true
+            --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
@@ -501,13 +500,14 @@ jobs:
           mkdir -p coverage/integration
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
-            --maxWorkers=1 \
+            --config=jest.ci.config.js \
+            --coverage \
+            --coverageDirectory=coverage/integration \
+            --coverageReporters=lcov \
             --testTimeout=15000 \
             --forceExit \
             --detectOpenHandles \
-            --passWithNoTests \
-            --coverageThreshold='{}' \
-            --verbose=true
+            --verbose=true 2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v4
@@ -604,14 +604,26 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p test-results/e2e
+          mkdir -p coverage/e2e
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
-          npx jest --config tests/configs/jest.e2e.config.js \
-            --maxWorkers=1 \
+          npm run test:e2e -- \
+            --coverage \
+            --coverageDirectory=coverage/e2e \
+            --coverageReporters=lcov \
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
-            --passWithNoTests
+            --verbose=true
+
+      - name: Upload unit test coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/e2e/lcov.info
+          flags: e2e-node${{ matrix.node-version }}
+          name: e2e-tests-node${{ matrix.node-version }}
+          fail_ci_if_error: false
+          plugins: ''
+
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -619,6 +631,7 @@ jobs:
         with:
           name: e2e-test-results
           path: |
+            coverage/e2e/
             logs/
             screenshots/
             .env.e2e
@@ -687,8 +700,6 @@ jobs:
             --testTimeout=60000 \
             --forceExit \
             --detectOpenHandles \
-            --passWithNoTests \
-            --coverageThreshold='{}' \
             --verbose=true
 
       - name: Generate performance report
@@ -809,8 +820,7 @@ jobs:
             --maxWorkers=1 \
             --testTimeout=20000 \
             --forceExit \
-            --detectOpenHandles \
-            --passWithNoTests
+            --detectOpenHandles 
 
       - name: Run security audit
         run: |
@@ -927,7 +937,7 @@ jobs:
           # Install coverage tools with retry logic
           for i in {1..3}; do
             echo "Attempt $i to install coverage tools..."
-            if npm install -g nyc; then
+            if npm install -g nyc lcov-result-merger; then
               echo "Coverage tools installed successfully on attempt $i"
               break
             else
@@ -965,86 +975,95 @@ jobs:
           merge-multiple: true
           path: test-results/
 
-      - name: Merge coverage reports (simplified)
+      - name: Collect and merge coverage reports
         id: coverage
         run: |
-          mkdir -p coverage/merged
+          mkdir -p coverage/merged coverage/collected
 
-          echo "Collecting coverage files..."
-
-          # Find primary coverage file (Node 18 unit tests)
-          PRIMARY_COVERAGE=""
-          if [ -f "test-results/unit/node18/coverage/unit/lcov.info" ]; then
-            PRIMARY_COVERAGE="test-results/unit/node18/coverage/unit/lcov.info"
-            echo "Found primary unit test coverage"
-          elif [ -f "test-results/unit/node20/coverage/unit/lcov.info" ]; then
-            PRIMARY_COVERAGE="test-results/unit/node20/coverage/unit/lcov.info"
-            echo "Using Node 20 coverage as primary"
+          echo "🔍 Collecting coverage files from all test suites..."
+          
+          # Find all available lcov.info files from different test suites
+          COVERAGE_FILES=()
+          
+          # Unit test coverage (Node 18 and 20)
+          if [ -f "test-results/unit/node18/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node18/coverage/unit/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/unit/node18/coverage/unit/lcov.info")
+            echo "✅ Found unit test coverage (Node 18)"
           fi
-
-          if [ -n "$PRIMARY_COVERAGE" ] && [ -s "$PRIMARY_COVERAGE" ]; then
-            # Use primary coverage as baseline
-            cp "$PRIMARY_COVERAGE" coverage/merged/lcov.info
-            
-            echo "Using primary coverage file with $(wc -l < coverage/merged/lcov.info) lines"
-            
-            # Extract coverage metrics
-            LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            
-            # Calculate percentages
-            LINES_PCT=$(awk -v hit="$LINES_HIT" -v found="$LINES_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            FUNCTIONS_PCT=$(awk -v hit="$FUNCTIONS_HIT" -v found="$FUNCTIONS_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            BRANCHES_PCT=$(awk -v hit="$BRANCHES_HIT" -v found="$BRANCHES_FOUND" 'BEGIN {
-              if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-            }')
-            
-            echo "Coverage: Lines ${LINES_PCT}%, Functions ${FUNCTIONS_PCT}%, Branches ${BRANCHES_PCT}%"
-            
-            # Generate simplified coverage summary
-            cat > coverage-summary.json << EOF
-          {
-            "total": {
-              "lines": {
-                "total": ${LINES_FOUND},
-                "covered": ${LINES_HIT},
-                "pct": ${LINES_PCT}
-              },
-              "statements": {
-                "total": ${LINES_FOUND},
-                "covered": ${LINES_HIT},
-                "pct": ${LINES_PCT}
-              },
-              "functions": {
-                "total": ${FUNCTIONS_FOUND},
-                "covered": ${FUNCTIONS_HIT},
-                "pct": ${FUNCTIONS_PCT}
-              },
-              "branches": {
-                "total": ${BRANCHES_FOUND},
-                "covered": ${BRANCHES_HIT},
-                "pct": ${BRANCHES_PCT}
-              }
-            }
-          }
-          EOF
-            
-            echo "coverage_pct=${LINES_PCT}" >> $GITHUB_OUTPUT
-            echo "status=available" >> $GITHUB_OUTPUT
-          else
-            echo "No coverage files found"
+          
+          if [ -f "test-results/unit/node20/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node20/coverage/unit/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/unit/node20/coverage/unit/lcov.info")
+            echo "✅ Found unit test coverage (Node 20)"
+          fi
+          
+          # Integration test coverage
+          if [ -f "test-results/integration-test-results/coverage/integration/lcov.info" ] && [ -s "test-results/integration-test-results/coverage/integration/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/integration-test-results/coverage/integration/lcov.info")
+            echo "✅ Found integration test coverage"
+          fi
+          
+          # E2E test coverage
+          if [ -f "test-results/e2e-test-results/coverage/e2e/lcov.info" ] && [ -s "test-results/e2e-test-results/coverage/e2e/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/e2e-test-results/coverage/e2e/lcov.info")
+            echo "✅ Found e2e test coverage"
+          fi
+          
+          # Performance test coverage
+          if [ -f "test-results/performance-test-results/coverage/performance/lcov.info" ] && [ -s "test-results/performance-test-results/coverage/performance/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/performance-test-results/coverage/performance/lcov.info")
+            echo "✅ Found performance test coverage"
+          fi
+          
+          # Security test coverage (if it generates coverage)
+          if [ -f "test-results/security-test-results/coverage/security/lcov.info" ] && [ -s "test-results/security-test-results/coverage/security/lcov.info" ]; then
+            COVERAGE_FILES+=("test-results/security-test-results/coverage/security/lcov.info")
+            echo "✅ Found security test coverage"
+          fi
+          
+          echo "📊 Found ${#COVERAGE_FILES[@]} coverage files to merge"
+          
+          if [ ${#COVERAGE_FILES[@]} -eq 0 ]; then
+            echo "❌ No coverage files found"
             echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
             echo "coverage_pct=0" >> $GITHUB_OUTPUT
             echo "status=missing" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          
+          # Copy coverage files to collected directory for merging
+          for i in "${!COVERAGE_FILES[@]}"; do
+            cp "${COVERAGE_FILES[$i]}" "coverage/collected/lcov-$i.info"
+            echo "📋 Copied ${COVERAGE_FILES[$i]} -> coverage/collected/lcov-$i.info"
+          done
+          
+          # Merge coverage files
+          echo "🔄 Merging coverage reports..."
+          if [ ${#COVERAGE_FILES[@]} -eq 1 ]; then
+            # Only one file, just copy it
+            cp "${COVERAGE_FILES[0]}" coverage/merged/lcov.info
+            echo "📝 Single coverage file used directly"
+          else
+            # Multiple files, use lcov-result-merger
+            lcov-result-merger 'coverage/collected/*.info' coverage/merged/lcov.info
+            echo "🔗 Merged ${#COVERAGE_FILES[@]} coverage files using lcov-result-merger"
+          fi
+          
+          # Verify merged file exists and has content
+          if [ ! -f "coverage/merged/lcov.info" ] || [ ! -s "coverage/merged/lcov.info" ]; then
+            echo "❌ Failed to create merged coverage file"
+            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
+            echo "coverage_pct=0" >> $GITHUB_OUTPUT
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "✅ Merged coverage file created with $(wc -l < coverage/merged/lcov.info) lines"
+          
+          # Use JavaScript for reliable coverage processing (no shell arithmetic)
+          COVERAGE_FILES_STR=$(printf '%s,' "${COVERAGE_FILES[@]}" | sed 's/,$//')
+          node scripts/process-coverage.js coverage/merged/lcov.info "$COVERAGE_FILES_STR"
+          
+          echo "files_merged=${#COVERAGE_FILES[@]}" >> $GITHUB_OUTPUT
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
@@ -1093,170 +1112,32 @@ jobs:
 
 
       - name: Generate comprehensive test report
+        env:
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          E2E_TESTS_RESULT: ${{ needs.e2e-tests.result }}
+          PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
+          SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
         run: |
-          mkdir -p reports
-          OVERALL_COVERAGE=$(jq -r '.total.lines.pct // 0' coverage-summary.json 2>/dev/null | awk '{printf "%.2f", $1}' || echo "0.00")
-
-          cat > reports/test-summary.md << EOF
-          # Test Summary Report
-
-          **Generated:** $(date)
-          **Commit:** \`${{ github.sha }}\`
-          **Branch:** \`${{ github.ref_name }}\`
-          **Trigger:** ${{ github.event_name }}
-
-          ## 🎯 Overall Merged Coverage: ${OVERALL_COVERAGE}%
-          *This is the accumulated coverage from all test suites that ran.*
-
-          ---
-
-          ## Test Suite Status
-
-          | Test Type   | Result  |
-          |-------------|---------|
-          EOF
-
-          # This loop now ONLY reports job status, not confusing individual coverage.
-          for test_type in unit integration e2e performance security; do
-            job_status=""
-            
-            case $test_type in
-              "unit") job_status="${{ needs.unit-tests.result }}" ;;
-              "integration") job_status="${{ needs.integration-tests.result }}" ;;
-              "e2e") job_status="${{ needs.e2e-tests.result }}" ;;
-              "performance") job_status="${{ needs.performance-tests.result }}" ;;
-              "security") job_status="${{ needs.security-tests.result }}" ;;
-            esac
-            
-            # Determine test status based on job result
-            if [[ -n "$job_status" && "$job_status" != "skipped" ]]; then
-              case "$job_status" in
-                "success") test_status="✅ Pass" ;;
-                "failure") test_status="❌ Fail" ;;
-                "cancelled") test_status="🛑 Cancel" ;;
-                *) test_status="⚠️ Unknown" ;;
-              esac
-              printf "| %-11s | %-7s |\n" "${test_type^}" "$test_status" >> reports/test-summary.md
-            fi
-          done
-
-          # Add link to LCOV report
-          if [ -d "lcov-html-report" ]; then
-            echo "" >> reports/test-summary.md
-            echo "## 📊 Detailed LCOV Coverage Report" >> reports/test-summary.md
-            echo "You can find a detailed HTML coverage report as a workflow artifact: [LCOV HTML Report Artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/lcov-html-report)" >> reports/test-summary.md
-          fi
-
-          echo "" >> reports/test-summary.md
-          echo "## Detailed Results" >> reports/test-summary.md
-
-          for test_type in unit integration e2e performance security; do
-            echo "" >> reports/test-summary.md
-            echo "### ${test_type^} Tests" >> reports/test-summary.md
-            echo "" >> reports/test-summary.md
-            echo "\`\`\`" >> reports/test-summary.md
-            if [ "$test_type" == "unit" ]; then
-              if [ -f test-results/unit/node18/coverage/unit/test-output-node18.log ]; then
-                cat test-results/unit/node18/coverage/unit/test-output-node18.log >> reports/test-summary.md
-              else
-                echo "No output for Node 18" >> reports/test-summary.md
-              fi
-              echo "" >> reports/test-summary.md
-              echo "---" >> reports/test-summary.md
-              echo "" >> reports/test-summary.md
-              if [ -f test-results/unit/node20/coverage/unit/test-output-node20.log ]; then
-                cat test-results/unit/node20/coverage/unit/test-output-node20.log >> reports/test-summary.md
-              else
-                echo "No output for Node 20" >> reports/test-summary.md
-              fi
-            else
-              if [ -f test-results/$test_type/coverage/$test_type/test-output.log ]; then
-                 cat test-results/$test_type/coverage/$test_type/test-output.log >> reports/test-summary.md
-              elif [ -f test-results/$test_type/test-output.log ]; then
-                cat test-results/$test_type/test-output.log >> reports/test-summary.md
-              else
-                echo "No output for $test_type tests" >> reports/test-summary.md
-              fi
-            fi
-            echo "\`\`\`" >> reports/test-summary.md
-          done
-
-          echo "" >> reports/test-summary.md
-          echo "Detailed test results and coverage reports are available in the individual test artifacts:" >> reports/test-summary.md
-          echo "- \`unit-test-results-node18\`, \`unit-test-results-node20\`" >> reports/test-summary.md
-          echo "- \`integration-test-results\`" >> reports/test-summary.md
-          echo "- \`e2e-test-results\`" >> reports/test-summary.md
-          echo "- \`performance-test-results\`" >> reports/test-summary.md
-          echo "- \`security-test-results\`" >> reports/test-summary.md
-
-          # Add overall coverage summary
-          if [ -f coverage-summary.json ]; then
-            echo "" >> reports/test-summary.md
-            echo "## Merged Coverage Breakdown" >> reports/test-summary.md
-            echo "" >> reports/test-summary.md
-            
-            BRANCH_COVERAGE=$(jq -r '.total.branches.pct // 0' coverage-summary.json 2>/dev/null | awk '{printf "%.2f", $1}' || echo "0.00")
-            FUNCTION_COVERAGE=$(jq -r '.total.functions.pct // 0' coverage-summary.json 2>/dev/null | awk '{printf "%.2f", $1}' || echo "0.00")
-            
-            echo "- **Lines:** ${OVERALL_COVERAGE}%" >> reports/test-summary.md
-            echo "- **Branches:** ${BRANCH_COVERAGE}%" >> reports/test-summary.md  
-            echo "- **Functions:** ${FUNCTION_COVERAGE}%" >> reports/test-summary.md
-            echo "" >> reports/test-summary.md
-            
-            # Coverage quality assessment using integer comparison
-            COVERAGE_INT=$(awk -v val="$OVERALL_COVERAGE" 'BEGIN {printf "%.0f", val * 100}')
-            if [ "$COVERAGE_INT" -ge 5000 ]; then
-              echo "✅ **Coverage Quality:** Meets minimum standards (≥50%)" >> reports/test-summary.md
-            elif [ "$COVERAGE_INT" -ge 2500 ]; then
-              echo "⚠️ **Coverage Quality:** Below target but acceptable (≥25%)" >> reports/test-summary.md
-            else
-              echo "❌ **Coverage Quality:** Below minimum standards (<25%)" >> reports/test-summary.md
-            fi
-          fi
+          node scripts/generate-test-report.js
 
       - name: Validate coverage quality
         run: |
-          if [ "${{ steps.coverage.outputs.status }}" == "available" ]; then
-            COVERAGE="${{ steps.coverage.outputs.coverage_pct }}"
-            # Ensure COVERAGE is a valid number
-            COVERAGE=$(echo "$COVERAGE" | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
-            
+          if [ -f coverage-metrics.json ]; then
+            COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
             echo "Current coverage: ${COVERAGE}%"
             
-            # Set coverage quality gates using integer comparison
-            COVERAGE_INT=$(awk -v val="$COVERAGE" 'BEGIN {printf "%.0f", val * 100}')
-            if [ "$COVERAGE_INT" -lt 2500 ]; then
+            # Set coverage quality gates
+            if (( $(echo "$COVERAGE < 25" | bc -l) )); then
               echo "❌ Coverage critically low: $COVERAGE%"
               echo "coverage_status=critical" >> $GITHUB_ENV
-            elif [ "$COVERAGE_INT" -lt 5000 ]; then
+            elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
               echo "⚠️ Coverage below minimum: $COVERAGE%"
               echo "coverage_status=warning" >> $GITHUB_ENV
-            elif [ "$COVERAGE_INT" -ge 5000 ]; then
+            else
               echo "✅ Coverage meets target: $COVERAGE%"
               echo "coverage_status=good" >> $GITHUB_ENV
-            else
-              echo "📈 Coverage progressing: $COVERAGE%"
-              echo "coverage_status=progress" >> $GITHUB_ENV
             fi
-            
-            # Create coverage metrics for tracking - Ensure all values are valid numbers
-            BRANCHES_PCT=$(jq -r '.total.branches.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
-            FUNCTIONS_PCT=$(jq -r '.total.functions.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
-            STATEMENTS_PCT=$(jq -r '.total.statements.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
-            QUALITY_SCORE=$(awk -v cov="$COVERAGE" -v br="$BRANCHES_PCT" -v fn="$FUNCTIONS_PCT" 'BEGIN {printf "%.2f", cov * 0.4 + br * 0.3 + fn * 0.3}')
-            
-            echo "{
-              \"timestamp\": \"$(date -Iseconds)\",
-              \"commit\": \"${{ github.sha }}\",
-              \"branch\": \"${{ github.ref_name }}\",
-              \"coverage\": {
-                \"lines\": $COVERAGE,
-                \"branches\": $BRANCHES_PCT,
-                \"functions\": $FUNCTIONS_PCT,
-                \"statements\": $STATEMENTS_PCT
-              },
-              \"quality_score\": $QUALITY_SCORE
-            }" > coverage-metrics.json
           else
             echo "No coverage data available"
             echo "coverage_status=missing" >> $GITHUB_ENV
@@ -1279,6 +1160,7 @@ jobs:
           path: |
             reports/
             coverage/merged/
+            coverage/collected/
             coverage-summary.json
             coverage-metrics.json
             test-results/
@@ -1326,6 +1208,7 @@ jobs:
           path: |
             reports/
             coverage/merged/
+            coverage/collected/
             coverage-summary.json
             coverage-metrics.json
             test-results/

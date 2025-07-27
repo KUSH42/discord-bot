@@ -71,11 +71,23 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      // Add enhanced logger methods
+      startOperation: jest.fn().mockReturnValue({
+        progress: jest.fn(),
+        success: jest.fn(),
+        error: jest.fn(),
+      }),
       child: jest.fn().mockReturnValue({
         info: jest.fn(),
         warn: jest.fn(),
         error: jest.fn(),
         debug: jest.fn(),
+        // Add enhanced logger methods to child logger too
+        startOperation: jest.fn().mockReturnValue({
+          progress: jest.fn(),
+          success: jest.fn(),
+          error: jest.fn(),
+        }),
         child: jest.fn().mockReturnThis(),
       }),
     };
@@ -100,7 +112,10 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
     };
 
     const mockContentCoordinator = {
-      processContent: jest.fn().mockResolvedValue({ processed: true }),
+      processContent: jest.fn().mockResolvedValue({
+        action: 'announced',
+        announcementResult: { success: true, channelId: 'test-channel', messageId: 'test-message' },
+      }),
     };
 
     const dependencies = {
@@ -419,12 +434,19 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
         details: { isLive: true },
       });
 
+      // Get the mockContentCoordinator from dependencies to update its mock
+      const mockContentCoordinator = monitorApp.contentCoordinator;
+
       // Execute fallback
       await monitorApp.performApiFallback();
 
       // Verify content was classified
       expect(mockContentClassifier.classifyYouTubeContent).toHaveBeenCalledWith(mockVideo);
-      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+
+      // Since contentCoordinator is present, verify it was called instead of direct announcer
+      expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+        'classified-video',
+        'api-fallback',
         expect.objectContaining({
           platform: 'youtube',
           type: 'livestream',

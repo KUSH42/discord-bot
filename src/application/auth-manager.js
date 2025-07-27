@@ -1,3 +1,5 @@
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+
 /**
  * Manages authentication for the scraper, handling cookies and login flows.
  */
@@ -6,9 +8,16 @@ export class AuthManager {
     this.browser = dependencies.browserService;
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
-    this.logger = dependencies.logger;
     this.twitterUsername = this.config.getRequired('TWITTER_USERNAME');
     this.twitterPassword = this.config.getRequired('TWITTER_PASSWORD');
+
+    // Create enhanced logger for this module
+    this.logger = createEnhancedLogger(
+      'auth',
+      dependencies.logger,
+      dependencies.debugManager,
+      dependencies.metricsManager
+    );
   }
 
   /**
@@ -21,56 +30,79 @@ export class AuthManager {
   async ensureAuthenticated(options = {}) {
     const { maxRetries = 3, baseDelay = 2000 } = options;
 
+    const operation = this.logger.startOperation('ensureAuthenticated', {
+      maxRetries,
+      baseDelay,
+      username: this.twitterUsername ? '[CONFIGURED]' : '[NOT_SET]',
+    });
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        this.logger.info(`Ensuring authentication... (attempt ${attempt}/${maxRetries})`);
+        operation.progress(`Authentication attempt ${attempt}/${maxRetries}`);
         const savedCookies = this.state.get('x_session_cookies');
 
         if (savedCookies && this.validateCookieFormat(savedCookies)) {
-          this.logger.info('Attempting to use saved session cookies');
+          operation.progress('Attempting authentication with saved cookies');
           try {
             await this.browser.setCookies(savedCookies);
             await this.browser.goto('https://x.com/home', { waitUntil: 'domcontentloaded' });
 
             if (await this.isAuthenticated()) {
-              this.logger.info('✅ Successfully authenticated using saved cookies.');
               this.clearSensitiveData();
+              this.logger.info('✅ Successfully authenticated using saved cookies.');
+              operation.success('Successfully authenticated using saved cookies', {
+                method: 'saved_cookies',
+                attempt,
+              });
               return;
             } else {
-              this.logger.warn('Saved cookies failed, attempting login');
+              operation.progress('Saved cookies expired, attempting fresh login');
               try {
                 this.state.delete('x_session_cookies');
-                this.logger.warn('Clearing expired session cookies');
               } catch (deleteError) {
                 this.logger.error('Failed to delete session cookies from state:', deleteError);
               }
+              this.logger.warn('Saved cookies failed, attempting login');
               await this.loginToX();
-              this.logger.info('✅ Authentication successful');
+              operation.success('Authentication successful after fresh login', {
+                method: 'fresh_login_after_expired_cookies',
+                attempt,
+              });
               return;
             }
           } catch (error) {
-            this.logger.error(
-              'Error validating saved cookies, falling back to login:',
-              this.sanitizeErrorMessage(error.message)
-            );
+            operation.progress('Cookie validation failed, falling back to login');
+            this.logger.error('Error validating saved cookies, falling back to login:', error.message);
             await this.loginToX();
-            this.logger.info('✅ Authentication successful');
+            operation.success('Authentication successful after cookie fallback', {
+              method: 'login_after_cookie_error',
+              attempt,
+              cookieError: this.sanitizeErrorMessage(error.message),
+            });
             return;
           }
         } else if (savedCookies) {
-          this.logger.warn('Invalid saved cookies format, performing login');
+          operation.progress('Invalid cookie format, performing fresh login');
           try {
             this.state.delete('x_session_cookies');
           } catch (deleteError) {
             this.logger.error('Failed to delete session cookies from state:', deleteError);
           }
+          this.logger.warn('Invalid saved cookies format, performing login');
           await this.loginToX();
-          this.logger.info('✅ Authentication successful');
+          operation.success('Authentication successful after invalid cookie cleanup', {
+            method: 'login_after_invalid_cookies',
+            attempt,
+          });
           return;
         } else {
+          operation.progress('No saved cookies found, performing fresh login');
           this.logger.info('No saved cookies found, performing login');
           await this.loginToX();
-          this.logger.info('✅ Authentication successful');
+          operation.success('Authentication successful with fresh login', {
+            method: 'fresh_login',
+            attempt,
+          });
           return;
         }
       } catch (error) {
@@ -80,7 +112,11 @@ export class AuthManager {
             : 'An unknown authentication error occurred.';
 
         if (attempt === maxRetries) {
-          this.logger.error(`Authentication failed after ${maxRetries} attempts:`, sanitizedMessage);
+          this.logger.error('Non-recoverable authentication error:', sanitizedMessage);
+          operation.error(error, `Authentication failed after ${maxRetries} attempts`, {
+            attempts: maxRetries,
+            finalError: sanitizedMessage,
+          });
           throw new Error('Authentication failed');
         }
 
@@ -88,11 +124,15 @@ export class AuthManager {
         const isRecoverable = this.isRecoverableError(error);
         if (!isRecoverable) {
           this.logger.error('Non-recoverable authentication error:', sanitizedMessage);
+          operation.error(error, 'Non-recoverable authentication error', {
+            attempt,
+            errorType: 'non_recoverable',
+          });
           throw new Error('Authentication failed');
         }
 
         const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-        this.logger.warn(`Authentication attempt ${attempt} failed, retrying in ${delay}ms:`, sanitizedMessage);
+        operation.progress(`Attempt ${attempt} failed, retrying in ${delay}ms`);
         await this.delay(delay);
       }
     }
@@ -134,31 +174,45 @@ export class AuthManager {
    * @returns {Promise<boolean>} True if login is successful.
    */
   async loginToX() {
-    this.logger.info('Using credential-based authentication...');
-    await this.browser.goto('https://x.com/i/flow/login');
+    const operation = this.logger.startOperation('loginToX', {
+      username: this.twitterUsername ? '[CONFIGURED]' : '[NOT_SET]',
+      loginUrl: 'https://x.com/i/flow/login',
+    });
 
-    // Step 1: Enter username
-    this.logger.info('Entering username...');
-    await this.browser.waitForSelector('input[name="text"]', { timeout: 10000 });
-    await this.browser.type('input[name="text"]', this.twitterUsername);
-    await this.clickNextButton();
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    try {
+      operation.progress('Navigating to X login page');
+      await this.browser.goto('https://x.com/i/flow/login');
 
-    // Step 2: Enter password
-    this.logger.info('Entering password...');
-    await this.browser.waitForSelector('input[name="password"]', { timeout: 10000 });
-    await this.browser.type('input[name="password"]', this.twitterPassword);
-    await this.clickLoginButton();
-    await this.browser.waitForNavigation({ timeout: 15000 });
+      operation.progress('Entering username credentials');
+      await this.browser.waitForSelector('input[name="text"]', { timeout: 10000 });
+      await this.browser.type('input[name="text"]', this.twitterUsername);
+      await this.clickNextButton();
+      await new Promise(resolve => setTimeout(resolve, 4000));
 
-    if (await this.isAuthenticated()) {
-      this.logger.info('✅ Login successful, a new session has been established.');
-      await this.saveAuthenticationState();
-      this.clearSensitiveData();
-      return true;
-    } else {
-      this.logger.error('Credential-based login failed.');
-      throw new Error('Authentication failed');
+      operation.progress('Entering password credentials');
+      await this.browser.waitForSelector('input[name="password"]', { timeout: 10000 });
+      await this.browser.type('input[name="password"]', this.twitterPassword);
+      await this.clickLoginButton();
+      await this.browser.waitForNavigation({ timeout: 15000 });
+
+      operation.progress('Verifying login success');
+      if (await this.isAuthenticated()) {
+        operation.progress('Saving authentication state');
+        await this.saveAuthenticationState();
+        this.clearSensitiveData();
+        this.logger.info('✅ Login successful, a new session has been established.');
+        operation.success('Login successful, new session established', {
+          method: 'credential_login',
+        });
+        return true;
+      } else {
+        this.logger.error('Credential-based login failed.');
+        operation.error(new Error('Credential-based login failed'), 'Login verification failed');
+        throw new Error('Authentication failed');
+      }
+    } catch (error) {
+      operation.error(error, 'Credential-based login failed');
+      throw error;
     }
   }
 
@@ -204,45 +258,66 @@ export class AuthManager {
    * @returns {Promise<boolean>}
    */
   async isAuthenticated() {
-    if (!this.browser || !this.browser.page) {
-      this.logger.warn('Browser service or page not available for authentication check.');
-      return false;
-    }
+    const operation = this.logger.startOperation('isAuthenticated', {
+      hasBrowser: !!this.browser,
+      hasPage: !!(this.browser && this.browser.page),
+    });
+
     try {
-      // Check for X authentication cookies
+      if (!this.browser || !this.browser.page) {
+        this.logger.warn('Browser service or page not available for authentication check.');
+        operation.success('Browser service not available', {
+          authenticated: false,
+          reason: 'no_browser_service',
+        });
+        return false;
+      }
+
+      operation.progress('Checking authentication cookies');
       const cookies = await this.browser.getCookies();
 
       // X uses 'auth_token' and 'ct0' cookies for authentication
       const authToken = cookies.find(cookie => cookie.name === 'auth_token');
       const ct0Token = cookies.find(cookie => cookie.name === 'ct0');
-
-      // Both cookies should be present and non-empty for valid authentication
       const hasValidCookies = authToken && authToken.value && ct0Token && ct0Token.value;
 
-      this.logger.info(
-        `Authentication check result: ${hasValidCookies ? 'authenticated (valid cookies)' : 'not authenticated (missing/invalid cookies)'}`
-      );
-
       if (hasValidCookies) {
-        // Optional: Do a quick navigation test to confirm cookies work
+        operation.progress('Valid cookies found, performing navigation test');
         try {
           await this.browser.goto('https://x.com/home', { timeout: 10000, waitUntil: 'domcontentloaded' });
-          // If we can navigate to home without being redirected to login, we're good
           const currentUrl = await this.browser.getUrl();
           const isOnHomePage = currentUrl.includes('/home') || currentUrl === 'https://x.com/';
 
-          this.logger.info(`Navigation check: ${isOnHomePage ? 'success' : 'redirected to login'}`);
+          operation.success('Authentication verification completed', {
+            authenticated: isOnHomePage,
+            method: 'navigation_test',
+            currentUrl: currentUrl.substring(0, 50),
+            cookiesPresent: true,
+          });
           return isOnHomePage;
         } catch (navError) {
-          this.logger.warn('Navigation test failed, but cookies present:', this.sanitizeErrorMessage(navError.message));
           // If navigation fails but cookies are present, assume authenticated
+          operation.success('Authentication verified by cookies (navigation failed)', {
+            authenticated: true,
+            method: 'cookies_only',
+            navigationError: this.sanitizeErrorMessage(navError.message),
+            cookiesPresent: true,
+          });
           return true;
         }
       }
 
+      operation.success('Authentication check completed', {
+        authenticated: false,
+        reason: 'missing_or_invalid_cookies',
+        cookiesFound: cookies.length,
+        hasAuthToken: !!authToken,
+        hasCt0Token: !!ct0Token,
+      });
       return false;
     } catch (error) {
-      this.logger.warn('Error checking authentication status:', this.sanitizeErrorMessage(error.message));
+      this.logger.warn('Error checking authentication status:', error.message);
+      operation.error(error, 'Error checking authentication status');
       return false;
     }
   }

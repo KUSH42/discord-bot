@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import crypto from 'crypto';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
   let mockYouTubeMonitor;
@@ -67,7 +68,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
       DISCORD_YOUTUBE_CHANNEL_ID: '123456789012345678',
 
       // State
-      lastSuccessfulCheck: new Date(Date.now() - 300000), // 5 minutes ago
+      lastSuccessfulCheck: new Date(timestampUTC() - 300000), // 5 minutes ago
       failedNotifications: new Map(),
       recentFailures: [],
       fallbackInProgress: false,
@@ -228,7 +229,7 @@ describe('Empty PubSubHubbub Notification Fallback E2E Tests', () => {
               id: { videoId: oldVideoId },
               snippet: {
                 title: 'Old Video Already Announced',
-                publishedAt: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+                publishedAt: new Date(timestampUTC() - 600000).toISOString(), // 10 minutes ago
                 channelId: mockYouTubeMonitor.YOUTUBE_CHANNEL_ID,
                 channelTitle: 'Test Channel',
               },
@@ -506,7 +507,7 @@ function setupMockImplementations(monitor) {
     this.fallbackMetrics.totalApiFallbackExecutions++;
 
     try {
-      const backfillStart = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+      const backfillStart = new Date(timestampUTC() - 2 * 60 * 60 * 1000); // 2 hours ago
       const publishedAfter = this.lastSuccessfulCheck > backfillStart ? this.lastSuccessfulCheck : backfillStart;
 
       const searchResponse = await this.youtube.search.list({

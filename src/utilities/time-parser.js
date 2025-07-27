@@ -1,18 +1,22 @@
 /**
  * Utility functions for parsing relative time strings into Date objects
+ * All operations are performed in UTC to avoid timezone issues
  */
+
+import { nowUTC } from './utc-time.js';
 
 /**
  * Parse relative time strings (e.g., "1 hour ago", "2 days ago") into Date objects
+ * All calculations are performed in UTC to ensure timezone safety
  * @param {string} relativeTimeString - The relative time string to parse
- * @param {Date} [referenceDate] - The reference date to calculate from (defaults to current time)
+ * @param {Date} [referenceDate] - The reference date to calculate from (defaults to current UTC time)
  * @returns {Date|null} The calculated Date object, or null if parsing fails
  * @example
- * parseRelativeTime("1 hour ago") // Returns Date 1 hour before now
- * parseRelativeTime("2 days ago") // Returns Date 2 days before now
- * parseRelativeTime("just now") // Returns current Date
+ * parseRelativeTime("1 hour ago") // Returns Date 1 hour before now (UTC)
+ * parseRelativeTime("2 days ago") // Returns Date 2 days before now (UTC)
+ * parseRelativeTime("just now") // Returns current Date (UTC)
  */
-export function parseRelativeTime(relativeTimeString, referenceDate = new Date()) {
+export function parseRelativeTime(relativeTimeString, referenceDate = nowUTC()) {
   if (!relativeTimeString || typeof relativeTimeString !== 'string') {
     return null;
   }
@@ -62,25 +66,25 @@ function calculateDateFromUnit(amount, unit, referenceDate) {
 
   switch (unit) {
     case 'second':
-      date.setSeconds(date.getSeconds() - amount);
+      date.setUTCSeconds(date.getUTCSeconds() - amount);
       break;
     case 'minute':
-      date.setMinutes(date.getMinutes() - amount);
+      date.setUTCMinutes(date.getUTCMinutes() - amount);
       break;
     case 'hour':
-      date.setHours(date.getHours() - amount);
+      date.setUTCHours(date.getUTCHours() - amount);
       break;
     case 'day':
-      date.setDate(date.getDate() - amount);
+      date.setUTCDate(date.getUTCDate() - amount);
       break;
     case 'week':
-      date.setDate(date.getDate() - amount * 7);
+      date.setUTCDate(date.getUTCDate() - amount * 7);
       break;
     case 'month':
-      date.setMonth(date.getMonth() - amount);
+      date.setUTCMonth(date.getUTCMonth() - amount);
       break;
     case 'year':
-      date.setFullYear(date.getFullYear() - amount);
+      date.setUTCFullYear(date.getUTCFullYear() - amount);
       break;
     default:
       return null;

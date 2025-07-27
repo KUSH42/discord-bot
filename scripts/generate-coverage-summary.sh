@@ -95,8 +95,10 @@ EOF
 if [ ! -f "coverage-summary.json" ] || [ ! -s "coverage-summary.json" ] || grep -q '"pct": 0' coverage-summary.json; then
     echo "📋 coverage-summary.json missing or empty, generating from lcov.info files..."
     
-    # Look for the main coverage file first
-    if [ -f "coverage/lcov.info" ]; then
+    # Look for the main coverage file first (prefer merged coverage)
+    if [ -f "coverage/merged/lcov.info" ]; then
+        extract_coverage_from_lcov "coverage/merged/lcov.info"
+    elif [ -f "coverage/lcov.info" ]; then
         extract_coverage_from_lcov "coverage/lcov.info"
     elif [ -f "test-results/unit-node20/coverage/unit/lcov.info" ]; then
         extract_coverage_from_lcov "test-results/unit-node20/coverage/unit/lcov.info"

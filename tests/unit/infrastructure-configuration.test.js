@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 // Simple test focused on basic functionality without complex mocking
 describe('Configuration', () => {
@@ -189,9 +190,9 @@ describe('Configuration', () => {
         largeEnv[`KEY_${i}`] = `value_${i}`;
       }
 
-      const startTime = Date.now();
+      const startTime = timestampUTC();
       const config = new Configuration({ ...mockEnv, ...largeEnv });
-      const endTime = Date.now();
+      const endTime = timestampUTC();
 
       // Should complete within reasonable time (1 second)
       expect(endTime - startTime).toBeLessThan(1000);

@@ -7,7 +7,7 @@ This guide documents the async timer handling improvements made to fix complex t
 ## Root Problems Fixed
 
 ### 1. **Time Source Conflicts**
-- **Problem**: `Date.now()` returned real time while Jest fake timers controlled `setTimeout`
+- **Problem**: `timestampUTC()` returned real time while Jest fake timers controlled `setTimeout`
 - **Solution**: Added `timeSource` abstraction to make time controllable in tests
 
 ### 2. **Automatic vs Manual Processing**
@@ -26,7 +26,7 @@ This guide documents the async timer handling improvements made to fix complex t
 // Constructor now supports test-friendly options
 constructor(logger, options = {}) {
   // Time source abstraction for testing
-  this.timeSource = options.timeSource || (() => Date.now());
+  this.timeSource = options.timeSource || (() => timestampUTC());
   
   // Allow disabling auto-start for tests
   this.autoStart = options.autoStart !== false; // Default true
@@ -37,10 +37,10 @@ constructor(logger, options = {}) {
   }
 }
 
-// All Date.now() calls replaced with this.timeSource()
+// All timestampUTC() calls replaced with this.timeSource()
 async processQueue() {
   if (this.isPaused && this.pauseUntil && this.timeSource() < this.pauseUntil) {
-    // ... uses timeSource instead of Date.now()
+    // ... uses timeSource instead of timestampUTC()
   }
 }
 ```

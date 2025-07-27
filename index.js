@@ -37,6 +37,20 @@ async function startBot() {
     await startWebServer(container, configuration);
     setupGracefulShutdown(container);
 
+    // Listen for bot initialization completion event to enable comprehensive logging
+    const eventBus = container.resolve('eventBus');
+    const contentStateManager = container.resolve('contentStateManager');
+
+    eventBus.on('bot.initialization.complete', event => {
+      logger.info('Bot initialization complete - enabling comprehensive content evaluation logging', {
+        timestamp: event.timestamp,
+        historyScanned: event.historyScanned,
+        error: event.error,
+      });
+
+      contentStateManager.markFullyInitialized();
+    });
+
     if (hasErrors) {
       logger.warn('⚠️ Bot startup completed with some components disabled due to errors');
     } else {

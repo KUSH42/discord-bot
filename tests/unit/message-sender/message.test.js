@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { Message } from '../../../src/services/implementations/message-sender/message.js';
+import { timestampUTC } from '../../../src/utilities/utc-time.js';
 
 describe('Message', () => {
   let message;
@@ -66,7 +67,7 @@ describe('Message', () => {
 
       expect(message.status).toBe('processing');
       expect(message.processingStarted).toBeDefined();
-      expect(message.processingStarted).toBeGreaterThan(Date.now() - 1000);
+      expect(message.processingStarted).toBeGreaterThan(timestampUTC() - 1000);
     });
 
     it('should handle completion', () => {
@@ -139,7 +140,7 @@ describe('Message', () => {
 
   describe('Timing Methods', () => {
     it('should calculate message age', () => {
-      const now = Date.now();
+      const now = timestampUTC();
       message.createdAt = now - 5000; // 5 seconds ago
 
       const age = message.getAge();

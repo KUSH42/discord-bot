@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('Search and Retweet Logic', () => {
   let scraperApp;
@@ -14,6 +15,9 @@ describe('Search and Retweet Logic', () => {
   let mockDelay;
 
   beforeEach(() => {
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+
     // Mock browser service
     mockBrowserService = {
       launch: jest.fn(),
@@ -85,13 +89,7 @@ describe('Search and Retweet Logic', () => {
     };
 
     // Mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     // Mock discord service
     mockDiscordService = {
@@ -115,6 +113,8 @@ describe('Search and Retweet Logic', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
       discord: mockDiscordService,
       authManager: mockAuthManager,
       delay: mockDelay,
@@ -171,10 +171,15 @@ describe('Search and Retweet Logic', () => {
     expect(mockBrowserService.goto).toHaveBeenCalledWith(expectedSearchUrlWithDate);
   });
 
-  it('should log polling message when starting profile poll', async () => {
+  it('should log polling completion message', async () => {
     await scraperApp.pollXProfile();
 
-    expect(mockLogger.info).toHaveBeenCalledWith('Polling X profile: @testuser');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'X profile polling completed successfully',
+      expect.objectContaining({
+        module: 'scraper',
+      })
+    );
   });
 
   it('should not log enhanced retweet message when disabled', async () => {

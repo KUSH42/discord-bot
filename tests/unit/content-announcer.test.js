@@ -7,6 +7,8 @@ describe('ContentAnnouncer', () => {
   let mockConfig;
   let mockStateManager;
   let mockLogger;
+  let mockDebugFlagManager;
+  let mockMetricsManager;
 
   beforeEach(() => {
     // Mock Discord service
@@ -59,16 +61,45 @@ describe('ContentAnnouncer', () => {
       _state: state,
     };
 
-    // Mock logger
+    // Mock logger with child method for enhanced logger
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      verbose: jest.fn(),
+      child: jest.fn(() => ({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+        verbose: jest.fn(),
+      })),
+    };
+
+    // Mock debug flag manager
+    mockDebugFlagManager = {
+      isEnabled: jest.fn(() => false),
+      getLevel: jest.fn(() => 1),
+    };
+
+    // Mock metrics manager
+    mockMetricsManager = {
+      increment: jest.fn(),
+      timing: jest.fn(),
+      gauge: jest.fn(),
+      startTimer: jest.fn(() => jest.fn()),
     };
 
     // Create content announcer instance
-    contentAnnouncer = new ContentAnnouncer(mockDiscordService, mockConfig, mockStateManager, mockLogger);
+    contentAnnouncer = new ContentAnnouncer(
+      mockDiscordService,
+      mockConfig,
+      mockStateManager,
+      mockLogger,
+      mockDebugFlagManager,
+      mockMetricsManager
+    );
   });
 
   afterEach(() => {
@@ -795,9 +826,29 @@ describe('ContentAnnouncer', () => {
     });
 
     it('should handle mirror message errors gracefully', async () => {
-      mockDiscordService.sendMessage
-        .mockResolvedValueOnce({ id: 'message123' }) // Main message succeeds
-        .mockRejectedValueOnce(new Error('Mirror failed')); // Mirror fails
+      // Reset all mocks first
+      jest.clearAllMocks();
+
+      // Mock sendMessage to succeed on first call, fail on second
+      let callCount = 0;
+      mockDiscordService.sendMessage.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ id: 'message123' }); // Main message succeeds
+        } else {
+          return Promise.reject(new Error('Mirror failed')); // Mirror fails
+        }
+      });
+
+      // Create a new ContentAnnouncer instance with the updated config
+      const mirrorContentAnnouncer = new ContentAnnouncer(
+        mockDiscordService,
+        mockConfig,
+        mockStateManager,
+        mockLogger,
+        mockDebugFlagManager,
+        mockMetricsManager
+      );
 
       const content = {
         platform: 'youtube',
@@ -809,10 +860,18 @@ describe('ContentAnnouncer', () => {
         publishedAt: '2024-01-01T00:01:00Z',
       };
 
-      const result = await contentAnnouncer.announceContent(content);
+      // Test that mirroring is enabled
+      expect(mirrorContentAnnouncer.shouldMirrorMessage('123456789012345678', {})).toBe(true);
+
+      // The enhanced logger creates a child logger, so we need to spy on that instance
+      const enhancedLoggerInstance = mirrorContentAnnouncer.logger;
+      const errorSpy = jest.spyOn(enhancedLoggerInstance, 'error');
+
+      const result = await mirrorContentAnnouncer.announceContent(content);
 
       expect(result.success).toBe(true); // Main message succeeded
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(mockDiscordService.sendMessage).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(
         'Failed to send mirror message',
         expect.objectContaining({
           error: 'Mirror failed',
@@ -846,7 +905,6 @@ describe('ContentAnnouncer', () => {
       genericAnnouncer.channelMap.generic = {
         content: '123456789012345684',
       };
-
       const content = {
         platform: 'generic',
         type: 'content',

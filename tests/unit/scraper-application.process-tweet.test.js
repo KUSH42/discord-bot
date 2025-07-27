@@ -1,5 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ScraperApplication Process Tweet', () => {
   let scraperApp;
@@ -13,6 +14,9 @@ describe('ScraperApplication Process Tweet', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockConfig = {
       getRequired: jest.fn(),
@@ -28,13 +32,7 @@ describe('ScraperApplication Process Tweet', () => {
       announceContent: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     mockEventBus = {
       emit: jest.fn(),
@@ -96,6 +94,8 @@ describe('ScraperApplication Process Tweet', () => {
       },
       duplicateDetector: mockDuplicateDetector,
       persistentStorage: { get: jest.fn(), set: jest.fn() },
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
     };
 
     scraperApp = new ScraperApplication(mockDependencies);
@@ -144,7 +144,14 @@ describe('ScraperApplication Process Tweet', () => {
       });
 
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweet.url);
-      expect(mockLogger.info).toHaveBeenCalledWith('Announced post from @testuser: 123456789');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Announced post from @testuser',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+          tweetId: '123456789',
+        })
+      );
     });
 
     it('should bypass classifier for author-based retweets', async () => {
@@ -164,7 +171,12 @@ describe('ScraperApplication Process Tweet', () => {
 
       expect(mockClassifier.classifyXContent).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Bypassing classifier for author-based retweet: otheruser != testuser'
+        'Announced retweet from @otheruser',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+          tweetId: '987654321',
+        })
       );
 
       expect(mockAnnouncer.announceContent).toHaveBeenCalledWith({
@@ -179,7 +191,14 @@ describe('ScraperApplication Process Tweet', () => {
         isOld: false,
       });
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Announced retweet from @otheruser: 987654321');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Announced retweet from @otheruser',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+          tweetId: '987654321',
+        })
+      );
     });
 
     it('should handle tweets with retweet metadata', async () => {
@@ -239,7 +258,14 @@ describe('ScraperApplication Process Tweet', () => {
 
       await scraperApp.processNewTweet(tweet);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Skipped post from @testuser: Content filtered');
+      // The announcer is called but returns skipped result
+      expect(mockAnnouncer.announceContent).toHaveBeenCalled();
+      expect(mockAnnouncer.announceContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'post',
+          platform: 'x',
+        })
+      );
     });
 
     it('should handle failed announcements', async () => {
@@ -266,7 +292,14 @@ describe('ScraperApplication Process Tweet', () => {
 
       await scraperApp.processNewTweet(tweet);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to announce post from @testuser: API error');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to announce post',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'error',
+          error: 'API error',
+        })
+      );
     });
 
     it('should emit tweet processed event', async () => {
@@ -317,7 +350,14 @@ describe('ScraperApplication Process Tweet', () => {
 
       await expect(scraperApp.processNewTweet(tweet)).rejects.toThrow('Processing failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error processing tweet error123:', processError);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error processing tweet error123',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'error',
+          error: 'Processing failed',
+        })
+      );
     });
 
     it('should handle tweet without URL', async () => {
@@ -362,7 +402,14 @@ describe('ScraperApplication Process Tweet', () => {
 
       await scraperApp.processNewTweet(retweetWithAt);
 
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Using classifier for tweet'));
+      // With enhanced logging, we get the final success message instead
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Announced post from @@testuser',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+        })
+      );
       expect(mockClassifier.classifyXContent).toHaveBeenCalled();
 
       // Test with Unknown author

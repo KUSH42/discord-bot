@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { AuthManager } from '../../src/application/auth-manager.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('AuthManager', () => {
   let authManager;
@@ -11,6 +12,9 @@ describe('AuthManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockPage = {
       url: jest.fn().mockResolvedValue('https://x.com/home'),
@@ -43,17 +47,15 @@ describe('AuthManager', () => {
       delete: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     const dependencies = {
       browserService: mockBrowserService,
       config: mockConfig,
       stateManager: mockStateManager,
       logger: mockLogger,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
     };
 
     authManager = new AuthManager(dependencies);
@@ -64,7 +66,7 @@ describe('AuthManager', () => {
       expect(authManager.browser).toBe(mockBrowserService);
       expect(authManager.config).toBe(mockConfig);
       expect(authManager.state).toBe(mockStateManager);
-      expect(authManager.logger).toBe(mockLogger);
+      expect(authManager.logger).toEqual(expect.objectContaining({ moduleName: 'auth' }));
     });
 
     it('should get required config values during initialization', () => {
@@ -162,14 +164,24 @@ describe('AuthManager', () => {
       const result = await authManager.isAuthenticated();
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Error checking authentication status:', 'Cookie check failed');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Error checking authentication status:',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should return false if browser or page is not available', async () => {
       authManager.browser = { ...mockBrowserService, page: null };
       let result = await authManager.isAuthenticated();
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Browser service or page not available for authentication check.');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Browser service or page not available for authentication check.',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
 
       authManager.browser = null;
       result = await authManager.isAuthenticated();
@@ -202,7 +214,12 @@ describe('AuthManager', () => {
 
       expect(mockBrowserService.getCookies).toHaveBeenCalled();
       expect(mockStateManager.set).toHaveBeenCalledWith('x_session_cookies', validCookies);
-      expect(mockLogger.info).toHaveBeenCalledWith('Saved session cookies to state');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Saved session cookies to state',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should warn when cookies are invalid format', async () => {
@@ -214,7 +231,12 @@ describe('AuthManager', () => {
       await authManager.saveAuthenticationState();
 
       expect(mockStateManager.set).not.toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Could not find any valid cookies to save.');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Could not find any valid cookies to save.',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should handle errors when getting cookies', async () => {
@@ -222,7 +244,12 @@ describe('AuthManager', () => {
 
       await authManager.saveAuthenticationState();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error saving session cookies:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error saving session cookies:',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
   });
 
@@ -249,7 +276,12 @@ describe('AuthManager', () => {
       expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="password"]', 'test_password');
       expect(clickLoginButtonSpy).toHaveBeenCalled();
       expect(saveAuthStateSpy).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Login successful, a new session has been established.');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Login successful'),
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
 
       jest.useRealTimers();
     });
@@ -261,7 +293,12 @@ describe('AuthManager', () => {
       jest.spyOn(authManager, 'saveAuthenticationState').mockResolvedValue();
 
       await expect(authManager.loginToX()).rejects.toThrow('Authentication failed');
-      expect(mockLogger.error).toHaveBeenCalledWith('Credential-based login failed.');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Credential-based login failed.',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should handle browser interaction errors', async () => {
@@ -286,7 +323,12 @@ describe('AuthManager', () => {
       expect(mockBrowserService.setCookies).toHaveBeenCalledWith(validCookies);
       expect(mockBrowserService.goto).toHaveBeenCalledWith('https://x.com/home', { waitUntil: 'domcontentloaded' });
       expect(authManager.loginToX).not.toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated using saved cookies.');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Successfully authenticated using saved cookies'),
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should fallback to login when saved cookies are invalid', async () => {
@@ -297,7 +339,12 @@ describe('AuthManager', () => {
 
       expect(mockStateManager.delete).toHaveBeenCalledWith('x_session_cookies');
       expect(authManager.loginToX).toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Invalid saved cookies format, performing login');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Invalid saved cookies format, performing login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should fallback to login when saved cookies fail authentication', async () => {
@@ -309,7 +356,12 @@ describe('AuthManager', () => {
 
       expect(mockStateManager.delete).toHaveBeenCalledWith('x_session_cookies');
       expect(authManager.loginToX).toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Saved cookies failed, attempting login');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Saved cookies failed, attempting login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should perform login when no saved cookies', async () => {
@@ -318,7 +370,12 @@ describe('AuthManager', () => {
       await authManager.ensureAuthenticated();
 
       expect(authManager.loginToX).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('No saved cookies found, performing login');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'No saved cookies found, performing login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should handle errors during cookie validation and fallback to login', async () => {
@@ -331,7 +388,9 @@ describe('AuthManager', () => {
       expect(authManager.loginToX).toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error validating saved cookies, falling back to login:',
-        'Cookie error'
+        expect.objectContaining({
+          module: 'auth',
+        })
       );
     });
 
@@ -340,7 +399,12 @@ describe('AuthManager', () => {
       authManager.loginToX.mockRejectedValue(new Error('Login failed'));
 
       await expect(authManager.ensureAuthenticated()).rejects.toThrow('Authentication failed');
-      expect(mockLogger.error).toHaveBeenCalledWith('Non-recoverable authentication error:', 'Login failed');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Non-recoverable authentication error:',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should handle browser navigation errors during cookie validation', async () => {
@@ -353,7 +417,9 @@ describe('AuthManager', () => {
       expect(authManager.loginToX).toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error validating saved cookies, falling back to login:',
-        'Navigation error'
+        expect.objectContaining({
+          module: 'auth',
+        })
       );
     });
   });
@@ -381,7 +447,12 @@ describe('AuthManager', () => {
       // The new implementation should not throw, but return false and log.
       const result = await authManager.isAuthenticated();
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Browser service or page not available for authentication check.');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Browser service or page not available for authentication check.',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should handle timeout errors during login', async () => {
@@ -435,7 +506,12 @@ describe('AuthManager', () => {
 
       await authManager.ensureAuthenticated();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated using saved cookies.');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Successfully authenticated using saved cookies'),
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
   });
 
@@ -450,7 +526,9 @@ describe('AuthManager', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error validating saved cookies, falling back to login:',
-        'Browser disconnected'
+        expect.objectContaining({
+          module: 'auth',
+        })
       );
       expect(authManager.loginToX).toHaveBeenCalled();
     });
@@ -491,7 +569,12 @@ describe('AuthManager', () => {
 
       await expect(authManager.ensureAuthenticated()).rejects.toThrow('Authentication failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Non-recoverable authentication error:', 'State read error');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Non-recoverable authentication error:',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should log an error but still attempt to login if stateManager.delete fails', async () => {
@@ -503,7 +586,12 @@ describe('AuthManager', () => {
 
       await authManager.ensureAuthenticated();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Invalid saved cookies format, performing login');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Invalid saved cookies format, performing login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
       expect(authManager.loginToX).toHaveBeenCalled();
     });
 
@@ -516,7 +604,12 @@ describe('AuthManager', () => {
 
       await authManager.saveAuthenticationState();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error saving session cookies:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error saving session cookies:',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
   });
 });

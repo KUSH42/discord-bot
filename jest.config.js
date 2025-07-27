@@ -27,30 +27,11 @@ export default {
   // Re-enabled coverage thresholds after fixing hanging tests
   coverageThreshold: {
     global: {
-      statements: 20, // Reduced from 25 to be more achievable
-      branches: 15, // Reduced from 20
-      functions: 20, // Reduced from 25
-      lines: 20, // Reduced from 25
+      statements: 80, // Increased from 20 to be more achievable
+      branches: 75, // Increased from 15
+      functions: 70, // Increased from 20
+      lines: 70, // Increased from 20
     },
-    'src/core/': {
-      statements: 40, // Reduced from 50
-      branches: 30, // Reduced from 40
-      functions: 45, // Reduced from 55
-      lines: 40, // Reduced from 50
-    },
-    // Temporarily disabled high coverage targets for specific files until tests stabilize
-    // 'src/services/implementations/youtube-api-service.js': {
-    //   statements: 90,
-    //   branches: 85,
-    //   functions: 90,
-    //   lines: 90,
-    // },
-    // 'src/core/content-classifier.js': {
-    //   statements: 85,
-    //   branches: 75,
-    //   functions: 90,
-    //   lines: 85,
-    // },
   },
   testMatch: ['**/tests/**/*.test.js', '**/tests/**/*.spec.js', '**/__tests__/**/*.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],

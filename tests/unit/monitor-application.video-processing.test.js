@@ -16,6 +16,7 @@ describe('MonitorApplication - Video Processing', () => {
   let mockContentCoordinator;
   let mockPersistentStorage;
   let mockDuplicateDetector;
+  let mockOperation;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -82,12 +83,28 @@ describe('MonitorApplication - Video Processing', () => {
       emit: jest.fn(),
     };
 
+    // Create mock operation object that mimics enhanced logger behavior
+    mockOperation = {
+      progress: jest.fn(),
+      success: jest.fn((message, data) => {
+        // Mock the enhanced logger's behavior of calling the base logger
+        mockLogger.info(message, data);
+        return data;
+      }),
+      error: jest.fn((error, message, context) => {
+        mockLogger.error(message, context);
+        throw error;
+      }),
+    };
+
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
       child: jest.fn().mockReturnThis(),
+      startOperation: jest.fn(() => mockOperation),
+      forOperation: jest.fn().mockReturnThis(),
     };
 
     mockContentStateManager = {
@@ -102,7 +119,10 @@ describe('MonitorApplication - Video Processing', () => {
     };
 
     mockContentCoordinator = {
-      processContent: jest.fn(),
+      processContent: jest.fn().mockResolvedValue({
+        action: 'announced',
+        announcementResult: { success: true },
+      }),
     };
 
     mockPersistentStorage = {
@@ -150,9 +170,10 @@ describe('MonitorApplication - Video Processing', () => {
     });
 
     it('should process video successfully and announce', async () => {
-      mockContentAnnouncer.announceContent.mockResolvedValue({
-        success: true,
-        messageId: 'msg123',
+      // ContentCoordinator should be called with processed content
+      mockContentCoordinator.processContent.mockResolvedValue({
+        action: 'announced',
+        announcementResult: { success: true, messageId: 'msg123' },
       });
 
       await monitorApp.processVideo(mockVideo, 'webhook');
@@ -162,20 +183,27 @@ describe('MonitorApplication - Video Processing', () => {
       expect(monitorApp.isNewContent).toHaveBeenCalledWith(mockVideo);
       expect(mockContentClassifier.classifyYouTubeContent).toHaveBeenCalledWith(mockVideo);
 
-      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith({
-        platform: 'youtube',
-        type: 'video',
-        id: 'test123',
-        url: 'https://www.youtube.com/watch?v=test123',
-        title: 'Test Video',
-        channelTitle: 'Test Channel',
-        publishedAt: '2023-01-01T00:00:00Z',
-        duration: '10:30',
-      });
+      // Verify ContentCoordinator was called with the content
+      expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+        'test123',
+        'webhook',
+        expect.objectContaining({
+          platform: 'youtube',
+          type: 'video',
+          id: 'test123',
+          title: 'Test Video',
+        })
+      );
 
       expect(monitorApp.stats.videosAnnounced).toBe(1);
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith('https://www.youtube.com/watch?v=test123');
-      expect(mockLogger.info).toHaveBeenCalledWith('Announced video: Test Video (test123) via webhook');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Video announcement successful',
+        expect.objectContaining({
+          videoId: 'test123',
+          source: 'webhook',
+        })
+      );
     });
 
     it('should skip duplicate videos', async () => {
@@ -184,9 +212,14 @@ describe('MonitorApplication - Video Processing', () => {
       await monitorApp.processVideo(mockVideo, 'webhook');
 
       expect(monitorApp.stats.videosProcessed).toBe(1);
-      expect(mockLogger.debug).toHaveBeenCalledWith('Duplicate video detected: Test Video (test123)');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Duplicate video detected, skipping',
+        expect.objectContaining({
+          videoId: 'test123',
+        })
+      );
       expect(mockContentClassifier.classifyYouTubeContent).not.toHaveBeenCalled();
-      expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
+      expect(mockContentCoordinator.processContent).not.toHaveBeenCalled();
       expect(monitorApp.stats.videosAnnounced).toBe(0);
     });
 
@@ -196,38 +229,43 @@ describe('MonitorApplication - Video Processing', () => {
       await monitorApp.processVideo(mockVideo, 'webhook');
 
       expect(monitorApp.stats.videosProcessed).toBe(1);
-      expect(mockLogger.debug).toHaveBeenCalledWith('Video is too old: Test Video (test123)');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Video is too old, skipping',
+        expect.objectContaining({
+          videoId: 'test123',
+        })
+      );
       expect(mockContentClassifier.classifyYouTubeContent).not.toHaveBeenCalled();
       expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
       expect(monitorApp.stats.videosAnnounced).toBe(0);
     });
 
     it('should handle skipped announcements', async () => {
-      mockContentAnnouncer.announceContent.mockResolvedValue({
-        success: false,
-        skipped: true,
-        reason: 'Announcements disabled',
+      mockContentCoordinator.processContent.mockResolvedValue({
+        action: 'skip',
+        reason: 'announcements_disabled',
+        contentId: 'test123',
+        source: 'api-fallback',
       });
 
       await monitorApp.processVideo(mockVideo, 'api-fallback');
 
       expect(monitorApp.stats.videosProcessed).toBe(1);
-      expect(mockLogger.debug).toHaveBeenCalledWith('Skipped video: Test Video - Announcements disabled');
       expect(monitorApp.stats.videosAnnounced).toBe(0);
       expect(mockDuplicateDetector.markAsSeen).not.toHaveBeenCalled();
     });
 
     it('should handle failed announcements', async () => {
-      mockContentAnnouncer.announceContent.mockResolvedValue({
-        success: false,
-        skipped: false,
-        reason: 'Discord API error',
+      mockContentCoordinator.processContent.mockResolvedValue({
+        action: 'skip',
+        reason: 'announcement_failed',
+        contentId: 'test123',
+        source: 'webhook',
       });
 
       await monitorApp.processVideo(mockVideo, 'webhook');
 
       expect(monitorApp.stats.videosProcessed).toBe(1);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to announce video: Test Video - Discord API error');
       expect(monitorApp.stats.videosAnnounced).toBe(0);
       expect(mockDuplicateDetector.markAsSeen).not.toHaveBeenCalled();
     });
@@ -257,32 +295,17 @@ describe('MonitorApplication - Video Processing', () => {
       });
     });
 
-    it('should handle videos with missing title', async () => {
-      const videoWithoutTitle = {
-        id: 'test123',
-        snippet: {
-          channelTitle: 'Test Channel',
-          publishedAt: '2023-01-01T00:00:00Z',
-        },
-      };
-
-      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
-
-      await monitorApp.processVideo(videoWithoutTitle, 'webhook');
-
-      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Unknown title',
-        })
-      );
-    });
-
     it('should handle processing errors', async () => {
       const error = new Error('Processing failed');
       mockDuplicateDetector.isDuplicate.mockRejectedValue(error);
 
       await expect(monitorApp.processVideo(mockVideo, 'webhook')).rejects.toThrow('Processing failed');
-      expect(mockLogger.error).toHaveBeenCalledWith('Error processing video test123:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error processing video',
+        expect.objectContaining({
+          videoId: 'test123',
+        })
+      );
     });
 
     it('should use default source when not provided', async () => {

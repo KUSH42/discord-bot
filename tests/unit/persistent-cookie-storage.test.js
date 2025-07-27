@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { AuthManager } from '../../src/application/auth-manager.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('Persistent Cookie Storage', () => {
   let authManager;
@@ -9,6 +10,9 @@ describe('Persistent Cookie Storage', () => {
   let mockLogger;
 
   beforeEach(() => {
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+
     mockBrowserService = {
       goto: jest.fn(),
       setCookies: jest.fn(),
@@ -34,17 +38,15 @@ describe('Persistent Cookie Storage', () => {
       delete: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     authManager = new AuthManager({
       browserService: mockBrowserService,
       config: mockConfig,
       stateManager: mockStateManager,
       logger: mockLogger,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
     });
   });
 
@@ -66,7 +68,12 @@ describe('Persistent Cookie Storage', () => {
 
       expect(mockBrowserService.getCookies).toHaveBeenCalled();
       expect(mockStateManager.set).toHaveBeenCalledWith('x_session_cookies', mockCookies);
-      expect(mockLogger.info).toHaveBeenCalledWith('Saved session cookies to state');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Saved session cookies to state',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should attempt to use saved cookies before performing login', async () => {
@@ -78,7 +85,12 @@ describe('Persistent Cookie Storage', () => {
       await authManager.ensureAuthenticated();
 
       expect(mockBrowserService.setCookies).toHaveBeenCalledWith(savedCookies);
-      expect(mockLogger.info).toHaveBeenCalledWith('Attempting to use saved session cookies');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        '✅ Successfully authenticated using saved cookies.',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
       expect(loginSpy).not.toHaveBeenCalled();
     });
 
@@ -91,7 +103,12 @@ describe('Persistent Cookie Storage', () => {
       await authManager.ensureAuthenticated();
 
       expect(mockBrowserService.setCookies).toHaveBeenCalledWith(savedCookies);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Saved cookies failed, attempting login');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Saved cookies failed, attempting login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
       expect(loginSpy).toHaveBeenCalled();
     });
 
@@ -102,7 +119,12 @@ describe('Persistent Cookie Storage', () => {
       await authManager.ensureAuthenticated();
 
       expect(mockBrowserService.setCookies).not.toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('No saved cookies found, performing login');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'No saved cookies found, performing login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
       expect(loginSpy).toHaveBeenCalled();
     });
 
@@ -113,7 +135,12 @@ describe('Persistent Cookie Storage', () => {
       await authManager.ensureAuthenticated();
 
       expect(mockBrowserService.setCookies).not.toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Invalid saved cookies format, performing login');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Invalid saved cookies format, performing login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
       expect(loginSpy).toHaveBeenCalled();
     });
   });
@@ -132,7 +159,12 @@ describe('Persistent Cookie Storage', () => {
       await authManager.ensureAuthenticated();
 
       expect(mockStateManager.set).toHaveBeenCalledWith('x_session_cookies', newCookies);
-      expect(mockLogger.info).toHaveBeenCalledWith('Saved session cookies to state');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Saved session cookies to state',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
 
     it('should clear saved cookies on persistent authentication failure', async () => {
@@ -144,7 +176,12 @@ describe('Persistent Cookie Storage', () => {
       await expect(authManager.ensureAuthenticated()).rejects.toThrow('Authentication failed');
 
       expect(mockStateManager.delete).toHaveBeenCalledWith('x_session_cookies');
-      expect(mockLogger.warn).toHaveBeenCalledWith('Clearing expired session cookies');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Saved cookies failed, attempting login',
+        expect.objectContaining({
+          module: 'auth',
+        })
+      );
     });
   });
 
@@ -159,7 +196,9 @@ describe('Persistent Cookie Storage', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error validating saved cookies, falling back to login:',
-        'Cookie setting error'
+        expect.objectContaining({
+          module: 'auth',
+        })
       );
       expect(loginSpy).toHaveBeenCalled();
     });
@@ -174,7 +213,9 @@ describe('Persistent Cookie Storage', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Non-recoverable authentication error:',
-        'State manager read error'
+        expect.objectContaining({
+          module: 'auth',
+        })
       );
       expect(loginSpy).not.toHaveBeenCalled(); // Should fail before calling login
     });

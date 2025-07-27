@@ -8,6 +8,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { timestampUTC } from '../src/utilities/utc-time.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,9 +146,9 @@ async function main() {
     log(`Arguments: ${extraArgs.join(' ')}`, 'magenta');
     log('', 'reset');
 
-    const startTime = Date.now();
+    const startTime = timestampUTC();
     await runTests(testType, extraArgs);
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const duration = ((timestampUTC() - startTime) / 1000).toFixed(2);
 
     log(`\\n✅ Tests completed successfully in ${duration}s`, 'green');
   } catch (error) {

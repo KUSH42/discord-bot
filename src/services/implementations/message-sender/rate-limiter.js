@@ -22,9 +22,9 @@ export class RateLimitError extends Error {
 export class RateLimiter {
   constructor(options = {}) {
     // Configuration - use options from parent or reasonable defaults
-    this.burstAllowance = options.burstAllowance || 15; // Match DiscordTransport setting
-    this.burstResetTime = options.burstResetTime || 120000; // Match DiscordTransport setting
-    this.baseSendDelay = options.baseSendDelay || 3000; // Match DiscordTransport setting
+    this.burstAllowance = options.burstAllowance || 30; // Match DiscordTransport setting
+    this.burstResetTime = options.burstResetTime || 60000; // Match DiscordTransport setting
+    this.baseSendDelay = options.baseSendDelay || 1000; // Match DiscordTransport setting
     this.timeSource = options.timeSource || (() => Date.now());
 
     // Burst tracking

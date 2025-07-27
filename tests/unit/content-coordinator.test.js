@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('ContentCoordinator', () => {
   let coordinator;
@@ -23,7 +24,7 @@ describe('ContentCoordinator', () => {
     };
 
     mockContentAnnouncer = {
-      announce: jest.fn(),
+      announceContent: jest.fn(),
     };
 
     mockDuplicateDetector = {
@@ -92,7 +93,7 @@ describe('ContentCoordinator', () => {
     const contentId = 'test-content-123';
     const source = 'webhook';
     const contentData = {
-      type: 'youtube_video',
+      type: 'video',
       title: 'Test Video',
       url: 'https://www.youtube.com/watch?v=test123',
       publishedAt: new Date().toISOString(),
@@ -103,7 +104,7 @@ describe('ContentCoordinator', () => {
       mockContentStateManager.isNewContent.mockReturnValue(true);
       mockContentStateManager.addContent.mockResolvedValue();
       mockContentStateManager.markAsAnnounced.mockResolvedValue();
-      mockContentAnnouncer.announce.mockResolvedValue({ success: true });
+      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
       mockDuplicateDetector.isDuplicateWithFingerprint.mockResolvedValue(false);
       mockDuplicateDetector.markAsSeenWithFingerprint.mockResolvedValue();
     });
@@ -168,7 +169,7 @@ describe('ContentCoordinator', () => {
 
     it('should handle processing failures and increment error metrics', async () => {
       const error = new Error('Processing failed');
-      mockContentAnnouncer.announce.mockRejectedValue(error);
+      mockContentAnnouncer.announceContent.mockRejectedValue(error);
 
       await expect(coordinator.processContent(contentId, source, contentData)).rejects.toThrow('Processing failed');
 
@@ -187,7 +188,7 @@ describe('ContentCoordinator', () => {
     const contentId = 'test-content-123';
     const source = 'webhook';
     const contentData = {
-      type: 'youtube_video',
+      type: 'video',
       title: 'Test Video',
       url: 'https://www.youtube.com/watch?v=test123',
       publishedAt: new Date().toISOString(),
@@ -198,7 +199,7 @@ describe('ContentCoordinator', () => {
       mockContentStateManager.isNewContent.mockReturnValue(true);
       mockContentStateManager.addContent.mockResolvedValue();
       mockContentStateManager.markAsAnnounced.mockResolvedValue();
-      mockContentAnnouncer.announce.mockResolvedValue({ success: true });
+      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
       mockDuplicateDetector.isDuplicateWithFingerprint.mockResolvedValue(false);
       mockDuplicateDetector.markAsSeenWithFingerprint.mockResolvedValue();
     });
@@ -267,7 +268,7 @@ describe('ContentCoordinator', () => {
       const result = await coordinator.doProcessContent(contentId, source, contentData);
 
       expect(mockContentStateManager.addContent).toHaveBeenCalledWith(contentId, {
-        type: 'youtube_video',
+        type: 'video',
         state: 'published',
         source,
         publishedAt: contentData.publishedAt,
@@ -276,12 +277,12 @@ describe('ContentCoordinator', () => {
         metadata: {},
       });
 
-      expect(mockContentAnnouncer.announce).toHaveBeenCalledWith({
+      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith({
         ...contentData,
         id: contentId,
         source,
         detectionTime: expect.any(Date),
-        contentType: 'youtube_video',
+        contentType: 'video',
       });
 
       expect(mockContentStateManager.markAsAnnounced).toHaveBeenCalledWith(contentId);
@@ -436,21 +437,21 @@ describe('ContentCoordinator', () => {
             url: 'https://www.youtube.com/watch?v=123',
             isLive: false,
           })
-        ).toBe('youtube_video');
+        ).toBe('video');
 
         expect(
           coordinator.determineContentType({
             url: 'https://youtu.be/123',
             isLive: false,
           })
-        ).toBe('youtube_video');
+        ).toBe('video');
 
         expect(
           coordinator.determineContentType({
             url: 'https://www.youtube.com/watch?v=123',
             isLive: true,
           })
-        ).toBe('youtube_livestream');
+        ).toBe('livestream');
       });
 
       it('should detect X/Twitter types from URL', () => {
@@ -485,8 +486,8 @@ describe('ContentCoordinator', () => {
       });
 
       it('should determine scheduled vs live based on time', () => {
-        const futureTime = new Date(Date.now() + 60000).toISOString();
-        const pastTime = new Date(Date.now() - 60000).toISOString();
+        const futureTime = new Date(timestampUTC() + 60000).toISOString();
+        const pastTime = new Date(timestampUTC() - 60000).toISOString();
 
         expect(coordinator.determineInitialState({ scheduledStartTime: futureTime })).toBe('scheduled');
 
@@ -508,16 +509,16 @@ describe('ContentCoordinator', () => {
     };
 
     it('should call content announcer with enriched data', async () => {
-      mockContentAnnouncer.announce.mockResolvedValue({ success: true });
+      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
 
       const result = await coordinator.announceContent(contentId, contentData, source);
 
-      expect(mockContentAnnouncer.announce).toHaveBeenCalledWith({
+      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith({
         ...contentData,
         id: contentId,
         source,
         detectionTime: expect.any(Date),
-        contentType: 'youtube_video',
+        contentType: 'video',
       });
 
       expect(result).toEqual({ success: true });
@@ -661,7 +662,7 @@ describe('ContentCoordinator', () => {
       mockContentStateManager.isNewContent.mockReturnValue(true);
       mockContentStateManager.addContent.mockResolvedValue();
       mockContentStateManager.markAsAnnounced.mockResolvedValue();
-      mockContentAnnouncer.announce.mockResolvedValue({ success: true });
+      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
       mockDuplicateDetector.isDuplicateWithFingerprint.mockResolvedValue(false);
       mockDuplicateDetector.markAsSeenWithFingerprint.mockResolvedValue();
 
@@ -669,7 +670,7 @@ describe('ContentCoordinator', () => {
 
       expect(result.action).toBe('announced');
       expect(mockContentStateManager.addContent).toHaveBeenCalledWith(contentId, {
-        type: 'youtube_video',
+        type: 'video',
         state: 'published',
         source,
         publishedAt: contentData.publishedAt,
@@ -693,7 +694,7 @@ describe('ContentCoordinator', () => {
       mockContentStateManager.isNewContent.mockReturnValue(true);
       mockContentStateManager.addContent.mockResolvedValue();
       mockContentStateManager.markAsAnnounced.mockResolvedValue();
-      mockContentAnnouncer.announce.mockResolvedValue({ success: true });
+      mockContentAnnouncer.announceContent.mockResolvedValue({ success: true });
       mockDuplicateDetector.isDuplicateWithFingerprint.mockResolvedValue(false);
       mockDuplicateDetector.markAsSeenWithFingerprint.mockResolvedValue();
 

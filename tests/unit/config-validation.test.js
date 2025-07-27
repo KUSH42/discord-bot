@@ -399,8 +399,8 @@ describe('Configuration Validation Tests', () => {
     });
 
     it('should validate log level values', () => {
-      const validLogLevels = ['error', 'warn', 'info', 'debug', 'silly'];
-      const invalidLogLevels = ['invalid', 'trace', 'verbose'];
+      const validLogLevels = ['error', 'warn', 'info', 'debug', 'verbose'];
+      const invalidLogLevels = ['invalid', 'trace', 'critical'];
 
       validLogLevels.forEach(level => {
         process.env.LOG_LEVEL = level;

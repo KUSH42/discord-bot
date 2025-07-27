@@ -1,5 +1,6 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ScraperApplication Email Verification', () => {
   let scraperApp;
@@ -10,6 +11,9 @@ describe('ScraperApplication Email Verification', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockConfig = {
       getRequired: jest.fn(),
@@ -29,13 +33,7 @@ describe('ScraperApplication Email Verification', () => {
       click: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     // Configure default mock returns
     mockConfig.getRequired.mockImplementation(key => {
@@ -69,6 +67,8 @@ describe('ScraperApplication Email Verification', () => {
       discordService: { login: jest.fn() },
       eventBus: { emit: jest.fn(), on: jest.fn(), off: jest.fn() },
       logger: mockLogger,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
       authManager: {
         login: jest.fn(),
         clickNextButton: jest.fn(),
@@ -114,7 +114,12 @@ describe('ScraperApplication Email Verification', () => {
         'test@example.com'
       );
       expect(mockBrowserService.click).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Entered email: test@example.com');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Entered email: test@example.com',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
 
     it('should handle email verification with TWITTER_USERNAME fallback', async () => {
@@ -138,7 +143,12 @@ describe('ScraperApplication Email Verification', () => {
         'input[data-testid="ocfEnterTextTextInput"]',
         'user@domain.com'
       );
-      expect(mockLogger.info).toHaveBeenCalledWith('Entered email: user@domain.com');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Entered email: user@domain.com',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
 
     it('should throw error when no valid email is configured', async () => {
@@ -156,7 +166,12 @@ describe('ScraperApplication Email Verification', () => {
         'Email verification required but no email configured'
       );
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('No valid email found in configuration for email verification');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'No valid email found in configuration for email verification',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
 
     it('should handle email input not found', async () => {
@@ -164,7 +179,12 @@ describe('ScraperApplication Email Verification', () => {
 
       await scraperApp.handleEmailVerification();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Could not find email input field, proceeding anyway');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Could not find email input field, proceeding anyway',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
       expect(mockBrowserService.type).not.toHaveBeenCalled();
     });
 
@@ -189,7 +209,12 @@ describe('ScraperApplication Email Verification', () => {
       await scraperApp.handleEmailVerification();
 
       expect(mockBrowserService.type).toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Could not find continue button after email entry');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Could not find continue button after email entry',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
 
     it('should try multiple continue button selectors', async () => {
@@ -203,7 +228,10 @@ describe('ScraperApplication Email Verification', () => {
 
       expect(mockBrowserService.click).toHaveBeenCalledWith('div[role="button"]:has-text("Continue")');
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Clicked continue button using selector: div[role="button"]:has-text("Continue")'
+        'Clicked continue button using selector: div[role="button"]:has-text("Continue")',
+        expect.objectContaining({
+          module: 'scraper',
+        })
       );
     });
 

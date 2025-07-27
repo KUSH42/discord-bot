@@ -2,6 +2,8 @@ import { exec as defaultExec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { CommandRateLimit } from '../rate-limiter.js';
+import { nowUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 // Global message processing tracker to detect duplicates across all instances
 const globalMessageTracker = new Map();
@@ -13,7 +15,7 @@ const globalMessageTracker = new Map();
 export class BotApplication {
   constructor(dependencies) {
     // Add unique instance ID for debugging
-    this.instanceId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    this.instanceId = `${nowUTC().getTime()}-${Math.random().toString(36).substring(2, 11)}`;
     this.exec = dependencies.exec || defaultExec;
     this.scraperApplication = dependencies.scraperApplication;
     this.monitorApplication = dependencies.monitorApplication;
@@ -23,7 +25,14 @@ export class BotApplication {
     this.eventBus = dependencies.eventBus;
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
-    this.logger = dependencies.logger;
+
+    // Create enhanced logger for this module
+    this.logger = createEnhancedLogger(
+      'api',
+      dependencies.logger,
+      dependencies.debugManager,
+      dependencies.metricsManager
+    );
 
     // Log BotApplication instance creation
     this.logger.info('BotApplication instance created', {
@@ -96,23 +105,23 @@ export class BotApplication {
       throw new Error('Bot application is already running');
     }
 
-    try {
-      this.logger.info('Starting bot application...', {
-        botInstanceId: this.instanceId,
-        discordInstanceId: this.discord.client?._botInstanceId || 'unknown',
-      });
+    const operation = this.logger.startOperation('startBotApplication', {
+      botInstanceId: this.instanceId,
+      discordInstanceId: this.discord.client?._botInstanceId || 'unknown',
+    });
 
-      // Login to Discord
+    try {
+      operation.progress('Logging in to Discord');
       const token = this.config.getRequired('DISCORD_BOT_TOKEN');
       await this.discord.login(token);
 
-      // Set up event handlers
+      operation.progress('Setting up Discord event handlers');
       this.setupEventHandlers();
 
-      // Set bot presence
+      operation.progress('Setting bot presence');
       await this.setBotPresence();
 
-      // Start YouTube Scraper if available
+      operation.progress('Starting YouTube Scraper if configured');
       if (this.youtubeScraper) {
         try {
           const youtubeChannelHandle = this.config.get('YOUTUBE_CHANNEL_HANDLE');
@@ -123,20 +132,24 @@ export class BotApplication {
             this.logger.info('YOUTUBE_CHANNEL_HANDLE not configured, YouTube scraper will not start.');
           }
         } catch (error) {
-          this.logger.error('❌ Failed to start YouTube Scraper:', error);
+          operation.error(error, 'Failed to start YouTube Scraper');
         }
       }
 
       this.isRunning = true;
-      this.logger.info('Bot application started successfully');
 
       // Emit start event
       this.eventBus.emit('bot.started', {
         startTime: this.state.get('botStartTime'),
         config: this.config.getAllConfig(false), // Don't include secrets
       });
+
+      return operation.success('Bot application started successfully', {
+        botInstanceId: this.instanceId,
+        discordClientReady: this.discord.isReady(),
+      });
     } catch (error) {
-      this.logger.error('❌ Failed to start bot application:', error);
+      operation.error(error, 'Failed to start bot application');
       await this.stop();
       throw error;
     }
@@ -170,7 +183,7 @@ export class BotApplication {
 
       // Emit stop event
       this.eventBus.emit('bot.stopped', {
-        stopTime: new Date(),
+        stopTime: nowUTC(),
       });
     } catch (err) {
       this.logger.error('Error stopping bot application:', err);
@@ -301,11 +314,22 @@ export class BotApplication {
    * @param {Object} message - Discord message object
    */
   async handleMessage(message) {
+    const operation = this.logger.startOperation('handleMessage', {
+      messageId: message.id,
+      authorId: message.author?.id,
+      channelId: message.channel?.id,
+      contentPreview: message.content?.substring(0, 50) || 'empty',
+      instanceId: this.instanceId,
+    });
+
+    let command = 'unknown';
+
     try {
       // ATOMIC DUPLICATE PREVENTION - Must be FIRST thing we do
       const isCommand = message.content?.startsWith(this.commandPrefix);
 
       if (isCommand) {
+        operation.progress('Performing duplicate command detection');
         const globalKey = `${message.id}-${message.content}`;
 
         // ATOMIC CHECK-AND-SET to prevent race conditions
@@ -313,81 +337,84 @@ export class BotApplication {
           const currentCount = globalMessageTracker.get(globalKey) + 1;
           globalMessageTracker.set(globalKey, currentCount);
 
-          this.logger.error(
-            `🚨 DUPLICATE COMMAND BLOCKED! ID: ${message.id}, Count: ${currentCount}, Instance: ${this.instanceId}, Content: "${message.content?.substring(0, 50) || 'empty'}"`
-          );
-          return; // IMMEDIATE EXIT - No further processing
+          return operation.success('Duplicate command blocked', {
+            messageId: message.id,
+            duplicateCount: currentCount,
+            action: 'blocked_duplicate',
+          });
         }
 
         // ATOMICALLY mark as processing (first instance wins)
         globalMessageTracker.set(globalKey, 1);
-
-        this.logger.debug(
-          `🎯 COMMAND accepted for processing - ID: ${message.id}, Instance: ${this.instanceId}, Content: "${message.content?.substring(0, 50) || 'empty'}"`
-        );
       }
 
+      operation.progress('Validating message and author');
       // Ignore bot messages and non-command messages
       if (message.author.bot || !message.content.startsWith(this.commandPrefix)) {
         if (message.author.bot) {
-          this.logger.debug('Ignoring bot message', {
+          return operation.success('Ignoring bot message', {
             messageId: message.id,
             authorId: message.author?.id,
-            botAuthor: true,
+            action: 'ignored_bot',
           });
         }
-        return;
+        return operation.success('Ignoring non-command message', {
+          action: 'ignored_non_command',
+        });
       }
 
       // Additional safety check: Ignore messages from this bot specifically
       const currentBotUser = await this.discord.getCurrentUser();
       if (currentBotUser && message.author.id === currentBotUser.id) {
-        this.logger.warn('Ignoring message from self', {
+        return operation.success('Ignoring message from self', {
           messageId: message.id,
           authorId: message.author?.id,
           botUserId: currentBotUser.id,
-          content: message.content?.substring(0, 50),
+          action: 'ignored_self',
         });
-        return;
       }
 
       // Ensure Discord client is ready before processing
       if (!this.discord.isReady()) {
-        this.logger.warn('Discord client not ready, ignoring message', {
+        return operation.error(new Error('Discord client not ready'), 'Discord client not ready', {
           messageId: message.id,
           authorId: message.author?.id,
         });
-        return;
       }
 
+      operation.progress('Parsing command and validating user');
       // Parse command and get user info
       const args = message.content.slice(this.commandPrefix.length).trim().split(/ +/);
-      const command = args.shift().toLowerCase();
+      command = args.shift().toLowerCase();
       const user = message.author;
-
-      // Duplicate prevention now handled at message entry - this code removed
 
       // Only process messages in the support channel or from admin in any other channel
       if (!user && this.supportChannelId && message.channel.id !== this.supportChannelId) {
-        return;
+        return operation.success('Message not in support channel', {
+          action: 'ignored_wrong_channel',
+        });
       }
 
       // Validate user
       if (!user || !user.id) {
-        this.logger.warn('Received message from invalid user object');
-        return;
+        return operation.error(new Error('Invalid user object'), 'Received message from invalid user object');
       }
 
+      operation.progress('Checking rate limits');
       // Rate limiting check
       if (!this.commandRateLimit.isAllowed(user.id)) {
         const remainingTime = Math.ceil(this.commandRateLimit.getRemainingTime(user.id) / 1000);
         await message.reply(
           `🚫 Rate limit exceeded. Please wait ${remainingTime} seconds before using another command.`
         );
-        this.logger.warn(`Rate limit exceeded for user ${user.tag} (${user.id})`);
-        return;
+        return operation.success('Rate limit exceeded', {
+          userId: user.id,
+          remainingTime,
+          action: 'rate_limited',
+        });
       }
 
+      operation.progress('Gathering application statistics');
       // Process command
       const appStats = {
         bot: this.getStats(),
@@ -401,27 +428,13 @@ export class BotApplication {
         },
       };
 
-      this.logger.debug(`Processing command: "${command}" from user ${user.tag}`, {
-        command,
-        userId: user.id,
-        messageId: message.id,
-        clientId: currentBotUser?.id,
-        botInstanceId: this.instanceId,
-        discordInstanceId: this.discord.client?._botInstanceId || 'unknown',
-        isReady: this.discord.isReady(),
-      });
+      operation.progress(`Processing command: ${command}`);
       const result = await this.commandProcessor.processCommand(command, args, user.id, appStats);
-      this.logger.debug(`Command "${command}" result: ${result.success ? 'success' : 'failure'}`, {
-        command,
-        success: result.success,
-        messageId: message.id,
-        clientId: currentBotUser?.id,
-        instanceId: this.discord.client?._botInstanceId || 'unknown',
-      });
 
-      // Handle command result
+      operation.progress('Handling command result');
       await this.handleCommandResult(message, result, command, user);
 
+      operation.progress('Performing cleanup tasks');
       // Cleanup: Remove old message tracking entries to prevent memory leaks
       if (this.messageProcessingCounter.size > 1000) {
         const entries = Array.from(this.messageProcessingCounter.entries());
@@ -441,13 +454,19 @@ export class BotApplication {
         recentGlobalEntries.forEach(([key, value]) => {
           globalMessageTracker.set(key, value);
         });
-        this.logger.info('🧹 Global message tracker cleaned up', {
-          entriesRemoved: globalEntries.length - 500,
-          entriesKept: 500,
-        });
       }
+
+      return operation.success('Message processed successfully', {
+        command,
+        userId: user.id,
+        success: result.success,
+        messageId: message.id,
+      });
     } catch (error) {
-      this.logger.error('Error processing message command:', error);
+      operation.error(error, 'Error processing message command', {
+        messageId: message.id,
+        command: command || 'unknown',
+      });
       try {
         await message.reply('❌ An error occurred while processing your command. Please try again.');
       } catch (replyError) {
@@ -875,9 +894,22 @@ export class BotApplication {
       }
 
       this.logger.info('Discord history caching completed (for duplicate detection only)');
+
+      // Emit event to signal that initialization is complete
+      this.eventBus.emit('bot.initialization.complete', {
+        timestamp: nowUTC(),
+        historyScanned: true,
+      });
     } catch (error) {
       this.logger.error('❌ Failed to initialize Discord history scanning:', error);
       // Don't throw - let bot continue running even if scanning fails
+
+      // Still emit completion event even if scanning failed
+      this.eventBus.emit('bot.initialization.complete', {
+        timestamp: nowUTC(),
+        historyScanned: false,
+        error: error.message,
+      });
     }
   }
 
@@ -891,7 +923,7 @@ export class BotApplication {
     // Emit error event
     this.eventBus.emit('discord.error', {
       error,
-      timestamp: new Date(),
+      timestamp: nowUTC(),
     });
   }
 

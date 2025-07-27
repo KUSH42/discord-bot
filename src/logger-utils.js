@@ -5,6 +5,7 @@ import Transport from 'winston-transport';
 import * as winston from 'winston';
 import { splitMessage } from './discord-utils.js';
 import { DiscordMessageSender } from './services/implementations/message-sender/discord-message-sender.js';
+import { createEnhancedLogger } from './utilities/enhanced-logger.js';
 
 /**
  * Discord Transport for Winston logger
@@ -19,22 +20,37 @@ export class DiscordTransport extends Transport {
     this.buffer = [];
 
     // Buffering options
-    this.flushInterval = opts.flushInterval || 3000; // 3 seconds to match send delay
+    this.flushInterval = opts.flushInterval || 1000; // 1 seconds to match send delay
     this.maxBufferSize = opts.maxBufferSize || 15; // 15 log entries to match burst allowance
     this.flushTimer = null;
     this.isDestroyed = false;
 
     // New event-driven message sender for real-time Discord logging
     // Optimized settings for ≤2s delay real-time logging while respecting Discord limits
+    // Create enhanced logger for DiscordMessageSender
+    const baseLogger =
+      process.env.NODE_ENV === 'test'
+        ? { debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, verbose: () => {} }
+        : {
+            debug: console.debug?.bind(console) || console.log.bind(console),
+            info: console.info?.bind(console) || console.log.bind(console),
+            warn: console.warn?.bind(console) || console.log.bind(console),
+            error: console.error?.bind(console) || console.log.bind(console),
+            verbose: console.debug?.bind(console) || console.log.bind(console),
+          };
+
+    // Create enhanced logger for the discord-transport module
     const logger =
-      process.env.NODE_ENV === 'test' ? { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } : console;
+      opts.debugManager && opts.metricsManager
+        ? createEnhancedLogger('discord-transport', baseLogger, opts.debugManager, opts.metricsManager)
+        : baseLogger;
     this.messageSender = new DiscordMessageSender(logger, {
-      baseSendDelay: opts.baseSendDelay || 3000, // 3 seconds between sends to respect Discord limits
-      burstAllowance: opts.burstAllowance || 15, // Allow 15 quick messages per 2 minutes
-      burstResetTime: opts.burstResetTime || 120000, // 2 minute burst reset for better recovery
+      baseSendDelay: opts.baseSendDelay || 1000, // 1 second between sends to respect Discord limits
+      burstAllowance: opts.burstAllowance || 30, // Allow 30 quick messages per 2 minutes
+      burstResetTime: opts.burstResetTime || 60000, // 1 minute burst reset for better recovery
       maxRetries: opts.maxRetries || 5, // More retries for better reliability
       backoffMultiplier: 1.5,
-      maxBackoffDelay: opts.maxBackoffDelay || 60000, // 60 second max backoff
+      maxBackoffDelay: opts.maxBackoffDelay || 30000, // 30 second max backoff
       testMode: process.env.NODE_ENV === 'test', // Enable test mode in test environment
       autoStart: process.env.NODE_ENV !== 'test', // Don't auto-start in test environment
     });
@@ -264,6 +280,13 @@ export class DiscordTransport extends Transport {
         this.buffer.unshift(...messagesToFlush);
       }
     }
+  }
+
+  /**
+   * Set Discord log level
+   */
+  async setLogLevel(loglevel) {
+    this.client.logger.level = loglevel;
   }
 }
 

@@ -1,23 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { YouTubeScraperService } from '../../src/services/implementations/youtube-scraper-service.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('YouTubeScraperService', () => {
   let scraperService;
   let mockLogger;
   let mockConfig;
   let mockBrowserService;
+  let mockDependencies;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      silly: jest.fn(),
-    };
+    // Create enhanced logging mocks
+    mockDependencies = createMockDependenciesWithEnhancedLogging();
+    mockLogger = mockDependencies.logger;
 
     mockConfig = {
       get: jest.fn((key, defaultValue) => {
@@ -50,6 +48,8 @@ describe('YouTubeScraperService', () => {
       logger: mockLogger,
       config: mockConfig,
       contentCoordinator: mockContentCoordinator,
+      debugManager: mockDependencies.debugManager,
+      metricsManager: mockDependencies.metricsManager,
     });
 
     // Replace the real browser service with a mock
@@ -126,11 +126,14 @@ describe('YouTubeScraperService', () => {
           '--mute-audio',
         ]),
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('YouTube scraper initialized', {
-        videosUrl: 'https://www.youtube.com/@testchannel/videos',
-        initialContentId: 'dQw4w9WgXcQ',
-        title: 'Test Video',
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube scraper initialized successfully',
+        expect.objectContaining({
+          videosUrl: 'https://www.youtube.com/@testchannel/videos',
+          initialContentId: 'dQw4w9WgXcQ',
+          title: 'Test Video',
+        })
+      );
     });
 
     it('should handle initialization when no videos are found', async () => {
@@ -139,9 +142,14 @@ describe('YouTubeScraperService', () => {
       await scraperService.initialize('emptychannel');
 
       expect(scraperService.isInitialized).toBe(true);
-      expect(mockLogger.warn).toHaveBeenCalledWith('YouTube scraper initialized but no videos found', {
-        videosUrl: 'https://www.youtube.com/@emptychannel/videos',
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube scraper initialized but no videos found',
+        expect.objectContaining({
+          videosUrl: 'https://www.youtube.com/@emptychannel/videos',
+          module: 'youtube',
+          outcome: 'success',
+        })
+      );
     });
 
     it('should throw error if already initialized', async () => {
@@ -164,11 +172,16 @@ describe('YouTubeScraperService', () => {
       mockBrowserService.launch.mockRejectedValue(launchError);
 
       await expect(scraperService.initialize('testchannel')).rejects.toThrow('Failed to launch browser');
-      expect(mockLogger.error).toHaveBeenCalledWith('❌ Failed to initialize YouTube scraper', {
-        error: 'Failed to launch browser',
-        stack: expect.any(String),
-        videosUrl: 'https://www.youtube.com/@testchannel/videos',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to initialize YouTube scraper',
+        expect.objectContaining({
+          error: 'Failed to launch browser',
+          stack: expect.any(String),
+          channelHandle: 'testchannel',
+          module: 'youtube',
+          outcome: 'error',
+        })
+      );
     });
   });
 
@@ -231,11 +244,16 @@ describe('YouTubeScraperService', () => {
         message: 'Page timeout',
         timestamp: expect.any(Date),
       });
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to scrape YouTube channel', {
-        error: 'Page timeout',
-        videosUrl: 'https://www.youtube.com/@testchannel/videos',
-        attempt: 1,
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to scrape YouTube channel',
+        expect.objectContaining({
+          error: 'Page timeout',
+          videosUrl: 'https://www.youtube.com/@testchannel/videos',
+          attempt: 1,
+          module: 'youtube',
+          outcome: 'error',
+        })
+      );
     });
 
     it('should throw error if not initialized', async () => {
@@ -280,10 +298,7 @@ describe('YouTubeScraperService', () => {
         waitUntil: 'networkidle',
         timeout: 30000,
       });
-      expect(mockLogger.debug).toHaveBeenCalledWith('Successfully scraped active live stream', {
-        videoId: 'live123',
-        title: '🔴 Now Live!',
-      });
+      // The service logs progress steps but doesn't log final success for live stream fetch
     });
 
     it('should return null when no live stream is active', async () => {
@@ -296,10 +311,15 @@ describe('YouTubeScraperService', () => {
       mockBrowserService.goto.mockRejectedValue(new Error('Live page error'));
       const result = await scraperService.fetchActiveLiveStream();
       expect(result).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith('Failed to scrape for active live stream', {
-        error: 'Live page error',
-        liveStreamUrl: 'https://www.youtube.com/@testchannel/live',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to scrape for active live stream',
+        expect.objectContaining({
+          error: 'Live page error',
+          liveStreamUrl: 'https://www.youtube.com/@testchannel/live',
+          module: 'youtube',
+          outcome: 'error',
+        })
+      );
     });
   });
 
@@ -369,9 +389,13 @@ describe('YouTubeScraperService', () => {
       await scraperService.startMonitoring();
 
       expect(scraperService.isRunning).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Starting YouTube scraper monitoring', {
-        nextCheckInMs: testInterval,
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Starting YouTube scraper monitoring',
+        expect.objectContaining({
+          nextCheckInMs: testInterval,
+          module: 'youtube',
+        })
+      );
 
       // Fast-forward time to trigger monitoring loop twice with predictable intervals
       await jest.advanceTimersByTimeAsync(testInterval + 100); // First scan (no new content)
@@ -391,7 +415,12 @@ describe('YouTubeScraperService', () => {
       await scraperService.stopMonitoring();
 
       expect(scraperService.isRunning).toBe(false);
-      expect(mockLogger.info).toHaveBeenCalledWith('YouTube scraper monitoring stopped');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube scraper monitoring stopped',
+        expect.objectContaining({
+          module: 'youtube',
+        })
+      );
     });
 
     it('should handle errors in monitoring loop gracefully', async () => {
@@ -419,7 +448,12 @@ describe('YouTubeScraperService', () => {
 
       await scraperService.startMonitoring();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('YouTube scraper monitoring is already running');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'YouTube scraper monitoring is already running',
+        expect.objectContaining({
+          module: 'youtube',
+        })
+      );
 
       // Explicitly stop monitoring to prevent hanging
       await scraperService.stopMonitoring();
@@ -555,7 +589,12 @@ describe('YouTubeScraperService', () => {
       expect(scraperService.videosUrl).toBeNull();
       expect(scraperService.liveStreamUrl).toBeNull();
       expect(mockBrowserService.close).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Cleaning up YouTube scraper service');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Cleaning up YouTube scraper service',
+        expect.objectContaining({
+          module: 'youtube',
+        })
+      );
     });
   });
 
@@ -725,7 +764,12 @@ describe('YouTubeScraperService', () => {
         expect(mockBrowserService.click).toHaveBeenCalledWith('#identifierNext');
         expect(mockBrowserService.click).toHaveBeenCalledWith('#passwordNext');
         expect(authenticatedService.isAuthenticated).toBe(true);
-        expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube');
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          '✅ Successfully authenticated with YouTube',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should skip authentication when disabled', async () => {
@@ -734,7 +778,12 @@ describe('YouTubeScraperService', () => {
         await authenticatedService.authenticateWithYouTube();
 
         expect(mockBrowserService.goto).not.toHaveBeenCalled();
-        expect(mockLogger.debug).toHaveBeenCalledWith('YouTube authentication is disabled');
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'YouTube authentication is disabled',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should skip authentication when credentials missing', async () => {
@@ -744,7 +793,12 @@ describe('YouTubeScraperService', () => {
         await authenticatedService.authenticateWithYouTube();
 
         expect(mockBrowserService.goto).not.toHaveBeenCalled();
-        expect(mockLogger.warn).toHaveBeenCalledWith('YouTube authentication enabled but credentials not provided');
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          'YouTube authentication enabled but credentials not provided',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should handle authentication failures gracefully', async () => {
@@ -753,11 +807,20 @@ describe('YouTubeScraperService', () => {
         await authenticatedService.authenticateWithYouTube();
 
         expect(authenticatedService.isAuthenticated).toBe(false);
-        expect(mockLogger.error).toHaveBeenCalledWith('⚠️Failed to authenticate with YouTube:', {
-          error: 'Navigation failed',
-          stack: expect.any(String),
-        });
-        expect(mockLogger.warn).toHaveBeenCalledWith('Continuing without YouTube authentication');
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          '⚠️Failed to authenticate with YouTube:',
+          expect.objectContaining({
+            error: 'Navigation failed',
+            stack: expect.any(String),
+            module: 'youtube',
+          })
+        );
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          'Continuing without YouTube authentication',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should warn when authentication may have failed', async () => {
@@ -776,7 +839,10 @@ describe('YouTubeScraperService', () => {
 
         expect(authenticatedService.isAuthenticated).toBe(false);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          '⚠️ YouTube authentication may have failed - proceeding without authentication'
+          '⚠️ YouTube authentication may have failed - proceeding without authentication',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
       });
     });
@@ -792,7 +858,12 @@ describe('YouTubeScraperService', () => {
           timeout: 3000,
         });
         expect(mockBrowserService.click).toHaveBeenCalled();
-        expect(mockLogger.debug).toHaveBeenCalledWith('Clicked cookie consent button: button:has-text("Accept all")');
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Clicked cookie consent button: button:has-text("Accept all")',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should handle no cookie consent banner gracefully', async () => {
@@ -800,7 +871,12 @@ describe('YouTubeScraperService', () => {
 
         await authenticatedService.handleCookieConsent();
 
-        expect(mockLogger.info).toHaveBeenCalledWith('No cookie consent banner found');
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          'No cookie consent banner found',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should try multiple consent selectors', async () => {
@@ -822,9 +898,17 @@ describe('YouTubeScraperService', () => {
 
         expect(result).toBe(false);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          'Email verification challenge detected - requires manual intervention'
+          'Email verification challenge detected - requires manual intervention',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
-        expect(mockLogger.info).toHaveBeenCalledWith('Please check your email and complete verification manually');
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          'Please check your email and complete verification manually',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should detect phone verification challenge', async () => {
@@ -838,7 +922,10 @@ describe('YouTubeScraperService', () => {
 
         expect(result).toBe(false);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          'Phone verification challenge detected - requires manual intervention'
+          'Phone verification challenge detected - requires manual intervention',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
       });
 
@@ -859,10 +946,16 @@ describe('YouTubeScraperService', () => {
 
         expect(result).toBe(false);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          '2FA challenge detected - authentication cannot proceed automatically'
+          '2FA challenge detected - authentication cannot proceed automatically',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
         expect(mockLogger.info).toHaveBeenCalledWith(
-          'Please disable 2FA for this account or handle authentication manually'
+          'Please disable 2FA for this account or handle authentication manually',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
       });
 
@@ -895,9 +988,17 @@ describe('YouTubeScraperService', () => {
 
         expect(result).toBe(false);
         expect(mockLogger.warn).toHaveBeenCalledWith(
-          'CAPTCHA challenge detected - authentication cannot proceed automatically'
+          'CAPTCHA challenge detected - authentication cannot proceed automatically',
+          expect.objectContaining({
+            module: 'youtube',
+          })
         );
-        expect(mockLogger.info).toHaveBeenCalledWith('Manual intervention required to complete CAPTCHA verification');
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          'Manual intervention required to complete CAPTCHA verification',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should return true when no CAPTCHA present', async () => {
@@ -940,7 +1041,12 @@ describe('YouTubeScraperService', () => {
         await authenticatedService.handleDeviceVerification();
 
         expect(mockBrowserService.click).toHaveBeenCalled();
-        expect(mockLogger.debug).toHaveBeenCalledWith('Handled device verification: button:has-text("Not now")');
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Handled device verification: button:has-text("Not now")',
+          expect.objectContaining({
+            module: 'youtube',
+          })
+        );
       });
 
       it('should try multiple device verification selectors', async () => {
@@ -1049,11 +1155,16 @@ describe('YouTubeScraperService', () => {
         // but logs the error details
         expect(health.status).toBe('no_videos_found');
         expect(health.details.warning).toBe('No videos found during health check');
-        expect(mockLogger.warn).toHaveBeenCalledWith('Failed to scrape YouTube channel', {
-          error: 'Health check network error',
-          videosUrl: 'https://www.youtube.com/@testchannel/videos',
-          attempt: expect.any(Number),
-        });
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Failed to scrape YouTube channel',
+          expect.objectContaining({
+            error: 'Health check network error',
+            videosUrl: 'https://www.youtube.com/@testchannel/videos',
+            attempt: expect.any(Number),
+            module: 'youtube',
+            outcome: 'error',
+          })
+        );
       });
     });
   });

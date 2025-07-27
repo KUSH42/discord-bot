@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { toISOStringUTC } from '../utilities/utc-time.js';
 
 /**
  * Persistent storage for content states, fingerprints, and system data.
@@ -87,7 +88,7 @@ export class PersistentStorage {
     const fingerprints = await this._readFile(this.fingerprintsFile);
     fingerprints[fingerprint] = {
       ...metadata,
-      seenAt: new Date().toISOString(),
+      seenAt: toISOStringUTC(),
     };
     await this._writeFile(this.fingerprintsFile, fingerprints);
   }
@@ -102,7 +103,7 @@ export class PersistentStorage {
   async addUrl(url) {
     const urls = await this._readFile(this.seenUrlsFile);
     if (!urls[url]) {
-      urls[url] = { seenAt: new Date().toISOString() };
+      urls[url] = { seenAt: toISOStringUTC() };
       await this._writeFile(this.seenUrlsFile, urls);
     }
   }

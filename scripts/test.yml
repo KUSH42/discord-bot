@@ -1,0 +1,67 @@
+            if [ "${{ steps.coverage.outputs.status }}" == "available" ]; then
+            COVERAGE="${{ steps.coverage.outputs.coverage_pct }}"
+            # Ensure COVERAGE is a valid number
+            COVERAGE=$(echo "$COVERAGE" | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
+            
+            # Calculate OVERALL_COVERAGE robustly
+            OVERALL_COVERAGE=$(jq -r '.total.lines.pct // 0' coverage-summary.json 2>/dev/null)
+            # If jq fails or file is missing, OVERALL_COVERAGE will be empty or '0'.
+            # We need to explicitly set it to a numeric 0.00 if it's not present or invalid.
+            if [[ -z "$OVERALL_COVERAGE" ]] || ! printf "%.2f" "$OVERALL_COVERAGE" &>/dev/null; then
+              OVERALL_COVERAGE="0.00"
+            else
+              OVERALL_COVERAGE=$(awk '{printf "%.2f", $1}' <<< "$OVERALL_COVERAGE")
+            fi
+            
+            # Calculate COVERAGE_INT. This needs to be robust.
+            # Use 'bc' for floating point arithmetic and then 'printf' for integer conversion.
+            # This handles potential leading zeros or other awk output quirks better.
+            COVERAGE_INT=$(echo "$OVERALL_COVERAGE * 100" | bc | awk '{printf "%.0f", $1}')
+            
+            # Add a check for COVERAGE_INT's value right before the if statement
+            # This will help diagnose if the problem persists
+            # echo "DEBUG: COVERAGE_INT = '$COVERAGE_INT'"
+            
+            # Ensure COVERAGE_INT is a valid number, specifically an integer
+            # This regex check `^[0-9]+$` is good, but let's make sure it's an integer before comparison.
+            if [[ ! "$COVERAGE_INT" =~ ^[0-9]+$ ]]; then
+              COVERAGE_INT=0 # Fallback to 0 if it's not a pure positive integer
+            fi
+
+            # Now perform the comparisons using arithmetic context $((...)) or 'test' command
+            # The [ ] (test command) is fine for -ge, but [[ ]] is generally preferred in bash.
+            # For arithmetic comparisons, (( )) is also very robust.
+            
+            if (( COVERAGE_INT >= 5000 )); then # Using (( )) for arithmetic comparison
+              echo "✅ **Coverage Quality:** Meets minimum standards (≥50%)" >> reports/test-summary.md
+            elif (( COVERAGE_INT >= 2500 )); then # Using (( ))
+              echo "⚠️ **Coverage Quality:** Below target but acceptable (≥25%)" >> reports/test-summary.md
+            else
+              echo "❌ **Coverage Quality:** Below minimum standards (<25%)" >> reports/test-summary.md
+            fi
+              echo "📈 Coverage progressing: $COVERAGE%"
+              echo "coverage_status=progress" >> $GITHUB_ENV
+            fi
+            
+            # Create coverage metrics for tracking - Ensure all values are valid numbers
+            BRANCHES_PCT=$(jq -r '.total.branches.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
+            FUNCTIONS_PCT=$(jq -r '.total.functions.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
+            STATEMENTS_PCT=$(jq -r '.total.statements.pct // 0' coverage-summary.json 2>/dev/null | awk '{if($1 == "") print "0"; else printf "%.2f", $1}')
+            QUALITY_SCORE=$(awk -v cov="$COVERAGE" -v br="$BRANCHES_PCT" -v fn="$FUNCTIONS_PCT" 'BEGIN {printf "%.2f", cov * 0.4 + br * 0.3 + fn * 0.3}')
+            
+            echo "{
+              \"timestamp\": \"$(date -Iseconds)\",
+              \"commit\": \"${{ github.sha }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"coverage\": {
+                \"lines\": $COVERAGE,
+                \"branches\": $BRANCHES_PCT,
+                \"functions\": $FUNCTIONS_PCT,
+                \"statements\": $STATEMENTS_PCT
+              },
+              \"quality_score\": $QUALITY_SCORE
+            }" > coverage-metrics.json
+          else
+            echo "No coverage data available"
+            echo "coverage_status=missing" >> $GITHUB_ENV
+          fi

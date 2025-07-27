@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { createMockRequest, createMockResponse } from '../mocks/express.mock.js';
 import { createMockMessage, createMockUser } from '../mocks/discord.mock.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('Security and Input Validation Tests', () => {
   let consoleSpy;
@@ -173,7 +174,7 @@ describe('Security and Input Validation Tests', () => {
         }
 
         // Check timestamp to prevent replay attacks (5 minute window)
-        const currentTime = Math.floor(Date.now() / 1000);
+        const currentTime = Math.floor(timestampUTC() / 1000);
         const maxAge = 300; // 5 minutes
 
         if (Math.abs(currentTime - timestamp) > maxAge) {
@@ -204,7 +205,7 @@ describe('Security and Input Validation Tests', () => {
 
       const validPayload = '<feed><entry><id>test</id></entry></feed>';
       const secret = 'webhook-secret';
-      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const currentTimestamp = Math.floor(timestampUTC() / 1000);
       const validSignature = 'sha1=expected-signature-hash';
 
       // Valid signature
@@ -300,7 +301,7 @@ describe('Security and Input Validation Tests', () => {
       const rateLimitTracker = new Map();
 
       const checkRateLimit = (identifier, maxRequests = 5, windowMs = 60000) => {
-        const now = Date.now();
+        const now = timestampUTC();
         const windowStart = now - windowMs;
 
         if (!rateLimitTracker.has(identifier)) {
@@ -372,7 +373,7 @@ describe('Security and Input Validation Tests', () => {
         suspiciousActivity: new Set(),
 
         checkForDistributedAttack(ip, threshold = 10, timeWindow = 60000) {
-          const now = Date.now();
+          const now = timestampUTC();
           const windowStart = now - timeWindow;
 
           if (!this.ipRequests.has(ip)) {
@@ -482,7 +483,7 @@ describe('Security and Input Validation Tests', () => {
             break;
 
           case 'loglevel': {
-            const validLevels = ['error', 'warn', 'info', 'debug', 'silly'];
+            const validLevels = ['error', 'warn', 'info', 'debug', 'verbose'];
             if (sanitizedArgs.length !== 1 || !validLevels.includes(sanitizedArgs[0])) {
               return { valid: false, error: 'Invalid log level' };
             }

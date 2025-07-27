@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Quick test to verify mutex and browser state validation fixes
+ * Manual test to verify mutex and browser state validation fixes
+ * This is a quick validation script that can be run independently
  */
 
-import { AsyncMutex } from './src/utilities/async-mutex.js';
-import { PlaywrightBrowserService } from './src/services/implementations/playwright-browser-service.js';
+import { AsyncMutex } from '../../src/utilities/async-mutex.js';
+import { PlaywrightBrowserService } from '../../src/services/implementations/playwright-browser-service.js';
 
 async function testAsyncMutex() {
   console.log('Testing AsyncMutex...');

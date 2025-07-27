@@ -17,6 +17,6 @@ fs.readFile(versionFilePath, 'utf8', (err, data) => {
       console.error('Error writing build-version.json:', err);
       process.exit(1);
     }
-    console.log(`\t⬆️ Build number incremented to #️ ${versionData.build}`);
+    console.log(`\t ⬆️ Build number incremented to #️ ${versionData.build}`);
   });
 });

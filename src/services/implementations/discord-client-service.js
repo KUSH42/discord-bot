@@ -63,7 +63,7 @@ export class DiscordClientService extends DiscordService {
           return; // Don't process bot messages at all
         }
 
-        this.logger.silly(
+        this.logger.verbose(
           `📨 Discord messageCreate event - ID: ${message.id}, Handlers: ${this.client.listenerCount('messageCreate')}, Instance: ${this.client._botInstanceId}, Content: "${message.content?.substring(0, 50) || 'empty'}"`
         );
         handler(message);

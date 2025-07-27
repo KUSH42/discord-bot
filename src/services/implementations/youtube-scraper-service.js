@@ -1,14 +1,18 @@
 import { PlaywrightBrowserService } from './playwright-browser-service.js';
 import { AsyncMutex } from '../../utilities/async-mutex.js';
 import { parseRelativeTime } from '../../utilities/time-parser.js';
+import { nowUTC } from '../../utilities/utc-time.js';
+import { getYouTubeScrapingBrowserConfig } from '../../utilities/browser-config.js';
+import { createEnhancedLogger } from '../../utilities/enhanced-logger.js';
 
 /**
  * YouTube web scraper service for near-instantaneous content detection
  * Provides an alternative to API polling for faster notifications
  */
 export class YouTubeScraperService {
-  constructor({ logger, config, contentCoordinator }) {
-    this.logger = logger;
+  constructor({ logger, config, contentCoordinator, debugManager, metricsManager }) {
+    // Create enhanced logger for YouTube module
+    this.logger = createEnhancedLogger('youtube', logger, debugManager, metricsManager);
     this.config = config;
     this.contentCoordinator = contentCoordinator;
     this.browserService = new PlaywrightBrowserService();
@@ -55,36 +59,28 @@ export class YouTubeScraperService {
       throw new Error('YouTube scraper is already initialized');
     }
 
+    // Start tracked operation for initialization
+    const operation = this.logger.startOperation('initialize', {
+      channelHandle,
+      authEnabled: this.authEnabled,
+    });
+
     // Construct channel URLs
     const baseUrl = `https://www.youtube.com/@${channelHandle}`;
     this.videosUrl = `${baseUrl}/videos`;
     this.liveStreamUrl = `${baseUrl}/live`;
 
     try {
-      // Launch browser with optimized settings for scraping
-      const browserOptions = {
-        headless: false,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-          // Minimal performance optimizations to avoid bot detection
-          '--disable-images',
-          '--disable-plugins',
-          '--mute-audio',
-        ],
-      };
+      operation.progress('Launching browser with optimized settings');
 
-      // Add display if running in headless environment
-      if (process.env.DISPLAY) {
-        browserOptions.args.push(`--display=${process.env.DISPLAY}`);
-      }
+      // Launch browser with optimized settings for scraping
+      const browserOptions = getYouTubeScrapingBrowserConfig({
+        headless: false,
+      });
 
       await this.browserService.launch(browserOptions);
+
+      operation.progress('Configuring browser user agent and viewport');
 
       // Set user agent to appear as regular browser
       await this.browserService.setUserAgent(
@@ -99,29 +95,34 @@ export class YouTubeScraperService {
 
       // Perform authentication if enabled
       if (this.authEnabled) {
+        operation.progress('Performing YouTube authentication');
         await this.authenticateWithYouTube();
       }
+
+      operation.progress('Fetching initial content to establish baseline');
 
       // Find and set the initial latest video
       const latestVideo = await this.fetchLatestVideo();
       if (latestVideo && latestVideo.success && latestVideo.id) {
         await this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
-        this.logger.info('YouTube scraper initialized', {
+
+        return operation.success('YouTube scraper initialized successfully', {
           videosUrl: this.videosUrl,
           initialContentId: latestVideo.id,
           title: latestVideo.title,
+          isAuthenticated: this.isAuthenticated,
         });
       } else {
-        this.logger.warn('YouTube scraper initialized but no videos found', {
+        return operation.success('YouTube scraper initialized but no videos found', {
           videosUrl: this.videosUrl,
+          isAuthenticated: this.isAuthenticated,
         });
       }
     } catch (error) {
       this.isInitialized = false;
-      this.logger.error('❌ Failed to initialize YouTube scraper', {
-        error: error.message,
-        stack: error.stack,
+      operation.error(error, 'Failed to initialize YouTube scraper', {
         videosUrl: this.videosUrl,
+        authEnabled: this.authEnabled,
       });
       throw error;
     }
@@ -496,20 +497,31 @@ export class YouTubeScraperService {
         return null;
       }
 
+      // Start tracked operation for video fetching
+      const operation = this.logger.startOperation('fetchLatestVideo', {
+        videosUrl: this.videosUrl,
+        isAuthenticated: this.isAuthenticated,
+      });
+
       this.metrics.totalScrapingAttempts++;
 
       try {
+        operation.progress('Navigating to channel videos page');
         // Navigate to channel videos page
         await this.browserService.goto(this.videosUrl, {
           waitUntil: 'networkidle',
           timeout: this.timeoutMs,
         });
 
+        operation.progress('Handling consent page redirects');
+
         // Handle consent page if redirected
         await this.handleConsentPageRedirect();
 
         // Wait for the page to load and videos to appear
         await this.browserService.waitFor(2000);
+
+        operation.progress('Extracting video information from page');
 
         // Debug: Log page content for troubleshooting
         let debugInfo = null;
@@ -529,9 +541,9 @@ export class YouTubeScraperService {
             /* eslint-enable no-undef */
           });
 
-          this.logger.silly(`YouTube page debug info: ${JSON.stringify(debugInfo, null, 2)}`);
+          this.logger.debug(`YouTube page debug info: ${JSON.stringify(debugInfo, null, 2)}`);
         } catch (error) {
-          this.logger.silly('Failed to get YouTube page debug info:', error.message);
+          this.logger.debug('Failed to get YouTube page debug info:', error.message);
           debugInfo = { error: 'Failed to evaluate page' };
         }
 
@@ -634,6 +646,7 @@ export class YouTubeScraperService {
               viewsText,
               thumbnailUrl,
               type: 'video',
+              platform: 'youtube',
               scrapedAt: new Date().toISOString(),
             };
           });
@@ -650,7 +663,22 @@ export class YouTubeScraperService {
           this.metrics.successfulScrapes++;
           this.metrics.lastSuccessfulScrape = new Date();
 
-          this.logger.info('Successfully scraped latest video:', JSON.stringify(latestVideo, null, 2));
+          // Create a plain object for logging to avoid complex object serialization issues
+          const logData = {
+            success: latestVideo.success,
+            strategy: latestVideo.strategy,
+            id: latestVideo.id,
+            title: latestVideo.title,
+            url: latestVideo.url,
+            publishedText: latestVideo.publishedText,
+            publishedAt: latestVideo.publishedAt,
+            viewsText: latestVideo.viewsText,
+            thumbnailUrl: latestVideo.thumbnailUrl,
+            type: latestVideo.type,
+            scrapedAt: latestVideo.scrapedAt,
+          };
+
+          operation.success('Successfully scraped latest video', logData);
         } else {
           const failureInfo = {
             videosUrl: this.videosUrl,
@@ -661,7 +689,7 @@ export class YouTubeScraperService {
             failureInfo.attemptedStrategies = latestVideo.strategies;
           }
 
-          this.logger.error('No videos found during scraping', failureInfo);
+          operation.error(new Error('No videos found during scraping'), 'No videos found during scraping', failureInfo);
         }
 
         return latestVideo;
@@ -669,11 +697,10 @@ export class YouTubeScraperService {
         this.metrics.failedScrapes++;
         this.metrics.lastError = {
           message: error.message,
-          timestamp: new Date(),
+          timestamp: nowUTC(),
         };
 
-        this.logger.warn('Failed to scrape YouTube channel', {
-          error: error.message,
+        operation.error(error, 'Failed to scrape YouTube channel', {
           videosUrl: this.videosUrl,
           attempt: this.metrics.totalScrapingAttempts,
         });
@@ -700,11 +727,20 @@ export class YouTubeScraperService {
         return null;
       }
 
+      // Start tracked operation for live stream fetching
+      const operation = this.logger.startOperation('fetchActiveLiveStream', {
+        liveStreamUrl: this.liveStreamUrl,
+        isAuthenticated: this.isAuthenticated,
+      });
+
       try {
+        operation.progress('Navigating to channel live stream page');
         await this.browserService.goto(this.liveStreamUrl, {
           waitUntil: 'networkidle',
           timeout: this.timeoutMs,
         });
+
+        operation.progress('Extracting live stream information');
 
         const liveStream = await this.browserService.evaluate(() => {
           // eslint-disable-next-line no-undef
@@ -724,22 +760,35 @@ export class YouTubeScraperService {
             title: liveElement.getAttribute('title') || 'Live Stream',
             url,
             type: 'livestream',
+            platform: 'youtube',
             publishedAt: new Date().toISOString(), // Live streams are happening now
             scrapedAt: new Date().toISOString(),
           };
         });
 
         if (liveStream) {
-          this.logger.debug('Successfully scraped active live stream', {
-            videoId: liveStream.id,
+          // Create a plain object for logging to avoid complex object serialization issues
+          const logData = {
+            id: liveStream.id,
             title: liveStream.title,
+            url: liveStream.url,
+            type: liveStream.type,
+            platform: liveStream.platform,
+            publishedAt: liveStream.publishedAt,
+            scrapedAt: liveStream.scrapedAt,
+          };
+
+          operation.success('Successfully scraped active live stream', logData);
+        } else {
+          operation.success('No active live stream found', {
+            liveStreamUrl: this.liveStreamUrl,
+            note: 'This is normal when no live stream is currently active',
           });
         }
 
         return liveStream;
       } catch (error) {
-        this.logger.error('Failed to scrape for active live stream', {
-          error: error.message,
+        operation.error(error, 'Failed to scrape for active live stream', {
           liveStreamUrl: this.liveStreamUrl,
         });
         return null;
@@ -818,7 +867,7 @@ export class YouTubeScraperService {
       // Schedule next check
       if (this.isRunning) {
         const nextInterval = this._getNextInterval();
-        this.logger.silly(`Next YouTube scrape scheduled in ${nextInterval}ms`);
+        this.logger.debug(`Next YouTube scrape scheduled in ${nextInterval}ms`);
         this.scrapingInterval = setTimeout(monitoringLoop, nextInterval);
       }
     };

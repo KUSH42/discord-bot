@@ -371,9 +371,7 @@ describe('End-to-End Command Processing Workflows', () => {
       const result = await commandProcessor.processCommand('loglevel', ['unknown'], authorizedUser.id);
 
       expect(result.success).toBe(false);
-      expect(result.message).toBe(
-        '❌ Invalid log level. Valid levels are: error, warn, info, http, verbose, debug, silly.'
-      );
+      expect(result.message).toBe('❌ Invalid log level. Valid levels are: error, warn, info, debug, verbose.');
     });
 
     it('should reject unknown commands', async () => {
@@ -423,7 +421,7 @@ describe('End-to-End Command Processing Workflows', () => {
 
     it('should validate log level values', async () => {
       // Valid log levels
-      const validLevels = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
+      const validLevels = ['error', 'warn', 'info', 'debug', 'verbose'];
       for (const level of validLevels) {
         const currentLevel = level; // Capture variable for safe closure
         const stateManager = mockStateManager; // Capture outer scope variable
@@ -435,7 +433,7 @@ describe('End-to-End Command Processing Workflows', () => {
       // Invalid log level
       await expect(async () => {
         mockStateManager.set('logLevel', 'invalid');
-      }).rejects.toThrow('logLevel must be one of: error, warn, info, http, verbose, debug, silly');
+      }).rejects.toThrow('logLevel must be one of: error, warn, info, debug, verbose');
     });
   });
 
@@ -549,6 +547,11 @@ describe('End-to-End Command Processing Workflows', () => {
         'auth-status',
         'force-reauth',
         'scraper-health',
+        'debug',
+        'debug-status',
+        'debug-level',
+        'metrics',
+        'log-pipeline',
       ]);
 
       expect(stats).toHaveProperty('restrictedCommands', [

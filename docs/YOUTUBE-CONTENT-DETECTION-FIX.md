@@ -244,7 +244,7 @@ or lightweight DB await this.writeToStorage('content_states', videoId, state); }
 
     async cleanup(olderThanDays = 7) {
       // Remove old entries to prevent storage bloat
-      const cutoff = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
+      const cutoff = timestampUTC() - (olderThanDays * 24 * 60 * 60 * 1000);
       await this.removeEntriesOlderThan('content_states', cutoff);
     }
 

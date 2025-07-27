@@ -1,19 +1,26 @@
+import { nowUTC } from '../utilities/utc-time.js';
+
 /**
  * Unified Content State Management System
  * Replaces dual-logic inconsistency with single source of truth
  * Tracks content through its complete lifecycle
  */
 export class ContentStateManager {
-  constructor(configManager, persistentStorage, logger) {
+  constructor(configManager, persistentStorage, logger, stateManager = null) {
     this.configManager = configManager;
     this.storage = persistentStorage;
     this.logger = logger;
+    this.stateManager = stateManager;
 
     // In-memory cache for active content states
     this.contentStates = new Map(); // videoId -> ContentState
 
     // Track when the bot started to determine content freshness
     this.botStartTime = new Date();
+
+    // Track initialization status for comprehensive logging
+    this.isFullyInitialized = false;
+    this.initializationTime = null;
 
     // Initialize from persistent storage
     this.initializeFromStorage();
@@ -28,7 +35,7 @@ export class ContentStateManager {
 
       for (const [contentId, state] of Object.entries(storedStates || {})) {
         // Only load recent states to prevent memory bloat
-        const age = Date.now() - new Date(state.lastUpdated).getTime();
+        const age = nowUTC().getTime() - new Date(state.lastUpdated).getTime();
         const maxAge = this.getMaxContentAgeMs();
 
         if (age <= maxAge * 2) {
@@ -50,6 +57,20 @@ export class ContentStateManager {
         error: error.message,
       });
     }
+  }
+
+  /**
+   * Mark the system as fully initialized (all submodules started, histories populated)
+   * This enables comprehensive content evaluation logging
+   */
+  markFullyInitialized() {
+    this.isFullyInitialized = true;
+    this.initializationTime = new Date();
+
+    this.logger.info('Content state manager marked as fully initialized - comprehensive logging enabled', {
+      initializationTime: this.initializationTime.toISOString(),
+      botStartTime: this.botStartTime.toISOString(),
+    });
   }
 
   /**
@@ -188,20 +209,55 @@ export class ContentStateManager {
     // Content is new if it's within the maximum age threshold
     const isWithinAgeLimit = contentAge <= maxAge;
 
-    // Also check against bot start time for content that existed before bot started
-    const isAfterBotStart = publishTime >= this.botStartTime;
+    // Check against bot start time, but allow recent content even if published before bot start
+    // This prevents announcing very old content while still allowing recent content from before restart
+    const botStartTime = this.getBotStartTime();
+    const isAfterBotStart = publishTime >= botStartTime;
+    const timeSinceBotStart = detectionTime.getTime() - botStartTime.getTime();
+    const botStartGracePeriod = 5 * 60 * 1000; // 5 minutes grace period
 
-    this.logger.debug('New content evaluation', {
+    // Allow content if:
+    // 1. Published after bot started, OR
+    // 2. Bot just started (within grace period) and content is within age limit
+    const shouldAllow = isAfterBotStart || (timeSinceBotStart <= botStartGracePeriod && isWithinAgeLimit);
+
+    // Always log basic debug info, but add comprehensive logging after initialization
+    const logData = {
       contentId,
       publishedAt: publishTime.toISOString(),
       contentAge: Math.round(contentAge / 1000), // seconds
       maxAge: Math.round(maxAge / 1000), // seconds
       isWithinAgeLimit,
       isAfterBotStart,
-      botStartTime: this.botStartTime.toISOString(),
-    });
+      timeSinceBotStart: Math.round(timeSinceBotStart / 1000), // seconds
+      botStartTime: botStartTime.toISOString(),
+      shouldAllow,
+    };
 
-    return isWithinAgeLimit && isAfterBotStart;
+    if (this.isFullyInitialized) {
+      // Comprehensive logging after full initialization - this helps catch issues like the one we just fixed
+      const decision = shouldAllow ? '✅ ALLOW' : '❌ REJECT';
+      const reason = !isWithinAgeLimit
+        ? 'content too old'
+        : !isAfterBotStart && timeSinceBotStart > 5 * 60 * 1000
+          ? 'published before bot start (outside grace period)'
+          : shouldAllow
+            ? 'within criteria'
+            : 'unknown';
+
+      this.logger.debug(`Content evaluation: ${decision} - ${reason}`, {
+        ...logData,
+        initializationTime: this.initializationTime?.toISOString(),
+        isFullyInitialized: this.isFullyInitialized,
+        gracePeriodMs: 5 * 60 * 1000,
+        reason,
+      });
+    } else {
+      // Basic logging during initialization
+      this.logger.debug('New content evaluation (pre-initialization)', logData);
+    }
+
+    return shouldAllow;
   }
 
   /**
@@ -264,7 +320,7 @@ export class ContentStateManager {
   async cleanup(olderThanHours) {
     const maxAge = olderThanHours ? olderThanHours * 60 * 60 * 1000 : this.getMaxContentAgeMs() * 2; // Default to 2x max age
 
-    const cutoffTime = Date.now() - maxAge;
+    const cutoffTime = nowUTC().getTime() - maxAge;
     const toRemove = [];
 
     for (const [contentId, state] of this.contentStates.entries()) {
@@ -305,6 +361,20 @@ export class ContentStateManager {
   }
 
   /**
+   * Get bot start time from state manager if available, otherwise use internal time
+   * @returns {Date} Bot start time
+   */
+  getBotStartTime() {
+    if (this.stateManager) {
+      const stateManagerBotStartTime = this.stateManager.get('botStartTime');
+      if (stateManagerBotStartTime) {
+        return new Date(stateManagerBotStartTime);
+      }
+    }
+    return this.botStartTime;
+  }
+
+  /**
    * Persist content state to storage
    * @param {string} contentId - Content identifier
    * @param {Object} state - Content state to persist
@@ -313,9 +383,9 @@ export class ContentStateManager {
     try {
       await this.storage.storeContentState(contentId, {
         ...state,
-        firstSeen: state.firstSeen.toISOString(),
-        lastUpdated: state.lastUpdated.toISOString(),
-        publishedAt: state.publishedAt.toISOString(),
+        firstSeen: state.firstSeen,
+        lastUpdated: state.lastUpdated,
+        publishedAt: state.publishedAt,
       });
     } catch (error) {
       this.logger.warn('Failed to persist content state', {

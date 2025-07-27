@@ -88,6 +88,7 @@ export class MessageProcessor {
       error: error.message,
       errorCode: error.code,
       retryCount: message.retryCount,
+      messageContent: this.sanitizeMessageContent(message),
     });
 
     // Handle rate limit errors (both proactive and reactive)
@@ -139,6 +140,7 @@ export class MessageProcessor {
       retryCount: message.retryCount,
       error: error.message,
       errorCode: error.code,
+      messageContent: this.sanitizeMessageContent(message),
     });
 
     throw error;
@@ -223,6 +225,61 @@ export class MessageProcessor {
 
     // Fallback check for basic channel properties
     return !!(channel.id && channel.send);
+  }
+
+  /**
+   * Sanitize message content for logging purposes
+   * @param {Message} message - Message to sanitize
+   * @returns {Object} Sanitized content info
+   */
+  sanitizeMessageContent(message) {
+    if (!message) {
+      return { error: 'No message provided' };
+    }
+
+    try {
+      const result = {
+        channelId: message.channel?.id || 'unknown',
+        contentType: typeof message.content,
+      };
+
+      if (typeof message.content === 'string') {
+        // Truncate long content and remove sensitive patterns
+        const truncated = message.content.length > 200 ? `${message.content.substring(0, 200)}...` : message.content;
+
+        // Basic sanitization - remove potential tokens/secrets
+        const sanitized = truncated
+          .replace(/[A-Za-z0-9]{24,}/g, '[REDACTED_TOKEN]') // Discord tokens
+          .replace(/https?:\/\/[^\s]+/g, '[URL]'); // URLs for privacy
+
+        result.content = sanitized;
+        result.contentLength = message.content.length;
+      } else if (message.content && typeof message.content === 'object') {
+        // For embed objects, log structure but not full content
+        result.contentKeys = Object.keys(message.content);
+        if (message.content.description) {
+          const desc = message.content.description;
+          const truncated = desc.length > 100 ? `${desc.substring(0, 100)}...` : desc;
+          result.description = truncated.replace(/[A-Za-z0-9]{24,}/g, '[REDACTED]');
+        }
+        if (message.content.title) {
+          result.title = message.content.title.substring(0, 50);
+        }
+      }
+
+      // Add message options info
+      if (message.options && Object.keys(message.options).length > 0) {
+        result.optionsKeys = Object.keys(message.options);
+      }
+
+      return result;
+    } catch (sanitizeError) {
+      return {
+        error: 'Failed to sanitize message content',
+        sanitizeError: sanitizeError.message,
+        messageId: message.id,
+      };
+    }
   }
 
   /**

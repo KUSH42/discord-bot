@@ -1,5 +1,7 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ScraperApplication Core Operations', () => {
   let scraperApp;
@@ -18,6 +20,9 @@ describe('ScraperApplication Core Operations', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     // Mock all dependencies
     mockConfig = {
@@ -51,13 +56,7 @@ describe('ScraperApplication Core Operations', () => {
       set: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     mockAuthManager = {
       login: jest.fn(),
@@ -104,7 +103,7 @@ describe('ScraperApplication Core Operations', () => {
         X_QUERY_INTERVAL_MAX: '600000',
         X_DEBUG_SAMPLING_RATE: '0.1',
         X_VERBOSE_LOG_SAMPLING_RATE: '0.05',
-        CONTENT_BACKOFF_DURATION_HOURS: '2',
+        MAX_CONTENT_AGE_HOURS: '2',
         INITIALIZATION_WINDOW_HOURS: '24',
         TWITTER_EMAIL: 'test@example.com',
       };
@@ -131,6 +130,8 @@ describe('ScraperApplication Core Operations', () => {
       authManager: mockAuthManager,
       duplicateDetector: mockDuplicateDetector,
       persistentStorage: mockPersistentStorage,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
     };
 
     scraperApp = new ScraperApplication(mockDependencies);
@@ -151,7 +152,7 @@ describe('ScraperApplication Core Operations', () => {
       expect(scraperApp.state).toBe(mockStateManager);
       expect(scraperApp.discord).toBe(mockDiscordService);
       expect(scraperApp.eventBus).toBe(mockEventBus);
-      expect(scraperApp.logger).toBe(mockLogger);
+      expect(scraperApp.logger).toEqual(expect.objectContaining({ moduleName: 'scraper' }));
       expect(scraperApp.authManager).toBe(mockAuthManager);
     });
 
@@ -238,7 +239,14 @@ describe('ScraperApplication Core Operations', () => {
       await expect(scraperApp.start()).rejects.toThrow('Browser launch failed');
 
       expect(scraperApp.stop).toHaveBeenCalled();
-      expect(mockLogger.error).toHaveBeenCalledWith('❌ Failed to start scraper application:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to start scraper application',
+        expect.objectContaining({
+          error: 'Browser launch failed',
+          module: 'scraper',
+          outcome: 'error',
+        })
+      );
     });
 
     it('should emit start event on successful start', async () => {
@@ -256,7 +264,13 @@ describe('ScraperApplication Core Operations', () => {
         xUser: 'testuser',
         pollingInterval: 300000,
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ X scraper application started successfully');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'X scraper application started successfully',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+        })
+      );
     });
   });
 
@@ -297,7 +311,12 @@ describe('ScraperApplication Core Operations', () => {
 
       await scraperApp.stop();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error stopping scraper application:', stopError);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error stopping scraper application:',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
   });
 
@@ -373,7 +392,13 @@ describe('ScraperApplication Core Operations', () => {
       await scraperApp.closeBrowser();
 
       expect(mockBrowserService.close).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Browser closed');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Browser closed successfully',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+        })
+      );
     });
 
     it('should skip closing browser when not running', async () => {
@@ -389,9 +414,16 @@ describe('ScraperApplication Core Operations', () => {
       const closeError = new Error('Close failed');
       mockBrowserService.close.mockRejectedValue(closeError);
 
-      await scraperApp.closeBrowser();
+      await expect(scraperApp.closeBrowser()).rejects.toThrow('Close failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error closing browser:', closeError);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to close browser',
+        expect.objectContaining({
+          error: 'Close failed',
+          module: 'scraper',
+          outcome: 'error',
+        })
+      );
     });
   });
 
@@ -433,7 +465,7 @@ describe('ScraperApplication Core Operations', () => {
 
     it('should stop polling and clear timer', () => {
       scraperApp.timerId = setTimeout(() => {}, 1000);
-      scraperApp.nextPollTimestamp = Date.now();
+      scraperApp.nextPollTimestamp = timestampUTC();
 
       scraperApp.stopPolling();
 
@@ -499,7 +531,12 @@ describe('ScraperApplication Core Operations', () => {
       mockAuthManager.ensureAuthenticated.mockRejectedValue(authError);
 
       await expect(scraperApp.ensureAuthenticated()).rejects.toThrow('Auth failed');
-      expect(mockLogger.error).toHaveBeenCalledWith('Authentication failed after all retry attempts:', authError);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Authentication failed after all retry attempts:',
+        expect.objectContaining({
+          module: 'scraper',
+        })
+      );
     });
   });
 

@@ -96,8 +96,8 @@ tests/
 
 | Component Type          | Statements | Branches | Functions | Lines  |
 | ----------------------- | ---------- | -------- | --------- | ------ |
-| **Global**              | 25%        | 20%      | 25%       | 25%    |
-| **Core Modules**        | 50%        | 40%      | 55%       | 50%    |
+| **Global**              | 50%        | 40%      | 50%       | 40%    |
+| **Core Modules**        | 70%        | 60%      | 65%       | 60%    |
 | **Critical Components** | 85-90%     | 75-85%   | 90%       | 85-90% |
 
 ## 🎨 Interactive Test Runner
@@ -124,6 +124,24 @@ npm run test:runner dev               # Development mode
 | `npm run test:debug`    | Debug with breakpoints    |
 | `npm run test:runner`   | Interactive test runner   |
 | `npm run test:coverage` | Generate coverage report  |
+
+## 🐛 Common Testing Patterns & Gotchas
+
+### Enhanced Logger Testing
+
+Components using `createEnhancedLogger` create child logger instances, not the mock logger directly:
+
+```javascript
+// ❌ This won't work - tests the mock base logger
+expect(mockLogger.error).toHaveBeenCalledWith(...);
+
+// ✅ This works - spy on the enhanced logger instance
+const enhancedLogger = component.logger;
+const errorSpy = jest.spyOn(enhancedLogger, 'error');
+expect(errorSpy).toHaveBeenCalledWith(...);
+```
+
+**Why**: Enhanced logger creates isolated child loggers with correlation tracking and performance metrics, so the actual logging calls don't reach the base mock.
 
 ---
 

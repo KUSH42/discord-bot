@@ -3,6 +3,7 @@ import { createMockChannel } from '../mocks/discord.mock.js';
 import { createMockRequest, createMockResponse } from '../mocks/express.mock.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
 import { createWebhookLimiter, createCommandRateLimiter } from '../../src/rate-limiter.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('Performance and Load Tests', () => {
   let startTime;
@@ -95,12 +96,12 @@ describe('Performance and Load Tests', () => {
 
           this.entries.set(key, {
             value,
-            timestamp: Date.now(),
+            timestamp: timestampUTC(),
           });
         },
 
         cleanup() {
-          const now = Date.now();
+          const now = timestampUTC();
           for (const [key, entry] of this.entries) {
             if (now - entry.timestamp > this.maxAge) {
               this.entries.delete(key);
@@ -114,7 +115,7 @@ describe('Performance and Load Tests', () => {
             return null;
           }
 
-          if (Date.now() - entry.timestamp > this.maxAge) {
+          if (timestampUTC() - entry.timestamp > this.maxAge) {
             this.entries.delete(key);
             return null;
           }
@@ -272,7 +273,7 @@ describe('Performance and Load Tests', () => {
 
       // Mock successful sends with realistic delay
       mockChannel.send.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 50))
+        () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${timestampUTC()}` }), Math.random() * 50))
       );
 
       const sendStart = performance.now();
@@ -320,7 +321,7 @@ describe('Performance and Load Tests', () => {
       // Mock send operations with varying delays
       channels.forEach(channel => {
         channel.send.mockImplementation(
-          () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${Date.now()}` }), Math.random() * 100))
+          () => new Promise(resolve => setTimeout(() => resolve({ id: `msg-${timestampUTC()}` }), Math.random() * 100))
         );
       });
 

@@ -3,6 +3,8 @@
  * This file contains reusable test data, fixtures, and data generation utilities
  */
 
+import { timestampUTC } from '../../src/utilities/utc-time.js';
+
 export const testDatasets = {
   // YouTube video URLs in various formats for comprehensive regex testing
   youtubeUrls: {
@@ -231,7 +233,7 @@ export const testDatasets = {
       },
       liveStreamingDetails: {
         actualStartTime: new Date().toISOString(),
-        scheduledStartTime: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+        scheduledStartTime: new Date(timestampUTC() - 300000).toISOString(), // 5 minutes ago
         concurrentViewers: '1000',
         activeLiveChatId: 'Cg0KC2xpdmUxMjM0NTY3ODk',
       },
@@ -578,7 +580,7 @@ export const testDatasets = {
 export const dataGenerators = {
   // Generate realistic Discord channel IDs (snowflakes)
   generateDiscordId: () => {
-    const timestamp = Date.now() - 1420070400000; // Discord epoch
+    const timestamp = timestampUTC() - 1420070400000; // Discord epoch
     const randomBits = Math.floor(Math.random() * 4095); // 12 bits
     return ((timestamp << 22) | randomBits).toString();
   },

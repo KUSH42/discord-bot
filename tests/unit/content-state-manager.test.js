@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('ContentStateManager', () => {
   let stateManager;
@@ -52,7 +53,7 @@ describe('ContentStateManager', () => {
 
   describe('initializeFromStorage', () => {
     it('should load recent states from storage', async () => {
-      const recentTime = new Date(Date.now() - 60000).toISOString(); // 1 minute ago
+      const recentTime = new Date(timestampUTC() - 60000).toISOString(); // 1 minute ago
       const storedStates = {
         'video-1': {
           id: 'video-1',
@@ -79,7 +80,7 @@ describe('ContentStateManager', () => {
     });
 
     it('should skip old states to prevent memory bloat', async () => {
-      const oldTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours ago (older than 2x max age)
+      const oldTime = new Date(timestampUTC() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours ago (older than 2x max age)
       const storedStates = {
         'video-old': {
           id: 'video-old',
@@ -163,9 +164,9 @@ describe('ContentStateManager', () => {
         id: contentId,
         type: 'youtube_video',
         state: 'published',
-        firstSeen: expect.any(String),
-        lastUpdated: expect.any(String),
-        publishedAt: expect.any(String),
+        firstSeen: expect.any(Date),
+        lastUpdated: expect.any(Date),
+        publishedAt: expect.any(Date),
         announced: false,
         source: 'webhook',
         url: 'https://www.youtube.com/watch?v=test123',
@@ -378,8 +379,8 @@ describe('ContentStateManager', () => {
     });
 
     it('should return true for new content within age limit and after bot start', () => {
-      const recentTime = new Date(Date.now() - 30000); // 30 seconds ago
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      const recentTime = new Date(timestampUTC() - 30000); // 30 seconds ago
+      stateManager.botStartTime = new Date(timestampUTC() - 60000); // Bot started 1 minute ago
 
       const result = stateManager.isNewContent(contentId, recentTime.toISOString());
 
@@ -387,7 +388,7 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for content older than max age', () => {
-      const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+      const oldTime = new Date(timestampUTC() - 25 * 60 * 60 * 1000); // 25 hours ago
 
       const result = stateManager.isNewContent(contentId, oldTime.toISOString());
 
@@ -395,35 +396,47 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for content published before bot started', () => {
-      const beforeBotStart = new Date(Date.now() - 120000); // 2 minutes ago
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      // Set specific times with large gap to avoid grace period
+      const botStartTime = new Date('2023-01-01T12:00:00.000Z');
+      const beforeBotStart = new Date('2023-01-01T10:00:00.000Z'); // 2 hours before (outside grace period)
+      const detectionTime = new Date('2023-01-01T13:00:00.000Z'); // 1 hour after bot start (outside grace period)
 
-      const result = stateManager.isNewContent(contentId, beforeBotStart.toISOString());
+      stateManager.botStartTime = botStartTime;
+
+      const result = stateManager.isNewContent(contentId, beforeBotStart.toISOString(), detectionTime);
 
       expect(result).toBe(false);
     });
 
     it('should log debug information', () => {
-      const publishTime = new Date(Date.now() - 60000);
-      stateManager.botStartTime = new Date(Date.now() - 30000);
+      // Use fixed times to ensure predictable behavior
+      const botStartTime = new Date('2023-01-01T12:00:00.000Z');
+      const publishTime = new Date('2023-01-01T12:30:00.000Z'); // 30 minutes after bot start
+      const detectionTime = new Date('2023-01-01T12:35:00.000Z');
 
-      stateManager.isNewContent(contentId, publishTime.toISOString());
+      stateManager.botStartTime = botStartTime;
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('New content evaluation', {
+      stateManager.isNewContent(contentId, publishTime.toISOString(), detectionTime);
+
+      // The implementation logs different messages before vs after initialization
+      // Before initialization: "New content evaluation (pre-initialization)"
+      expect(mockLogger.debug).toHaveBeenCalledWith('New content evaluation (pre-initialization)', {
         contentId,
         publishedAt: publishTime.toISOString(),
         contentAge: expect.any(Number),
         maxAge: expect.any(Number),
         isWithinAgeLimit: expect.any(Boolean),
         isAfterBotStart: expect.any(Boolean),
+        timeSinceBotStart: expect.any(Number),
         botStartTime: expect.any(String),
+        shouldAllow: expect.any(Boolean),
       });
     });
 
     it('should handle custom detection time', () => {
-      const publishTime = new Date(Date.now() - 30000); // 30 seconds ago
+      const publishTime = new Date(timestampUTC() - 30000); // 30 seconds ago
       const detectionTime = new Date(); // now
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      stateManager.botStartTime = new Date(timestampUTC() - 60000); // Bot started 1 minute ago
 
       const result = stateManager.isNewContent(contentId, publishTime.toISOString(), detectionTime);
 
@@ -652,9 +665,9 @@ describe('ContentStateManager', () => {
 
       expect(mockPersistentStorage.storeContentState).toHaveBeenCalledWith(contentId, {
         ...contentState,
-        firstSeen: contentState.firstSeen.toISOString(),
-        lastUpdated: contentState.lastUpdated.toISOString(),
-        publishedAt: contentState.publishedAt.toISOString(),
+        firstSeen: contentState.firstSeen,
+        lastUpdated: contentState.lastUpdated,
+        publishedAt: contentState.publishedAt,
       });
     });
 
@@ -821,7 +834,7 @@ describe('ContentStateManager', () => {
       mockConfigManager.getNumber.mockReturnValue(24);
 
       // Add old content (older than 2x 24h = 48h)
-      const oldTime = new Date(Date.now() - 72 * 60 * 60 * 1000); // 72 hours ago
+      const oldTime = new Date(timestampUTC() - 72 * 60 * 60 * 1000); // 72 hours ago
       stateManager.contentStates.set('old-content', { lastUpdated: oldTime });
 
       // This should not throw even if storage fails (we now handle the error)
@@ -857,8 +870,8 @@ describe('ContentStateManager', () => {
     it('should handle isNewContent with string dates vs Date objects', () => {
       mockConfigManager.getNumber.mockReturnValue(24);
 
-      const stringDate = new Date(Date.now() - 60000).toISOString();
-      const dateObject = new Date(Date.now() - 60000);
+      const stringDate = new Date(timestampUTC() - 60000).toISOString();
+      const dateObject = new Date(timestampUTC() - 60000);
 
       const result1 = stateManager.isNewContent('test-1', stringDate);
       const result2 = stateManager.isNewContent('test-2', dateObject);

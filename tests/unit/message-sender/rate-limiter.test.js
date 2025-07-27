@@ -43,9 +43,9 @@ describe('RateLimiter', () => {
     it('should initialize with default options', () => {
       const limiter = new RateLimiter();
 
-      expect(limiter.burstAllowance).toBe(15);
-      expect(limiter.burstResetTime).toBe(120000);
-      expect(limiter.baseSendDelay).toBe(3000);
+      expect(limiter.burstAllowance).toBe(30);
+      expect(limiter.burstResetTime).toBe(60000);
+      expect(limiter.baseSendDelay).toBe(1000);
       expect(limiter.burstCounter).toBe(0);
       expect(limiter.isPaused).toBe(false);
     });

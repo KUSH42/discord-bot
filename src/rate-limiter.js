@@ -8,7 +8,7 @@ import rateLimit from 'express-rate-limit';
  * Implements in-memory rate limiting with automatic cleanup
  */
 export class CommandRateLimit {
-  constructor(maxCommands = 5, windowMs = 60000) {
+  constructor(maxCommands = 15, windowMs = 15000) {
     this.maxCommands = maxCommands;
     this.windowMs = windowMs;
     this.users = new Map();

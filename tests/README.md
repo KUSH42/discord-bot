@@ -178,8 +178,6 @@ For detailed information on recent fixes, see
     and checks for potential secret leaks.
 - **AI Agent Guidance:**
   - Add new security tests for any new input processing logic.
-  - Regularly check for and propose fixes for vulnerabilities reported by
-    `npm audit`.
 
 ### 3.6. Accessibility (A11y) Tests
 

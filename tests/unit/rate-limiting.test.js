@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { createMockRequest, createMockResponse, mockNext } from '../mocks/express.mock.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 import {
   CommandRateLimit,
   createWebhookLimiter,
@@ -549,7 +550,7 @@ describe('Rate Limiting Tests', () => {
 
     return (req, res, next) => {
       const key = options.keyGenerator ? options.keyGenerator(req) : req.ip;
-      const now = Date.now();
+      const now = timestampUTC();
       const windowStart = now - options.windowMs;
 
       // Check if rate limit skip function is working

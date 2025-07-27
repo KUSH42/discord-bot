@@ -5,6 +5,7 @@
 
 export default {
   testEnvironment: 'node',
+  rootDir: '../../',
 
   // Transform configuration
   transform: {

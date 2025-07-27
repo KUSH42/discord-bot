@@ -74,7 +74,16 @@ describe('Application Input Validation Security Tests', () => {
     };
 
     mockStateManager = {
-      get: jest.fn().mockReturnValue(true),
+      get: jest.fn().mockImplementation(key => {
+        const stateValues = {
+          postingEnabled: true,
+          announcementEnabled: true,
+          vxTwitterConversionEnabled: true,
+          logLevel: 'info',
+          botStartTime: new Date('2024-01-01T00:00:00Z'),
+        };
+        return stateValues[key] !== undefined ? stateValues[key] : true;
+      }),
       set: jest.fn(),
       subscribe: jest.fn(),
       setValidator: jest.fn(),
@@ -304,7 +313,7 @@ describe('Application Input Validation Security Tests', () => {
           let contentStr;
           try {
             contentStr = JSON.stringify(currentContent);
-          } catch (e) {
+          } catch (_e) {
             contentStr = '[Circular Content]';
           }
           classifier.classifyXContent('https://x.com/test/status/123', contentStr);
