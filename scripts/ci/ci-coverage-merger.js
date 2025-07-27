@@ -100,32 +100,44 @@ class CICoverageMerger {
   discoverCoverageFiles() {
     console.log('🔍 Discovering coverage files...');
 
+    // Dynamically discover all possible coverage file locations
     const searchPaths = [
-      // Unit test coverage (multiple Node versions)
+      // PRIORITY: Fresh main coverage file (from local test runs)
+      './lcov.info',
+      'lcov.info',
+
+      // Current standard paths
       'test-results/unit/node18/coverage/unit/lcov.info',
       'test-results/unit/node20/coverage/unit/lcov.info',
+      'test-results/integration/coverage/integration/lcov.info',
+      'test-results/e2e/coverage/e2e/lcov.info',
+      'test-results/performance/coverage/performance/lcov.info',
+
+      // Alternative artifact naming patterns
       'test-results/unit-test-results-node18/coverage/unit/lcov.info',
       'test-results/unit-test-results-node20/coverage/unit/lcov.info',
-
-      // Integration test coverage
-      'test-results/integration/coverage/integration/lcov.info',
       'test-results/integration-test-results/coverage/integration/lcov.info',
-
-      // E2E test coverage
-      'test-results/e2e/coverage/e2e/lcov.info',
       'test-results/e2e-test-results/coverage/e2e/lcov.info',
-
-      // Performance test coverage
-      'test-results/performance/coverage/performance/lcov.info',
       'test-results/performance-test-results/coverage/performance/lcov.info',
 
-      // Alternative paths
+      // Direct coverage directory paths
       'coverage/unit/lcov.info',
       'coverage/integration/lcov.info',
       'coverage/e2e/lcov.info',
       'coverage/performance/lcov.info',
       'coverage/lcov.info',
+
+      // GitHub Actions artifact patterns
+      'unit-test-results-node18/coverage/unit/lcov.info',
+      'unit-test-results-node20/coverage/unit/lcov.info',
+      'integration-test-results/coverage/integration/lcov.info',
+      'e2e-test-results/coverage/e2e/lcov.info',
+      'performance-test-results/coverage/performance/lcov.info',
     ];
+
+    // Also dynamically search for any lcov.info files in test-results
+    const dynamicPaths = this.discoverDynamicCoveragePaths();
+    searchPaths.push(...dynamicPaths);
 
     const foundFiles = [];
     const seenHashes = new Set();
@@ -176,6 +188,66 @@ class CICoverageMerger {
 
     this.summary.sources = foundFiles;
     return foundFiles;
+  }
+
+  /**
+   * Dynamically discover coverage paths by scanning directories
+   */
+  discoverDynamicCoveragePaths() {
+    const dynamicPaths = [];
+
+    try {
+      // Scan test-results directory if it exists
+      if (fs.existsSync('test-results')) {
+        this.scanDirectoryForLcov('test-results', dynamicPaths);
+      }
+
+      // Scan current directory for artifact directories
+      const entries = fs.readdirSync('.', { withFileTypes: true });
+      for (const entry of entries) {
+        if (
+          entry.isDirectory() &&
+          (entry.name.includes('test-results') ||
+            entry.name.includes('coverage') ||
+            entry.name.endsWith('-test-results'))
+        ) {
+          this.scanDirectoryForLcov(entry.name, dynamicPaths);
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️  Dynamic discovery error: ${error.message}`);
+    }
+
+    if (dynamicPaths.length > 0) {
+      console.log(`🔍 Dynamically discovered ${dynamicPaths.length} additional coverage paths`);
+    }
+
+    return dynamicPaths;
+  }
+
+  /**
+   * Recursively scan directory for lcov.info files
+   */
+  scanDirectoryForLcov(dirPath, foundPaths, maxDepth = 4) {
+    if (maxDepth <= 0) {
+      return;
+    }
+
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
+
+        if (entry.isFile() && entry.name === 'lcov.info') {
+          foundPaths.push(fullPath);
+        } else if (entry.isDirectory() && maxDepth > 1) {
+          this.scanDirectoryForLcov(fullPath, foundPaths, maxDepth - 1);
+        }
+      }
+    } catch (error) {
+      // Skip directories we can't read
+    }
   }
 
   /**
@@ -254,22 +326,72 @@ class CICoverageMerger {
       const command = `npx lcov-result-merger ${quotedPaths} "${outputPath}"`;
 
       console.log(`Executing: ${command}`);
-      execSync(command, { stdio: 'pipe' });
+      const result = execSync(command, { stdio: 'pipe', encoding: 'utf8' });
       console.log('✅ Used lcov-result-merger');
-    } catch (error) {
-      console.log('⚠️  lcov-result-merger failed, using Python fallback');
 
-      // Use Python merger as fallback
-      const pythonMerger = path.join(__dirname, 'merge-coverage.py');
-      if (fs.existsSync(pythonMerger)) {
-        const command = `python3 "${pythonMerger}" ${filePaths.map(p => `"${p}"`).join(' ')} -o "${outputPath}"`;
-        console.log(`Executing: ${command}`);
-        execSync(command, { stdio: 'inherit' });
-        console.log('✅ Used Python fallback merger');
+      // Check if the merge actually worked
+      if (fs.existsSync(outputPath)) {
+        const content = fs.readFileSync(outputPath, 'utf8');
+        if (content.trim().length < 10) {
+          console.log('⚠️  lcov-result-merger produced empty output, trying manual merge');
+          this.manualMergeLcovFiles(filePaths, outputPath);
+        } else {
+          console.log(`✅ lcov-result-merger succeeded: ${content.length} characters`);
+        }
       } else {
-        throw new Error('No coverage merger available');
+        console.log('⚠️  lcov-result-merger did not create output file, trying manual merge');
+        this.manualMergeLcovFiles(filePaths, outputPath);
+      }
+    } catch (error) {
+      console.log(`⚠️  lcov-result-merger failed: ${error.message}`);
+      console.log('Using manual merge fallback...');
+      this.manualMergeLcovFiles(filePaths, outputPath);
+    }
+  }
+
+  /**
+   * Manual LCOV file merging as fallback
+   */
+  manualMergeLcovFiles(filePaths, outputPath) {
+    console.log('🔧 Performing manual LCOV merge...');
+
+    let mergedContent = '';
+    const seenFiles = new Set();
+
+    for (const filePath of filePaths) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const lines = content.split('\n');
+
+        let currentFile = '';
+        let fileData = [];
+
+        for (const line of lines) {
+          if (line.startsWith('SF:')) {
+            // New source file
+            if (currentFile && !seenFiles.has(currentFile)) {
+              mergedContent += `${fileData.join('\n')}\n`;
+              seenFiles.add(currentFile);
+            }
+            currentFile = line.substring(3);
+            fileData = [line];
+          } else if (line.trim()) {
+            fileData.push(line);
+          }
+        }
+
+        // Add the last file
+        if (currentFile && !seenFiles.has(currentFile)) {
+          mergedContent += `${fileData.join('\n')}\n`;
+          seenFiles.add(currentFile);
+        }
+      } catch (error) {
+        console.log(`⚠️  Failed to read ${filePath}: ${error.message}`);
       }
     }
+
+    fs.writeFileSync(outputPath, mergedContent);
+    console.log(`✅ Manual merge completed, ${seenFiles.size} unique files`);
   }
 
   /**
@@ -278,8 +400,20 @@ class CICoverageMerger {
   isValidLcovFile(filePath) {
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      return content.includes('SF:') && content.includes('DA:') && content.trim().length > 50;
-    } catch {
+      const trimmed = content.trim();
+
+      // A valid LCOV file should have:
+      // 1. Some actual content (more than just a newline)
+      // 2. At least one SF: line (source file)
+      // 3. Some meaningful size
+      const hasContent = trimmed.length > 10;
+      const hasSourceFiles = content.includes('SF:');
+
+      console.log(`📋 Validating ${filePath}: length=${trimmed.length}, hasSourceFiles=${hasSourceFiles}`);
+
+      return hasContent && hasSourceFiles;
+    } catch (error) {
+      console.log(`❌ Failed to validate ${filePath}: ${error.message}`);
       return false;
     }
   }
@@ -331,7 +465,7 @@ class CICoverageMerger {
   }
 
   /**
-   * Generate comprehensive coverage summary
+   * Generate comprehensive coverage summary and HTML report
    */
   async generateComprehensiveSummary() {
     console.log('📊 Generating comprehensive coverage summary...');
@@ -365,12 +499,134 @@ class CICoverageMerger {
     console.log(`✅ Generated ${summaryPath}`);
     console.log(`✅ Generated ${metricsPath}`);
 
+    // Generate HTML coverage report
+    await this.generateHtmlReport();
+
     // Log summary
     const cov = this.summary.mergedCoverage;
     console.log(
       `📈 Final Coverage: ${cov.lines.pct.toFixed(2)}% lines, ${cov.functions.pct.toFixed(2)}% functions, ${cov.branches.pct.toFixed(2)}% branches`
     );
     console.log(`🏆 Quality Score: ${summary.quality_score.toFixed(1)}/100`);
+  }
+
+  /**
+   * Generate HTML coverage report using genhtml
+   */
+  async generateHtmlReport() {
+    console.log('🌐 Generating HTML coverage report...');
+
+    const lcovFile = path.join(this.mergedDir, 'lcov.info');
+    const htmlDir = path.join(this.outputDir, 'html');
+
+    if (!fs.existsSync(lcovFile)) {
+      console.log('⚠️  No LCOV file found, skipping HTML report');
+      return;
+    }
+
+    try {
+      // Create HTML output directory
+      fs.mkdirSync(htmlDir, { recursive: true });
+
+      // Copy custom CSS if available
+      const cssSourceDir = 'assets/lcov';
+      if (fs.existsSync(cssSourceDir)) {
+        console.log('📄 Copying custom CSS files...');
+        const cssFiles = fs.readdirSync(cssSourceDir).filter(f => f.endsWith('.css'));
+        for (const cssFile of cssFiles) {
+          fs.copyFileSync(path.join(cssSourceDir, cssFile), path.join(htmlDir, cssFile));
+        }
+      }
+
+      // Generate HTML report using genhtml
+      const command = [
+        'genhtml',
+        `"${lcovFile}"`,
+        `--output-directory "${htmlDir}"`,
+        '--title "Discord Bot Coverage Report"',
+        '--branch-coverage',
+        '--function-coverage',
+        `--prefix "${this.workingDir}"`,
+        '--legend',
+        '--show-details',
+        '--dark-mode',
+      ].join(' ');
+
+      console.log(`Executing: ${command}`);
+      execSync(command, { stdio: 'pipe' });
+
+      console.log(`✅ HTML coverage report generated in ${htmlDir}`);
+
+      // Create an index file for easy access
+      const indexPath = path.join(this.outputDir, 'index.html');
+      fs.writeFileSync(
+        indexPath,
+        `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Coverage Report</title>
+    <meta http-equiv="refresh" content="0; url=html/index.html">
+</head>
+<body>
+    <p>Redirecting to <a href="html/index.html">coverage report</a>...</p>
+</body>
+</html>
+      `.trim()
+      );
+    } catch (error) {
+      console.log(`⚠️  HTML report generation failed: ${error.message}`);
+      console.log('Creating fallback HTML report...');
+
+      // Create a simple fallback HTML report
+      const fallbackHtml = this.createFallbackHtmlReport();
+      fs.writeFileSync(path.join(htmlDir, 'index.html'), fallbackHtml);
+    }
+  }
+
+  /**
+   * Create a fallback HTML report when genhtml fails
+   */
+  createFallbackHtmlReport() {
+    const cov = this.summary.mergedCoverage;
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Coverage Report - Fallback</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .metric { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .good { background: #d4edda; }
+        .warning { background: #fff3cd; }
+        .critical { background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Coverage Report (Fallback)</h1>
+    <p>Generated: ${this.summary.timestamp}</p>
+    
+    <div class="metric ${cov.lines.pct >= 70 ? 'good' : cov.lines.pct >= 40 ? 'warning' : 'critical'}">
+        <strong>Lines:</strong> ${cov.lines.covered}/${cov.lines.total} (${cov.lines.pct.toFixed(2)}%)
+    </div>
+    
+    <div class="metric ${cov.functions.pct >= 70 ? 'good' : cov.functions.pct >= 40 ? 'warning' : 'critical'}">
+        <strong>Functions:</strong> ${cov.functions.covered}/${cov.functions.total} (${cov.functions.pct.toFixed(2)}%)
+    </div>
+    
+    <div class="metric ${cov.branches.pct >= 70 ? 'good' : cov.branches.pct >= 40 ? 'warning' : 'critical'}">
+        <strong>Branches:</strong> ${cov.branches.covered}/${cov.branches.total} (${cov.branches.pct.toFixed(2)}%)
+    </div>
+    
+    <h2>Coverage by Type</h2>
+    ${Object.entries(this.summary.coverageByType)
+      .map(([type, files]) => `<div class="metric"><strong>${type}:</strong> ${files.length} file(s)</div>`)
+      .join('')}
+    
+    <p><em>Full HTML report could not be generated. Check CI logs for details.</em></p>
+</body>
+</html>
+    `.trim();
   }
 
   /**
@@ -390,7 +646,10 @@ class CICoverageMerger {
     console.log('📝 Generating test summary...');
 
     try {
-      const summaryGenerator = path.join(__dirname, 'generate-test-summary.js');
+      const summaryGenerator = path.join(
+        path.dirname(new URL(import.meta.url).pathname),
+        '../testing/generate-test-summary.js'
+      );
 
       if (fs.existsSync(summaryGenerator)) {
         execSync(`node "${summaryGenerator}" --test-results test-results --output reports`, {

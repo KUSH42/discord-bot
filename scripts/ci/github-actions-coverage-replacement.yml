@@ -85,14 +85,32 @@
           fail_ci_if_error: false
           plugins: ''
 
+      - name: Clean up individual lcov files for artifacts
+        run: |
+          # Remove individual test suite lcov files to keep artifacts lean
+          # Keep only the merged coverage and essential reports
+          echo "🧹 Cleaning up individual LCOV files..."
+          
+          # Remove individual lcov.info files from test-results but keep other artifacts
+          find test-results -name "lcov.info" -type f -delete || echo "No individual lcov files to remove"
+          
+          # Remove individual coverage directories but preserve structure
+          find test-results -name "coverage" -type d -exec rm -rf {} + || echo "No coverage dirs to remove"
+          
+          # Keep test XML results and logs for debugging
+          echo "✅ Individual LCOV files removed, keeping test results and logs"
+
       - name: Store comprehensive test report
         uses: actions/upload-artifact@v4
         with:
           name: comprehensive-test-report
           path: |
             reports/
-            coverage/
-            test-results/
+            coverage/merged/
+            coverage/html/
+            coverage/*.json
+            test-results/*.xml
+            test-results/*.log
           retention-days: 30
 
       - name: Upload LCOV HTML Report
@@ -100,7 +118,7 @@
         uses: actions/upload-artifact@v4
         with:
           name: lcov-html-report
-          path: lcov-html-report/
+          path: coverage/html/
           retention-days: 14
 
       - name: Comment on commit with enhanced results
