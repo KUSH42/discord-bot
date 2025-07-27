@@ -75,7 +75,7 @@ fi
 export DISPLAY
 
 echo "🔧 Changing to project directory..."
-cd /home/xush/discord-youtube-bot
+cd /home/xush/discord-bot
 
 echo "📦 Installing/updating dependencies..."
 /home/xush/.nvm/versions/node/v22.17.0/bin/npm install

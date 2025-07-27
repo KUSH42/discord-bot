@@ -665,7 +665,7 @@ automatic restarts and process management.
     # Replace 'your_bot_user' with the user the bot runs as
     User=your_bot_user
     # The start-bot.sh script handles finding the correct Node.js path
-    ExecStart=/home/your_bot_user/discord-youtube-bot/scripts/start-bot.sh
+    ExecStart=/home/your_bot_user/discord-bot/scripts/deployment/discord-bot-start.sh
     Restart=on-failure
     RestartSec=10s
     StandardOutput=syslog
@@ -701,8 +701,8 @@ development and production environments.
 1. **Build and run the production image:**
 
    ```sh
-   docker build -t discord-youtube-bot --target production .
-   docker run -d --name bot --env-file .env -p 3000:3000 discord-youtube-bot
+   docker build -t discord-bot --target production .
+   docker run -d --name bot --env-file .env -p 3000:3000 discord-bot
    ```
 
 2. **Using Docker Compose (recommended):**

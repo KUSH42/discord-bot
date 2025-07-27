@@ -23,8 +23,8 @@ pids
 *.pid.lock
 
 # Github Actions artifacts
-./coverage
-./reports
+#./coverage
+#./reports
 test-results
 test-merger
 coverage-metrics.json
