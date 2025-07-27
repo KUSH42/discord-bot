@@ -25,6 +25,11 @@ class CICoverageMerger {
       mergedCoverage: null,
       sources: [],
     };
+
+    // Debug working directory issues
+    console.log(`🔧 Debug: Working directory: ${this.workingDir}`);
+    console.log(`🔧 Debug: GITHUB_WORKSPACE: ${process.env.GITHUB_WORKSPACE || 'not set'}`);
+    console.log(`🔧 Debug: PWD: ${process.env.PWD || 'not set'}`);
   }
 
   /**
@@ -44,6 +49,38 @@ class CICoverageMerger {
 
       if (coverageFiles.length === 0) {
         console.log('❌ No coverage files found');
+
+        // Debug: List what's actually in the working directory
+        console.log('🔧 Debug: Current directory contents:');
+        try {
+          const items = fs.readdirSync('.', { withFileTypes: true });
+          items.forEach(item => {
+            const type = item.isDirectory() ? 'DIR' : 'FILE';
+            const size = item.isFile()
+              ? (() => {
+                  try {
+                    return fs.statSync(item.name).size;
+                  } catch {
+                    return 'unknown';
+                  }
+                })()
+              : '';
+            console.log(`  ${type}: ${item.name} ${size ? `(${size} bytes)` : ''}`);
+          });
+        } catch (error) {
+          console.log(`  Error listing directory: ${error.message}`);
+        }
+
+        // Debug: Check if test-results exists and what's in it
+        if (fs.existsSync('test-results')) {
+          console.log('🔧 Debug: test-results directory contents:');
+          try {
+            this.debugListDirectory('test-results', 2);
+          } catch (error) {
+            console.log(`  Error listing test-results: ${error.message}`);
+          }
+        }
+
         this.createEmptyCoverage();
         process.exit(0);
       }
@@ -70,6 +107,40 @@ class CICoverageMerger {
       // Create fallback coverage for CI to continue
       this.createEmptyCoverage();
       process.exit(1);
+    }
+  }
+
+  /**
+   * Debug helper: recursively list directory contents
+   */
+  debugListDirectory(dirPath, maxDepth = 2, currentDepth = 0) {
+    if (currentDepth >= maxDepth) {
+      return;
+    }
+
+    const prefix = '  '.repeat(currentDepth + 1);
+    try {
+      const items = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const item of items) {
+        const fullPath = path.join(dirPath, item.name);
+        if (item.isDirectory()) {
+          console.log(`${prefix}DIR: ${item.name}/`);
+          if (currentDepth < maxDepth - 1) {
+            this.debugListDirectory(fullPath, maxDepth, currentDepth + 1);
+          }
+        } else {
+          const size = (() => {
+            try {
+              return fs.statSync(fullPath).size;
+            } catch {
+              return 'unknown';
+            }
+          })();
+          console.log(`${prefix}FILE: ${item.name} (${size} bytes)`);
+        }
+      }
+    } catch (error) {
+      console.log(`${prefix}Error: ${error.message}`);
     }
   }
 
@@ -646,19 +717,33 @@ class CICoverageMerger {
     console.log('📝 Generating test summary...');
 
     try {
-      const summaryGenerator = path.join(
-        path.dirname(new URL(import.meta.url).pathname),
-        '../testing/generate-test-summary.js'
-      );
+      // Try multiple paths to find the test summary generator
+      const possiblePaths = [
+        path.join(this.workingDir, 'scripts/testing/generate-test-summary.js'),
+        path.join(path.dirname(new URL(import.meta.url).pathname), '../testing/generate-test-summary.js'),
+        './scripts/testing/generate-test-summary.js',
+        'scripts/testing/generate-test-summary.js',
+      ];
 
-      if (fs.existsSync(summaryGenerator)) {
+      let summaryGenerator = null;
+      for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+          summaryGenerator = testPath;
+          console.log(`📍 Found test summary generator: ${testPath}`);
+          break;
+        }
+      }
+
+      if (summaryGenerator) {
         execSync(`node "${summaryGenerator}" --test-results test-results --output reports`, {
           stdio: 'inherit',
           cwd: this.workingDir,
         });
         console.log('✅ Test summary generated successfully');
       } else {
-        console.log('⚠️  Test summary generator not found, skipping');
+        console.log('⚠️  Test summary generator not found in any expected location');
+        console.log(`   Searched paths: ${possiblePaths.join(', ')}`);
+        console.log(`   Working directory: ${this.workingDir}`);
       }
     } catch (error) {
       console.log(`⚠️  Test summary generation failed: ${error.message}`);
