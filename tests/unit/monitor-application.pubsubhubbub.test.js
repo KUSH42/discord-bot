@@ -384,7 +384,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
         status: 403,
         message: 'Invalid verify token',
       });
-      expect(mockLogger.warn).toHaveBeenCalledWith('Verification token mismatch');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Verification token mismatch',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should handle unsubscribe verification', () => {
@@ -400,7 +406,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
         status: 200,
         body: 'unsubscribe-challenge',
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('PubSubHubbub verification successful (mode: unsubscribe)');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'PubSubHubbub verification successful (mode: unsubscribe)',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -418,11 +430,15 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
 
       monitorApp.logWebhookDebug('TEST MESSAGE', { data: 'test' });
 
-      expect(mockLogger.info).toHaveBeenCalledWith('[WEBHOOK-DEBUG] TEST MESSAGE', {
-        webhookDebug: true,
-        timestamp: expect.any(String),
-        data: 'test',
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        '[WEBHOOK-DEBUG] TEST MESSAGE',
+        expect.objectContaining({
+          webhookDebug: true,
+          timestamp: expect.any(String),
+          data: 'test',
+          module: 'youtube',
+        })
+      );
     });
 
     it('should handle missing data parameter', () => {
@@ -430,10 +446,14 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
 
       monitorApp.logWebhookDebug('TEST MESSAGE');
 
-      expect(mockLogger.info).toHaveBeenCalledWith('[WEBHOOK-DEBUG] TEST MESSAGE', {
-        webhookDebug: true,
-        timestamp: expect.any(String),
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        '[WEBHOOK-DEBUG] TEST MESSAGE',
+        expect.objectContaining({
+          webhookDebug: true,
+          timestamp: expect.any(String),
+          module: 'youtube',
+        })
+      );
     });
   });
 });

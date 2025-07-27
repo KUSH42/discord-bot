@@ -309,12 +309,14 @@ describe('ScraperApplication Core Operations', () => {
       jest.spyOn(scraperApp, 'stopPolling').mockImplementation(() => {});
       jest.spyOn(scraperApp, 'closeBrowser').mockRejectedValue(stopError);
 
-      await scraperApp.stop();
+      await expect(scraperApp.stop()).rejects.toThrow('Stop failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error stopping scraper application:',
+        'Error stopping scraper application',
         expect.objectContaining({
           module: 'scraper',
+          error: 'Stop failed',
+          outcome: 'error',
         })
       );
     });

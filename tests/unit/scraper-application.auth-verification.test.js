@@ -93,17 +93,13 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.verifyAuthentication();
 
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Verifying X authentication status...',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
       expect(mockAuthManager.isAuthenticated).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        '✅ Authentication verified successfully',
+        'Authentication verified successfully',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
+          authStatus: '[REDACTED]',
         })
       );
     });
@@ -114,10 +110,11 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.verifyAuthentication();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Authentication check failed, re-authenticating...',
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Re-authentication completed after verification failure',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
         })
       );
       expect(scraperApp.ensureAuthenticated).toHaveBeenCalled();
@@ -130,16 +127,11 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.verifyAuthentication();
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Authentication verification failed:',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Attempting to re-authenticate after verification failure...',
+        'Recovery authentication successful',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
         })
       );
       expect(scraperApp.ensureAuthenticated).toHaveBeenCalled();
@@ -152,18 +144,15 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.refreshAuth();
 
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Refreshing X authentication...',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
       expect(mockBrowserService.goto).toHaveBeenCalledWith('https://x.com/home');
       expect(mockBrowserService.evaluate).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Authentication refreshed successfully',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
+          wasLoggedIn: true,
+          actionTaken: 'session_refresh',
         })
       );
     });
@@ -174,17 +163,14 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.refreshAuth();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Authentication expired, re-logging in...',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
       expect(scraperApp.loginToX).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Authentication refreshed successfully',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'success',
+          wasLoggedIn: false,
+          actionTaken: 'full_login',
         })
       );
     });
@@ -196,9 +182,10 @@ describe('ScraperApplication Authentication Verification', () => {
       await expect(scraperApp.refreshAuth()).rejects.toThrow('Refresh failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to refresh authentication:',
+        'Failed to refresh authentication',
         expect.objectContaining({
           module: 'scraper',
+          outcome: 'error',
         })
       );
     });

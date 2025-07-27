@@ -412,8 +412,14 @@ describe('CommandProcessor', () => {
         throw new Error('State error');
       });
 
-      // The command should propagate the error from state manager
-      await expect(processor.processCommand('kill', [], '123456789012345678')).rejects.toThrow('State error');
+      // The command should catch the error and return an error response
+      const result = await processor.processCommand('kill', [], '123456789012345678');
+
+      expect(result).toEqual({
+        success: false,
+        message: '❌ An unexpected error occurred while processing the command.',
+        requiresRestart: false,
+      });
     });
   });
 });
