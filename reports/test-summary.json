@@ -1,117 +1,157 @@
 {
-  "timestamp": "2025-07-27T23:07:25.625Z",
+  "timestamp": "2025-07-27T23:44:25.000Z",
   "commit": "unknown",
   "branch": "unknown",
   "trigger": "manual",
   "runId": "local",
   "repository": "local",
-  "coverage": null,
-  "tests": {
-    "unit": {
-      "status": "success",
-      "details": "98 tests, 0 failures, 0 errors, 0 skipped (57.06s)",
-      "path": "test-results/unit-tests-node18.xml, test-results/unit-tests-node20.xml",
-      "summary": {
-        "total": 98,
-        "passed": 98,
-        "failed": 0,
-        "skipped": 0,
-        "time": "57.06s"
-      },
-      "extended": {
-        "suites": [
+  "coverage": {
+    "source": "coverage/coverage-summary.json",
+    "files": 47,
+    "lines": {
+      "total": 19668,
+      "covered": 15080,
+      "pct": 76.67276794793574
+    },
+    "functions": {
+      "total": 747,
+      "covered": 616,
+      "pct": 82.46318607764391
+    },
+    "branches": {
+      "total": 2929,
+      "covered": 2502,
+      "pct": 85.42164561283715
+    },
+    "statements": {
+      "total": 19668,
+      "covered": 15080,
+      "pct": 76.67276794793574
+    },
+    "qualityScore": 81.03455668631861,
+    "mergedFrom": [
+      "coverage/unit/lcov.info",
+      "coverage/integration/lcov.info",
+      "coverage/performance/lcov.info",
+      "coverage/lcov.info"
+    ],
+    "extended": {
+      "timestamp": "2025-07-27T23:44:24.461Z",
+      "totalFiles": 0,
+      "coverageByType": {
+        "unit": [
           {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
-          },
-          {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
+            "path": "coverage/unit/lcov.info",
+            "nodeVersion": "unknown",
+            "size": 259332
           }
         ],
-        "path": "test-results/unit-tests-node18.xml"
+        "integration": [
+          {
+            "path": "coverage/integration/lcov.info",
+            "nodeVersion": "unknown",
+            "size": 155872
+          }
+        ],
+        "performance": [
+          {
+            "path": "coverage/performance/lcov.info",
+            "nodeVersion": "unknown",
+            "size": 156077
+          }
+        ],
+        "unknown": [
+          {
+            "path": "coverage/lcov.info",
+            "nodeVersion": "unknown",
+            "size": 259292
+          }
+        ]
+      },
+      "mergedCoverage": {
+        "files": 47,
+        "lines": {
+          "total": 19668,
+          "covered": 15080,
+          "pct": 76.67276794793574
+        },
+        "functions": {
+          "total": 747,
+          "covered": 616,
+          "pct": 82.46318607764391
+        },
+        "branches": {
+          "total": 2929,
+          "covered": 2502,
+          "pct": 85.42164561283715
+        },
+        "statements": {
+          "total": 19668,
+          "covered": 15080,
+          "pct": 76.67276794793574
+        }
+      },
+      "sources": [
+        {
+          "path": "coverage/unit/lcov.info",
+          "type": "unit",
+          "nodeVersion": "unknown",
+          "size": 259332,
+          "hash": "9ff9ba1a"
+        },
+        {
+          "path": "coverage/integration/lcov.info",
+          "type": "integration",
+          "nodeVersion": "unknown",
+          "size": 155872,
+          "hash": "5e11d597"
+        },
+        {
+          "path": "coverage/performance/lcov.info",
+          "type": "performance",
+          "nodeVersion": "unknown",
+          "size": 156077,
+          "hash": "d3bd4243"
+        },
+        {
+          "path": "coverage/lcov.info",
+          "type": "unknown",
+          "nodeVersion": "unknown",
+          "size": 259292,
+          "hash": "1a95be68"
+        }
+      ],
+      "qualityScore": 81.03455668631861,
+      "tests": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "suites": 4
       }
+    }
+  },
+  "tests": {
+    "unit": {
+      "status": "failure",
+      "tests": 1552,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "time": 31.208000000000002,
+      "successRate": 99.93556701030928,
+      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
+      "path": "undefined, test-results/unit-tests-node18.xml, test-results/unit-tests-node20.xml"
     },
     "integration": {
       "status": "success",
-      "details": "49 tests, 0 failures, 0 errors, 0 skipped (28.53s)",
-      "path": "test-results/integration-tests.xml",
-      "summary": {
-        "total": 49,
-        "passed": 49,
-        "failed": 0,
-        "skipped": 0,
-        "time": "28.53s"
-      },
-      "extended": {
-        "suites": [
-          {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
-          }
-        ],
-        "path": "test-results/integration-tests.xml"
-      }
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time": 0.223,
+      "successRate": 100,
+      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
+      "path": "undefined, test-results/integration-tests.xml"
     },
     "e2e": {
       "status": "success",
@@ -197,63 +237,33 @@
     },
     "security": {
       "status": "success",
-      "details": "49 tests, 0 failures, 0 errors, 0 skipped (28.53s)",
-      "path": "test-results/security-tests.xml",
-      "summary": {
-        "total": 49,
-        "passed": 49,
-        "failed": 0,
-        "skipped": 0,
-        "time": "28.53s"
-      },
-      "extended": {
-        "suites": [
-          {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
-          }
-        ],
-        "path": "test-results/security-tests.xml"
-      }
+      "tests": 98,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time": 9.035,
+      "successRate": 100,
+      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
+      "path": "undefined, test-results/security-tests.xml"
     }
   },
   "artifacts": [],
   "qualityGates": {
     "coverage": {
-      "passed": false,
+      "passed": true,
       "threshold": 25,
-      "actual": 0
+      "actual": 76.67276794793574
     },
     "testsPassing": {
-      "passed": true,
+      "passed": false,
       "threshold": 95,
-      "actual": 100
+      "actual": 80
     },
     "security": {
       "passed": false,
       "vulnerabilities": 0
     }
   },
-  "generated": "2025-07-27T23:07:25.649Z",
+  "generated": "2025-07-27T23:44:25.050Z",
   "version": "2.0"
 }

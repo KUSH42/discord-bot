@@ -177,19 +177,20 @@ class CICoverageMerger {
       './lcov.info',
       'lcov.info',
 
-      // Current standard paths
-      'test-results/unit/node18/coverage/unit/lcov.info',
-      'test-results/unit/node20/coverage/unit/lcov.info',
-      'test-results/integration/coverage/integration/lcov.info',
-      'test-results/e2e/coverage/e2e/lcov.info',
-      'test-results/performance/coverage/performance/lcov.info',
-
-      // Alternative artifact naming patterns
+      // GitHub Actions artifact patterns (primary - where CI actually places files)
       'test-results/unit-test-results-node18/coverage/unit/lcov.info',
       'test-results/unit-test-results-node20/coverage/unit/lcov.info',
       'test-results/integration-test-results/coverage/integration/lcov.info',
       'test-results/e2e-test-results/coverage/e2e/lcov.info',
       'test-results/performance-test-results/coverage/performance/lcov.info',
+      'test-results/security-test-results/coverage/security/lcov.info',
+
+      // Legacy paths for backwards compatibility
+      'test-results/unit/node18/coverage/unit/lcov.info',
+      'test-results/unit/node20/coverage/unit/lcov.info',
+      'test-results/integration/coverage/integration/lcov.info',
+      'test-results/e2e/coverage/e2e/lcov.info',
+      'test-results/performance/coverage/performance/lcov.info',
 
       // Direct coverage directory paths
       'coverage/unit/lcov.info',
