@@ -955,7 +955,7 @@ jobs:
       - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-          node scripts/ci-coverage-merger.js
+          node scripts/ci/ci-coverage-merger.js
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'

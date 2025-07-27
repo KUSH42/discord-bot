@@ -413,15 +413,14 @@ export class DuplicateDetector {
           const videoMatches = [...(message.content || '').matchAll(videoUrlRegex)];
           for (const match of videoMatches) {
             const videoId = match[1];
-            if (videoId) {
+            const videoUrl = match[0];
+            if (videoId && videoUrl) {
               results.videoIdsFound.push(videoId);
-              if (!this.knownVideoIds.has(videoId)) {
-                this.knownVideoIds.add(videoId);
+              // Use modern duplicate detection system instead of legacy Sets
+              if (!(await this.isDuplicateByUrl(videoUrl))) {
+                await this.markAsSeenByUrl(videoUrl);
                 results.videoIdsAdded++;
               }
-              // Also add to URL cache for consistent duplicate checking
-              const normalizedUrl = this._normalizeUrl(match[0]);
-              this.urlCache.add(normalizedUrl);
             }
           }
           messagesProcessed++;
@@ -486,15 +485,14 @@ export class DuplicateDetector {
           const tweetMatches = [...(message.content || '').matchAll(tweetUrlRegex)];
           for (const match of tweetMatches) {
             const tweetId = match[1];
-            if (tweetId) {
+            const tweetUrl = match[0];
+            if (tweetId && tweetUrl) {
               results.tweetIdsFound.push(tweetId);
-              if (!this.knownTweetIds.has(tweetId)) {
-                this.knownTweetIds.add(tweetId);
+              // Use modern duplicate detection system instead of legacy Sets
+              if (!(await this.isDuplicateByUrl(tweetUrl))) {
+                await this.markAsSeenByUrl(tweetUrl);
                 results.tweetIdsAdded++;
               }
-              // Also add to URL cache for consistent duplicate checking
-              const normalizedUrl = this._normalizeUrl(match[0]);
-              this.urlCache.add(normalizedUrl);
             }
           }
           messagesProcessed++;
