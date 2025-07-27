@@ -1059,75 +1059,10 @@ jobs:
           
           echo "✅ Merged coverage file created with $(wc -l < coverage/merged/lcov.info) lines"
           
-          # Extract coverage metrics from merged file
-          # Use lcov --summary for accurate metrics
-          COVERAGE_SUMMARY=$(lcov --summary coverage/merged/lcov.info 2>/dev/null)
+          # Use JavaScript for reliable coverage processing (no shell arithmetic)
+          COVERAGE_FILES_STR=$(printf '%s,' "${COVERAGE_FILES[@]}" | sed 's/,$//')
+          node scripts/process-coverage.js coverage/merged/lcov.info "$COVERAGE_FILES_STR"
           
-          # Extract values from lcov summary output
-          LINES_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "lines\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
-          LINES_HIT=$(echo "$COVERAGE_SUMMARY" | grep "lines\.\.\.\.\.\." | awk '{print $4}' || echo "0")
-          FUNCTIONS_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "functions\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
-          FUNCTIONS_HIT=$(echo "$COVERAGE_SUMMARY" | grep "functions\.\.\.\.\.\." | awk '{print $4}' || echo "0")
-          BRANCHES_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "branches\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
-          BRANCHES_HIT=$(echo "$COVERAGE_SUMMARY" | grep "branches\.\.\.\.\.\." | awk '{print $4}' || echo "0")
-          
-          # Fallback to manual parsing if lcov --summary fails
-          if [ "$LINES_FOUND" = "0" ] || [ -z "$LINES_FOUND" ]; then
-            echo "⚠️ lcov --summary failed, using manual parsing"
-            LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-            BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          fi
-          
-          # Calculate percentages
-          LINES_PCT=$(awk -v hit="$LINES_HIT" -v found="$LINES_FOUND" 'BEGIN {
-            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-          }')
-          FUNCTIONS_PCT=$(awk -v hit="$FUNCTIONS_HIT" -v found="$FUNCTIONS_FOUND" 'BEGIN {
-            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-          }')
-          BRANCHES_PCT=$(awk -v hit="$BRANCHES_HIT" -v found="$BRANCHES_FOUND" 'BEGIN {
-            if (found == 0) print "0.00"; else printf "%.2f", hit * 100 / found
-          }')
-          
-          echo "📈 Merged Coverage: Lines ${LINES_PCT}%, Functions ${FUNCTIONS_PCT}%, Branches ${BRANCHES_PCT}%"
-          
-          # Generate comprehensive coverage summary
-          cat > coverage-summary.json << EOF
-          {
-            "total": {
-              "lines": {
-                "total": ${LINES_FOUND},
-                "covered": ${LINES_HIT},
-                "pct": ${LINES_PCT}
-              },
-              "statements": {
-                "total": ${LINES_FOUND},
-                "covered": ${LINES_HIT},
-                "pct": ${LINES_PCT}
-              },
-              "functions": {
-                "total": ${FUNCTIONS_FOUND},
-                "covered": ${FUNCTIONS_HIT},
-                "pct": ${FUNCTIONS_PCT}
-              },
-              "branches": {
-                "total": ${BRANCHES_FOUND},
-                "covered": ${BRANCHES_HIT},
-                "pct": ${BRANCHES_PCT}
-              }
-            },
-            "merged_from": [
-              $(printf '"%s",' "${COVERAGE_FILES[@]}" | sed 's/,$//')
-            ]
-          }
-          EOF
-          
-          echo "coverage_pct=${LINES_PCT}" >> $GITHUB_OUTPUT
-          echo "status=available" >> $GITHUB_OUTPUT
           echo "files_merged=${#COVERAGE_FILES[@]}" >> $GITHUB_OUTPUT
 
       - name: Generate LCOV HTML Report
