@@ -994,25 +994,18 @@ jobs:
         run: |
           if [ -f coverage-metrics.json ]; then
             COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
-          if [ -f coverage-metrics.json ]; then
-            COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
             echo "Current coverage: ${COVERAGE}%"
             
-            # Set coverage quality gates
-            if (( $(echo "$COVERAGE < 25" | bc -l) )); then
             # Set coverage quality gates
             if (( $(echo "$COVERAGE < 25" | bc -l) )); then
               echo "❌ Coverage critically low: $COVERAGE%"
               echo "coverage_status=critical" >> $GITHUB_ENV
             elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
-            elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
               echo "⚠️ Coverage below minimum: $COVERAGE%"
               echo "coverage_status=warning" >> $GITHUB_ENV
             else
-            else
               echo "✅ Coverage meets target: $COVERAGE%"
               echo "coverage_status=good" >> $GITHUB_ENV
-            fi
             fi
           else
             echo "No coverage data available"
