@@ -246,7 +246,7 @@ jobs:
           mkdir -p coverage/unit test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
-            --config=jest.ci.config.js \
+            --config=tests/configs/jest.unit.config.js \
             --coverage \
             --coverageDirectory=coverage/unit \
             --coverageReporters=lcov \
@@ -255,8 +255,6 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            --reporters=default \
-            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "unit-tests-node${{ matrix.node-version }}.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
             2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
@@ -503,7 +501,6 @@ jobs:
           mkdir -p coverage/integration test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
-            --config=jest.ci.config.js \
             --coverage \
             --coverageDirectory=coverage/integration \
             --coverageReporters=lcov \
@@ -511,8 +508,6 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            --reporters=default \
-            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "integration-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
             2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage
@@ -621,8 +616,6 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            --reporters=default \
-            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "e2e-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
             2>&1 | tee coverage/e2e/test-output.log
 
 
@@ -712,8 +705,6 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            --reporters=default \
-            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "performance-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
             2>&1 | tee coverage/performance/test-output.log
 
       - name: Generate performance report
@@ -835,9 +826,7 @@ jobs:
             --maxWorkers=1 \
             --testTimeout=20000 \
             --forceExit \
-            --detectOpenHandles \
-            --reporters=default \
-            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "security-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]'
+            --detectOpenHandles
 
       - name: Run security audit
         run: |
