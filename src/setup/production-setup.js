@@ -234,7 +234,9 @@ async function setupCoreServices(container, _config) {
       c.resolve('contentAnnouncer'),
       c.resolve('duplicateDetector'),
       c.resolve('logger').child({ service: 'ContentCoordinator' }),
-      c.resolve('config')
+      c.resolve('config'),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
     );
   });
 

@@ -26,6 +26,7 @@ pids
 coverage
 reports
 test-results
+test-merger
 coverage-metrics.json
 coverage-summary.json
 

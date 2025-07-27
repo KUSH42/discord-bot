@@ -1,4 +1,5 @@
 import { nowUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
  * Content Coordinator
@@ -6,11 +7,11 @@ import { nowUTC } from '../utilities/utc-time.js';
  * Manages unified content processing with source priority
  */
 export class ContentCoordinator {
-  constructor(contentStateManager, contentAnnouncer, duplicateDetector, logger, config) {
+  constructor(contentStateManager, contentAnnouncer, duplicateDetector, logger, config, debugManager, metricsManager) {
     this.contentStateManager = contentStateManager;
     this.contentAnnouncer = contentAnnouncer;
     this.duplicateDetector = duplicateDetector;
-    this.logger = logger;
+    this.logger = createEnhancedLogger('state', logger, debugManager, metricsManager);
     this.config = config;
 
     // Processing coordination
@@ -42,47 +43,63 @@ export class ContentCoordinator {
    * @returns {Promise<Object>} Processing result
    */
   async processContent(contentId, source, contentData) {
-    if (!contentId || typeof contentId !== 'string') {
-      throw new Error('Content ID must be a non-empty string');
-    }
-
-    if (!this.sourcePriority.includes(source)) {
-      this.logger.warn('Unknown content source', { contentId, source, validSources: this.sourcePriority });
-    }
-
-    // Prevent duplicate processing with lock
-    if (this.processingQueue.has(contentId)) {
-      this.logger.debug('Content already being processed, waiting for completion', { contentId, source });
-      this.metrics.raceConditionsPrevented++;
-
-      try {
-        return await this.processingQueue.get(contentId);
-      } catch (error) {
-        // If the original processing failed, allow retry
-        this.logger.debug('Original processing failed, allowing retry', { contentId, source, error: error.message });
-      }
-    }
-
-    // Create processing promise
-    const processingPromise = this.doProcessContent(contentId, source, contentData);
-    this.processingQueue.set(contentId, processingPromise);
-
-    // Set timeout to prevent infinite locks
-    const timeoutId = setTimeout(() => {
-      this.processingQueue.delete(contentId);
-      this.logger.warn('Processing lock timeout, removing from queue', {
-        contentId,
-        source,
-        timeoutMs: this.lockTimeout,
-      });
-    }, this.lockTimeout);
+    const operation = this.logger.startOperation('processContent', {
+      contentId,
+      source,
+      platform: contentData.platform,
+      type: contentData.type,
+    });
 
     try {
-      const result = await processingPromise;
-      return result;
-    } finally {
-      clearTimeout(timeoutId);
-      this.processingQueue.delete(contentId);
+      if (!contentId || typeof contentId !== 'string') {
+        throw new Error('Content ID must be a non-empty string');
+      }
+
+      if (!this.sourcePriority.includes(source)) {
+        operation.progress('Unknown content source detected', { validSources: this.sourcePriority });
+      }
+
+      // Prevent duplicate processing with lock
+      if (this.processingQueue.has(contentId)) {
+        operation.progress('Content already being processed, waiting for completion');
+        this.metrics.raceConditionsPrevented++;
+
+        try {
+          const result = await this.processingQueue.get(contentId);
+          operation.success('Retrieved result from existing processing', { action: result.action });
+          return result;
+        } catch (error) {
+          // If the original processing failed, allow retry
+          operation.progress('Original processing failed, allowing retry', { error: error.message });
+        }
+      }
+
+      operation.progress('Starting new content processing');
+
+      // Create processing promise
+      const processingPromise = this.doProcessContent(contentId, source, contentData);
+      this.processingQueue.set(contentId, processingPromise);
+
+      // Set timeout to prevent infinite locks
+      const timeoutId = setTimeout(() => {
+        this.processingQueue.delete(contentId);
+        operation.progress('Processing lock timeout, removing from queue', { timeoutMs: this.lockTimeout });
+      }, this.lockTimeout);
+
+      try {
+        const result = await processingPromise;
+        operation.success('Content processing completed', {
+          action: result.action,
+          processingTimeMs: result.processingTimeMs,
+        });
+        return result;
+      } finally {
+        clearTimeout(timeoutId);
+        this.processingQueue.delete(contentId);
+      }
+    } catch (error) {
+      operation.error(error, 'Content processing failed');
+      throw error;
     }
   }
 
@@ -94,8 +111,7 @@ export class ContentCoordinator {
    * @returns {Promise<Object>} Processing result
    */
   async doProcessContent(contentId, source, contentData) {
-    const startTime = Date.now();
-    const contentSummary = {
+    const operation = this.logger.startOperation('doProcessContent', {
       contentId,
       source,
       platform: contentData.platform,
@@ -103,25 +119,19 @@ export class ContentCoordinator {
       title: contentData.title?.substring(0, 50) || 'Unknown',
       publishedAt: contentData.publishedAt,
       url: contentData.url,
-    };
+    });
 
     try {
-      this.logger.info('🔄 Starting content coordination', {
-        ...contentSummary,
-        timestamp: nowUTC().toISOString(),
-      });
+      operation.progress('Starting content coordination');
 
       // Check if content already exists in state management
-      this.logger.debug('🔍 Checking existing content state', { contentId, source });
+      operation.progress('Checking existing content state');
       const existingState = this.contentStateManager.getContentState(contentId);
 
       if (existingState) {
-        this.logger.debug('📋 Content already exists in state', {
-          contentId,
+        operation.progress('Content already exists in state', {
           existingSource: existingState.source,
-          newSource: source,
           announced: existingState.announced,
-          existingState,
         });
 
         // Content already known - check if we should still process based on source priority
@@ -129,10 +139,8 @@ export class ContentCoordinator {
 
         if (!shouldProcess) {
           this.metrics.sourcePrioritySkips++;
-          this.logger.info('⏭️ Skipping due to source priority', {
-            contentId,
+          operation.success('Skipping due to source priority', {
             existingSource: existingState.source,
-            newSource: source,
             sourcePriority: this.sourcePriority,
           });
           return {
@@ -147,10 +155,8 @@ export class ContentCoordinator {
         // Check if already announced
         if (existingState.announced) {
           this.metrics.duplicatesSkipped++;
-          this.logger.debug('⏭️ Content already announced, skipping', {
-            contentId,
+          operation.success('Content already announced, skipping', {
             existingSource: existingState.source,
-            newSource: source,
             announcedAt: existingState.lastUpdated,
           });
           return {
@@ -162,20 +168,16 @@ export class ContentCoordinator {
           };
         }
       } else {
-        this.logger.debug('✨ New content detected', { contentId, source });
+        operation.progress('New content detected');
       }
 
       // Check for duplicates using enhanced detection
-      this.logger.debug('🔍 Checking for duplicates', { contentId, url: contentData.url });
+      operation.progress('Checking for duplicates', { url: contentData.url });
       const isDuplicate = await this.checkForDuplicates(contentData);
 
       if (isDuplicate) {
         this.metrics.duplicatesSkipped++;
-        this.logger.debug('⏭️ Duplicate content detected, skipping', {
-          contentId,
-          source,
-          url: contentData.url,
-        });
+        operation.success('Duplicate content detected, skipping', { url: contentData.url });
         return {
           action: 'skip',
           reason: 'duplicate_detected',
@@ -183,20 +185,17 @@ export class ContentCoordinator {
           contentId,
         };
       }
-      this.logger.debug('✅ No duplicates found', { contentId });
+      operation.progress('No duplicates found');
 
       // Check if content is new enough to announce
-      this.logger.debug('📅 Checking content age', {
-        contentId,
+      operation.progress('Checking content age', {
         publishedAt: contentData.publishedAt,
         currentTime: nowUTC().toISOString(),
       });
       const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, nowUTC());
 
       if (!isNew) {
-        this.logger.debug('⏭️ Content too old, skipping', {
-          contentId,
-          source,
+        operation.success('Content too old, skipping', {
           publishedAt: contentData.publishedAt,
           currentTime: nowUTC().toISOString(),
         });
@@ -208,15 +207,13 @@ export class ContentCoordinator {
           publishedAt: contentData.publishedAt,
         };
       }
-      this.logger.debug('✅ Content is new enough', { contentId, publishedAt: contentData.publishedAt });
+      operation.progress('Content is new enough', { publishedAt: contentData.publishedAt });
 
       // Add to content state management if not exists
       if (!existingState) {
-        this.logger.debug('📝 Adding new content to state management', {
-          contentId,
+        operation.progress('📝 Adding new content to state management', {
           type: this.determineContentType(contentData),
           state: this.determineInitialState(contentData),
-          source,
         });
         await this.contentStateManager.addContent(contentId, {
           type: this.determineContentType(contentData),
@@ -227,57 +224,46 @@ export class ContentCoordinator {
           title: contentData.title,
           metadata: contentData.metadata || {},
         });
-        this.logger.debug('✅ Content added to state management', { contentId });
+        operation.progress('✅ Content added to state management');
       } else {
         // Update existing state with new source information
         const bestSource = this.selectBestSource(existingState.source, source);
-        this.logger.debug('🔄 Updating existing content state', {
-          contentId,
+        operation.progress('🔄 Updating existing content state', {
           oldSource: existingState.source,
-          newSource: source,
           bestSource,
         });
         await this.contentStateManager.updateContentState(contentId, {
           source: bestSource,
           lastUpdated: nowUTC(),
         });
-        this.logger.debug('✅ Content state updated', { contentId });
+        operation.progress('✅ Content state updated');
       }
 
       // Process and announce content
-      this.logger.info('📢 Proceeding with content announcement', {
-        contentId,
-        source,
+      operation.progress('📢 Proceeding with content announcement', {
         platform: contentData.platform,
         type: contentData.type,
       });
       const announcementResult = await this.announceContent(contentId, contentData, source);
 
       if (announcementResult && announcementResult.success) {
-        this.logger.info('✅ Content announcement successful', {
-          contentId,
-          source,
+        operation.progress('✅ Content announcement successful', {
           channelId: announcementResult.channelId,
           messageId: announcementResult.messageId,
         });
 
         // Mark as announced in state management
-        this.logger.debug('📝 Marking content as announced in state', { contentId });
+        operation.progress('📝 Marking content as announced in state');
         await this.contentStateManager.markAsAnnounced(contentId);
 
         // Mark as seen in duplicate detector
-        this.logger.debug('📝 Marking content as seen in duplicate detector', { contentId, url: contentData.url });
+        operation.progress('📝 Marking content as seen in duplicate detector', { url: contentData.url });
         await this.markContentAsSeen(contentData);
 
         this.metrics.totalProcessed++;
 
-        const processingTime = Date.now() - startTime;
-
-        this.logger.info('🎉 Content processing completed successfully', {
-          contentId,
-          source,
+        operation.success('🎉 Content processing completed successfully', {
           action: 'announced',
-          processingTimeMs: processingTime,
           title: contentData.title,
           channelId: announcementResult.channelId,
           messageId: announcementResult.messageId,
@@ -287,16 +273,12 @@ export class ContentCoordinator {
           action: 'announced',
           source,
           contentId,
-          processingTimeMs: processingTime,
           announcementResult,
         };
       } else {
-        this.logger.warn('⚠️ Content announcement failed or was skipped', {
-          contentId,
-          source,
+        operation.progress('⚠️ Content announcement failed or was skipped', {
           reason: announcementResult?.reason || 'Unknown error',
           skipped: announcementResult?.skipped || false,
-          announcementResult,
         });
 
         // Still mark as processed even if announcement failed to prevent retry loops
@@ -304,30 +286,22 @@ export class ContentCoordinator {
           await this.contentStateManager.markAsAnnounced(contentId);
         }
 
-        const processingTime = Date.now() - startTime;
+        operation.success('Content processing completed with warning', {
+          action: announcementResult?.skipped ? 'skip' : 'failed',
+          reason: announcementResult?.reason || 'Content announcement failed',
+        });
 
         return {
           action: announcementResult?.skipped ? 'skip' : 'failed',
           reason: announcementResult?.reason || 'Content announcement failed',
           source,
           contentId,
-          processingTimeMs: processingTime,
           announcementResult,
         };
       }
     } catch (error) {
       this.metrics.processingErrors++;
-
-      const processingTime = Date.now() - startTime;
-
-      this.logger.error('Content processing failed', {
-        contentId,
-        source,
-        error: error.message,
-        stack: error.stack,
-        processingTimeMs: processingTime,
-      });
-
+      operation.error(error, 'Content processing failed');
       throw error;
     }
   }
