@@ -1,6 +1,6 @@
 // test-validation.js - Environment validation before startup
 import { config } from '@dotenvx/dotenvx';
-import { validateEnvironmentVariables } from '../src/config-validator.js';
+import { validateEnvironmentVariables } from '../../src/config-validator.js';
 
 // Load environment variables
 config();

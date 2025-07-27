@@ -13,7 +13,7 @@
         id: coverage
         run: |
           # Use our enhanced coverage merger
-          node scripts/ci-coverage-merger.js
+          node scripts/ci/ci-coverage-merger.js
           
           # The merger sets GitHub outputs automatically
           echo "Enhanced coverage merging completed"
