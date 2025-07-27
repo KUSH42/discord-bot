@@ -500,21 +500,39 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
 
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('No scheduled content to poll for state changes.');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'No scheduled content to poll for state changes.',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockYoutubeService.checkScheduledContentStates).not.toHaveBeenCalled();
     });
 
     it('should check states for scheduled content', async () => {
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Polling state for 2 scheduled item(s)...');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Polling state for 2 scheduled item(s)...',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockYoutubeService.checkScheduledContentStates).toHaveBeenCalledWith(['live1', 'live2']);
     });
 
     it('should detect and handle state transitions', async () => {
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('State transition detected for live1: scheduled -> live');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'State transition detected for live1: scheduled -> live',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockLivestreamStateMachine.transitionState).toHaveBeenCalledWith('live1', 'live');
     });
 

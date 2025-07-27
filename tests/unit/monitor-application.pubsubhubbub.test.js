@@ -153,7 +153,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
       expect(monitorApp.subscriptionActive).toBe(true);
       expect(monitorApp.stats.subscriptions).toBe(1);
       expect(monitorApp.stats.lastSubscriptionTime).toBeInstanceOf(Date);
-      expect(mockLogger.info).toHaveBeenCalledWith('Successfully subscribed to PubSubHubbub');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Successfully subscribed to PubSubHubbub',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.scheduleSubscriptionRenewal).toHaveBeenCalled();
     });
 
@@ -254,7 +260,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
       );
 
       expect(monitorApp.subscriptionActive).toBe(false);
-      expect(mockLogger.info).toHaveBeenCalledWith('Successfully unsubscribed from PubSubHubbub');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Successfully unsubscribed from PubSubHubbub',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should send correct unsubscription parameters', async () => {
@@ -281,7 +293,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
 
       await monitorApp.unsubscribeFromPubSubHubbub();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Unsubscription failed with status: 400');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Unsubscription failed with status: 400',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       // Should not throw an error for unsubscription failures
     });
 
@@ -291,7 +309,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
 
       await monitorApp.unsubscribeFromPubSubHubbub();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('PubSubHubbub unsubscription failed:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'PubSubHubbub unsubscription failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       // Should not throw an error for unsubscription failures
     });
   });
@@ -350,7 +374,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
       jest.advanceTimersByTime(20 * 60 * 60 * 1000);
       await Promise.resolve();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Subscription renewal failed:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Subscription renewal failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -368,7 +398,13 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
         status: 200,
         body: 'test-challenge-123',
       });
-      expect(mockLogger.info).toHaveBeenCalledWith('PubSubHubbub verification successful (mode: subscribe)');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'PubSubHubbub verification successful (mode: subscribe)',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should reject request with invalid verify token', () => {
@@ -434,7 +470,7 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
         '[WEBHOOK-DEBUG] TEST MESSAGE',
         expect.objectContaining({
           webhookDebug: true,
-          timestamp: expect.any(String),
+          timestamp: expect.any(Number),
           data: 'test',
           module: 'youtube',
         })
@@ -450,7 +486,7 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
         '[WEBHOOK-DEBUG] TEST MESSAGE',
         expect.objectContaining({
           webhookDebug: true,
-          timestamp: expect.any(String),
+          timestamp: expect.any(Number),
           module: 'youtube',
         })
       );
