@@ -41,7 +41,7 @@ export class ScraperApplication {
     this.duplicateDetector =
       dependencies.duplicateDetector ||
       new DuplicateDetector(
-        dependencies.persistentStorage,
+        null, // Disable persistent storage - rely only on Discord history and in-memory caches
         dependencies.logger?.child({ service: 'DuplicateDetector' })
       );
     this.isRunning = false;

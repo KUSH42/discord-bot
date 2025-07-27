@@ -181,10 +181,10 @@ async function setupCoreServices(container, _config) {
     return new ContentAnnouncer(c.resolve('discordService'), c.resolve('config'), c.resolve('stateManager'));
   });
 
-  // Duplicate Detector
+  // Duplicate Detector - with persistent storage disabled to avoid JSON corruption
   container.registerSingleton('duplicateDetector', c => {
     return new DuplicateDetector(
-      c.resolve('persistentStorage'),
+      null, // Disable persistent storage - rely only on Discord history and in-memory caches
       c.resolve('logger').child({ service: 'DuplicateDetector' })
     );
   });
