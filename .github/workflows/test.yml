@@ -988,7 +988,7 @@ jobs:
           PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
           SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
         run: |
-          node scripts/dev/generate-test-summary.js
+          node scripts/testing/generate-test-summary.js
 
       - name: Validate coverage quality
         run: |
