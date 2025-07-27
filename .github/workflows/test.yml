@@ -636,8 +636,6 @@ jobs:
           fail_ci_if_error: false
           plugins: ''
 
-            --verbose=true
-
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
         with:
@@ -646,7 +644,6 @@ jobs:
           name: e2e-tests-node${{ matrix.node-version }}
           fail_ci_if_error: false
           plugins: ''
-
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -996,12 +993,6 @@ jobs:
           fi
 
       - name: Generate comprehensive test report
-        env:
-          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
-          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
-          E2E_TESTS_RESULT: ${{ needs.e2e-tests.result }}
-          PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
-          SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
         env:
           UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
           INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
