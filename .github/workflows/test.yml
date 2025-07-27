@@ -247,6 +247,7 @@ jobs:
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=jest.ci.config.js \
+            --config=jest.ci.config.js \
             --coverage \
             --coverageDirectory=coverage/unit \
             --coverageReporters=lcov \
@@ -254,6 +255,7 @@ jobs:
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
+            --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
             --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
@@ -325,9 +327,9 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=Discord YouTube Bot
+            org.opencontainers.image.title=Discord Bot
             org.opencontainers.image.description=Integration test environment
-            org.opencontainers.image.vendor=discord-youtube-bot
+            org.opencontainers.image.vendor=discord-bot
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -504,9 +506,14 @@ jobs:
             --coverage \
             --coverageDirectory=coverage/integration \
             --coverageReporters=lcov \
+            --config=jest.ci.config.js \
+            --coverage \
+            --coverageDirectory=coverage/integration \
+            --coverageReporters=lcov \
             --testTimeout=15000 \
             --forceExit \
             --detectOpenHandles \
+            --verbose=true 2>&1 | tee coverage/integration/test-output.log
             --verbose=true 2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage
@@ -605,7 +612,12 @@ jobs:
           NODE_ENV: test
         run: |
           mkdir -p coverage/e2e
+          mkdir -p coverage/e2e
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
+          npm run test:e2e -- \
+            --coverage \
+            --coverageDirectory=coverage/e2e \
+            --coverageReporters=lcov \
           npm run test:e2e -- \
             --coverage \
             --coverageDirectory=coverage/e2e \
@@ -624,6 +636,17 @@ jobs:
           fail_ci_if_error: false
           plugins: ''
 
+            --verbose=true
+
+      - name: Upload unit test coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage/e2e/lcov.info
+          flags: e2e-node${{ matrix.node-version }}
+          name: e2e-tests-node${{ matrix.node-version }}
+          fail_ci_if_error: false
+          plugins: ''
+
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -631,6 +654,7 @@ jobs:
         with:
           name: e2e-test-results
           path: |
+            coverage/e2e/
             coverage/e2e/
             logs/
             screenshots/
@@ -821,6 +845,7 @@ jobs:
             --testTimeout=20000 \
             --forceExit \
             --detectOpenHandles 
+            --detectOpenHandles 
 
       - name: Run security audit
         run: |
@@ -928,45 +953,6 @@ jobs:
             fi
           done
 
-      - name: Install coverage tools
-        run: |
-          # Install coverage tools with retry logic
-          # Ensure lcov is installed for genhtml
-          sudo apt-get update && sudo apt-get install -y lcov
-
-          # Install coverage tools with retry logic
-          for i in {1..3}; do
-            echo "Attempt $i to install coverage tools..."
-            if npm install -g nyc lcov-result-merger; then
-              echo "Coverage tools installed successfully on attempt $i"
-              break
-            else
-              echo "Failed attempt $i"
-              if [ $i -lt 3 ]; then
-                echo "Clearing npm cache and retrying..."
-                npm cache clean --force
-                sleep $((i * 3))
-              else
-                echo "Coverage tools installation failed after 3 attempts"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Download Node 18 unit test coverage
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: unit-test-results-node18
-          path: test-results/unit/node18/
-
-      - name: Download Node 20 unit test coverage
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: unit-test-results-node20
-          path: test-results/unit/node20/
-
       - name: Download test results
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -975,143 +961,46 @@ jobs:
           merge-multiple: true
           path: test-results/
 
-      - name: Collect and merge coverage reports
+      - name: Install enhanced coverage tools
+        run: |
+          npm install --no-save lcov-result-merger || echo "Will use fallback merger"
+          sudo apt-get update && sudo apt-get install -y lcov || echo "lcov install failed"
+
+      - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-          mkdir -p coverage/merged coverage/collected
-
-          echo "🔍 Collecting coverage files from all test suites..."
-          
-          # Find all available lcov.info files from different test suites
-          COVERAGE_FILES=()
-          
-          # Unit test coverage (Node 18 and 20)
-          if [ -f "test-results/unit/node18/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node18/coverage/unit/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/unit/node18/coverage/unit/lcov.info")
-            echo "✅ Found unit test coverage (Node 18)"
-          fi
-          
-          if [ -f "test-results/unit/node20/coverage/unit/lcov.info" ] && [ -s "test-results/unit/node20/coverage/unit/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/unit/node20/coverage/unit/lcov.info")
-            echo "✅ Found unit test coverage (Node 20)"
-          fi
-          
-          # Integration test coverage
-          if [ -f "test-results/integration-test-results/coverage/integration/lcov.info" ] && [ -s "test-results/integration-test-results/coverage/integration/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/integration-test-results/coverage/integration/lcov.info")
-            echo "✅ Found integration test coverage"
-          fi
-          
-          # E2E test coverage
-          if [ -f "test-results/e2e-test-results/coverage/e2e/lcov.info" ] && [ -s "test-results/e2e-test-results/coverage/e2e/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/e2e-test-results/coverage/e2e/lcov.info")
-            echo "✅ Found e2e test coverage"
-          fi
-          
-          # Performance test coverage
-          if [ -f "test-results/performance-test-results/coverage/performance/lcov.info" ] && [ -s "test-results/performance-test-results/coverage/performance/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/performance-test-results/coverage/performance/lcov.info")
-            echo "✅ Found performance test coverage"
-          fi
-          
-          # Security test coverage (if it generates coverage)
-          if [ -f "test-results/security-test-results/coverage/security/lcov.info" ] && [ -s "test-results/security-test-results/coverage/security/lcov.info" ]; then
-            COVERAGE_FILES+=("test-results/security-test-results/coverage/security/lcov.info")
-            echo "✅ Found security test coverage"
-          fi
-          
-          echo "📊 Found ${#COVERAGE_FILES[@]} coverage files to merge"
-          
-          if [ ${#COVERAGE_FILES[@]} -eq 0 ]; then
-            echo "❌ No coverage files found"
-            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
-            echo "coverage_pct=0" >> $GITHUB_OUTPUT
-            echo "status=missing" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Copy coverage files to collected directory for merging
-          for i in "${!COVERAGE_FILES[@]}"; do
-            cp "${COVERAGE_FILES[$i]}" "coverage/collected/lcov-$i.info"
-            echo "📋 Copied ${COVERAGE_FILES[$i]} -> coverage/collected/lcov-$i.info"
-          done
-          
-          # Merge coverage files
-          echo "🔄 Merging coverage reports..."
-          if [ ${#COVERAGE_FILES[@]} -eq 1 ]; then
-            # Only one file, just copy it
-            cp "${COVERAGE_FILES[0]}" coverage/merged/lcov.info
-            echo "📝 Single coverage file used directly"
-          else
-            # Multiple files, use lcov-result-merger
-            lcov-result-merger 'coverage/collected/*.info' coverage/merged/lcov.info
-            echo "🔗 Merged ${#COVERAGE_FILES[@]} coverage files using lcov-result-merger"
-          fi
-          
-          # Verify merged file exists and has content
-          if [ ! -f "coverage/merged/lcov.info" ] || [ ! -s "coverage/merged/lcov.info" ]; then
-            echo "❌ Failed to create merged coverage file"
-            echo '{"total":{"lines":{"pct":0},"functions":{"pct":0},"branches":{"pct":0}}}' > coverage-summary.json
-            echo "coverage_pct=0" >> $GITHUB_OUTPUT
-            echo "status=failed" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          echo "✅ Merged coverage file created with $(wc -l < coverage/merged/lcov.info) lines"
-          
-          # Use JavaScript for reliable coverage processing (no shell arithmetic)
-          COVERAGE_FILES_STR=$(printf '%s,' "${COVERAGE_FILES[@]}" | sed 's/,$//')
-          node scripts/process-coverage.js coverage/merged/lcov.info "$COVERAGE_FILES_STR"
-          
-          echo "files_merged=${#COVERAGE_FILES[@]}" >> $GITHUB_OUTPUT
+          node scripts/ci-coverage-merger.js
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
         run: |
-          set -e # Exit immediately if a command exits with a non-zero status
-
+          set -e
           LCOV_REPORT_DIR="lcov-html-report"
-          mkdir -p "$LCOV_REPORT_DIR" # Quoting for safety
-
-          echo "Current working directory: $(pwd)"
-          echo "Listing contents of assets/lcov/ for debugging:"
-          ls -lR ./assets/lcov/ # Output of this was already good, confirms file presence
-
-          # Define full source and destination paths for clarity and debugging
-          SOURCE_BASE_CSS="$(pwd)/assets/lcov/base.css"
-          SOURCE_PRETTIFY_CSS="$(pwd)/assets/lcov/prettify.css"
-          SOURCE_DARK_THEME_CSS="$(pwd)/assets/lcov/lcov-dark-theme.css"
-
-          DEST_BASE_CSS="$LCOV_REPORT_DIR/base.css"
-          DEST_PRETTIFY_CSS="$LCOV_REPORT_DIR/prettify.css"
-          DEST_DARK_THEME_CSS="$LCOV_REPORT_DIR/lcov-dark-theme.css"
-
-          # Debugging: Print the exact paths before copying
-          echo "Attempting to copy base.css from: $SOURCE_BASE_CSS"
-          echo "Attempting to copy prettify.css from: $SOURCE_PRETTIFY_CSS"
-          echo "Attempting to symlink lcov-dark-theme.css from: $SOURCE_DARK_THEME_CSS"
-          echo "Attempting to copy to destination directory: $LCOV_REPORT_DIR"
-          # Use verbose copy (-v) for more output
-          cp -v "$SOURCE_BASE_CSS" "$DEST_BASE_CSS"
-          cp -v "$SOURCE_PRETTIFY_CSS" "$DEST_PRETTIFY_CSS"
-
-          # Create a symbolic link in the current working directory for genhtml to find
-          echo "Creating temporary symlink for lcov-dark-theme.css in current directory."
-          ln -s "$SOURCE_DARK_THEME_CSS" "lcov-dark-theme.css"
-
-          echo "All CSS files copied successfully."
-
-          genhtml coverage/merged/lcov.info \
-            --output-directory "$LCOV_REPORT_DIR" \
-            --css-file lcov-dark-theme.css \
-            --title "Code Coverage Report" \
-            --branch-coverage \
-            --rc lcov_html_css_file="lcov-dark-theme.css" \
-            --prefix "$(pwd)" # Important for correct source paths
-          echo "LCOV HTML report generated in $LCOV_REPORT_DIR"
-
+          mkdir -p "$LCOV_REPORT_DIR"
+          
+          if [ -d "assets/lcov" ]; then
+            find assets/lcov -name "*.css" -exec cp {} "$LCOV_REPORT_DIR/" \;
+          fi
+          
+          if [ -f "coverage/merged/lcov.info" ]; then
+            genhtml coverage/merged/lcov.info \
+              --output-directory "$LCOV_REPORT_DIR" \
+              --title "Enhanced Code Coverage Report" \
+              --branch-coverage \
+              --function-coverage \
+              --prefix "$(pwd)" \
+              --legend \
+              --show-details || echo "genhtml failed but continuing"
+            echo "✅ LCOV HTML report generated"
+          fi
 
       - name: Generate comprehensive test report
+        env:
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          E2E_TESTS_RESULT: ${{ needs.e2e-tests.result }}
+          PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
+          SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
         env:
           UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
           INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
@@ -1125,18 +1014,25 @@ jobs:
         run: |
           if [ -f coverage-metrics.json ]; then
             COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
+          if [ -f coverage-metrics.json ]; then
+            COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
             echo "Current coverage: ${COVERAGE}%"
             
+            # Set coverage quality gates
+            if (( $(echo "$COVERAGE < 25" | bc -l) )); then
             # Set coverage quality gates
             if (( $(echo "$COVERAGE < 25" | bc -l) )); then
               echo "❌ Coverage critically low: $COVERAGE%"
               echo "coverage_status=critical" >> $GITHUB_ENV
             elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
               echo "⚠️ Coverage below minimum: $COVERAGE%"
               echo "coverage_status=warning" >> $GITHUB_ENV
             else
+            else
               echo "✅ Coverage meets target: $COVERAGE%"
               echo "coverage_status=good" >> $GITHUB_ENV
+            fi
             fi
           else
             echo "No coverage data available"
@@ -1158,12 +1054,12 @@ jobs:
         with:
           name: comprehensive-test-report-${{ github.run_id }}
           path: |
-            reports/
-            coverage/merged/
-            coverage/collected/
-            coverage-summary.json
-            coverage-metrics.json
-            test-results/
+            coverage /
+            test-results /
+            reports /
+            coverage-summary.json /
+            coverage-metrics.json /
+            test-results 
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
@@ -1200,19 +1096,6 @@ jobs:
             } else {
               console.log('Test summary file not found');
             }
-
-      - name: Store final test report
-        uses: actions/upload-artifact@v4
-        with:
-          name: comprehensive-test-report
-          path: |
-            reports/
-            coverage/merged/
-            coverage/collected/
-            coverage-summary.json
-            coverage-metrics.json
-            test-results/
-          retention-days: 30
 
       - name: Update status check
         if: always()
