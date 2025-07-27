@@ -843,7 +843,6 @@ jobs:
             --testTimeout=20000 \
             --forceExit \
             --detectOpenHandles 
-            --detectOpenHandles 
 
       - name: Run security audit
         run: |
