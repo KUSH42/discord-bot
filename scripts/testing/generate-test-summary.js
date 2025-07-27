@@ -130,32 +130,24 @@ class TestSummaryGenerator {
 
       for (const xmlFile of xmlFiles) {
         const fileName = path.basename(xmlFile, '.xml');
-        let testType = 'unit'; // Default
-
-        // Determine test type from filename
-        if (fileName.includes('integration')) {
-          testType = 'integration';
-        } else if (fileName.includes('e2e')) {
-          testType = 'e2e';
-        } else if (fileName.includes('performance')) {
-          testType = 'performance';
-        } else if (fileName.includes('security')) {
-          testType = 'security';
-        } else if (fileName.includes('all') || fileName.includes('ci')) {
-          testType = 'unit'; // Main test run is treated as unit
-        }
 
         try {
           const xmlContent = fs.readFileSync(xmlFile, 'utf8');
           const result = await parser.parseStringPromise(xmlContent);
 
           if (result.testsuites || result.testsuite) {
-            const testSuiteResults = this.parseJunitXml(result, xmlFile);
+            // For combined XML files (like all-tests.xml), parse and categorize by test suite names
+            if (fileName.includes('all') || fileName.includes('ci') || fileName.includes('combined')) {
+              this.parseCombinedJunitXml(result, xmlFile);
+            } else {
+              // For individual test type files, use filename-based detection
+              const testType = this.detectTestTypeFromFilename(fileName);
+              const testSuiteResults = this.parseJunitXml(result, xmlFile);
 
-            // Update the summary with XML results
-            if (this.summary.tests[testType].status === 'unknown') {
-              this.summary.tests[testType] = testSuiteResults;
-              console.log(`✅ Loaded ${testType} results from ${xmlFile}`);
+              if (this.summary.tests[testType].status === 'unknown') {
+                this.summary.tests[testType] = testSuiteResults;
+                console.log(`✅ Loaded ${testType} results from ${xmlFile}`);
+              }
             }
           }
         } catch (xmlError) {
@@ -165,6 +157,164 @@ class TestSummaryGenerator {
     } catch (error) {
       console.log(`⚠️  Error loading JUnit results: ${error.message}`);
     }
+  }
+
+  /**
+   * Detect test type from filename
+   */
+  detectTestTypeFromFilename(fileName) {
+    if (fileName.includes('integration')) {
+      return 'integration';
+    } else if (fileName.includes('e2e')) {
+      return 'e2e';
+    } else if (fileName.includes('performance')) {
+      return 'performance';
+    } else if (fileName.includes('security')) {
+      return 'security';
+    }
+    return 'unit'; // Default
+  }
+
+  /**
+   * Parse combined JUnit XML file and categorize by test suite names
+   */
+  parseCombinedJunitXml(xmlData, filePath) {
+    console.log(`🔍 Analyzing combined test results from ${filePath}...`);
+
+    const testsuites = xmlData.testsuites || { testsuite: [xmlData.testsuite] };
+    const suites = Array.isArray(testsuites.testsuite) ? testsuites.testsuite : [testsuites.testsuite];
+
+    // Initialize categorized results
+    const categorizedResults = {
+      unit: { suites: [], totalTests: 0, totalFailures: 0, totalErrors: 0, totalSkipped: 0, totalTime: 0 },
+      integration: { suites: [], totalTests: 0, totalFailures: 0, totalErrors: 0, totalSkipped: 0, totalTime: 0 },
+      e2e: { suites: [], totalTests: 0, totalFailures: 0, totalErrors: 0, totalSkipped: 0, totalTime: 0 },
+      performance: { suites: [], totalTests: 0, totalFailures: 0, totalErrors: 0, totalSkipped: 0, totalTime: 0 },
+      security: { suites: [], totalTests: 0, totalFailures: 0, totalErrors: 0, totalSkipped: 0, totalTime: 0 },
+    };
+
+    // Categorize each test suite
+    for (const suite of suites) {
+      if (!suite) {
+        continue;
+      }
+
+      const suiteName = suite.$.name || '';
+      const testType = this.categorizeTestSuite(suiteName);
+
+      const tests = parseInt(suite.$.tests || '0', 10);
+      const failures = parseInt(suite.$.failures || '0', 10);
+      const errors = parseInt(suite.$.errors || '0', 10);
+      const skipped = parseInt(suite.$.skipped || '0', 10);
+      const time = parseFloat(suite.$.time || '0');
+
+      // Add to appropriate category
+      const category = categorizedResults[testType];
+      category.suites.push({
+        name: suiteName,
+        tests,
+        failures,
+        errors,
+        skipped,
+        time,
+        timestamp: suite.$.timestamp,
+      });
+
+      category.totalTests += tests;
+      category.totalFailures += failures;
+      category.totalErrors += errors;
+      category.totalSkipped += skipped;
+      category.totalTime += time;
+    }
+
+    // Update summary for each test type found
+    for (const [testType, results] of Object.entries(categorizedResults)) {
+      if (results.totalTests > 0 && this.summary.tests[testType].status === 'unknown') {
+        const successRate =
+          results.totalTests > 0
+            ? ((results.totalTests - results.totalFailures - results.totalErrors) / results.totalTests) * 100
+            : 0;
+
+        this.summary.tests[testType] = {
+          status: results.totalFailures === 0 && results.totalErrors === 0 ? 'success' : 'failure',
+          tests: results.totalTests,
+          failures: results.totalFailures,
+          errors: results.totalErrors,
+          skipped: results.totalSkipped,
+          time: results.totalTime,
+          successRate,
+          details: {
+            suites: results.suites,
+            path: filePath,
+          },
+        };
+
+        console.log(`✅ Loaded ${testType} results: ${results.totalTests} tests (${successRate.toFixed(1)}% success)`);
+      }
+    }
+  }
+
+  /**
+   * Categorize test suite by name patterns
+   */
+  categorizeTestSuite(suiteName) {
+    const name = suiteName.toLowerCase();
+
+    // Integration test patterns
+    if (
+      name.includes('integration') ||
+      name.includes('-integration') ||
+      name.includes('external-apis') ||
+      name.includes('discord-integration') ||
+      name.includes('startup-shutdown') ||
+      name.includes('production-setup') ||
+      name.includes('content-announcement-flow') ||
+      name.includes('pubsubhubbub-security') ||
+      name.includes('monitor-application-fallback')
+    ) {
+      return 'integration';
+    }
+
+    // E2E test patterns
+    if (
+      name.includes('e2e') ||
+      name.includes('end-to-end') ||
+      name.includes('workflow') ||
+      name.includes('announcement-workflows') ||
+      name.includes('command-processing-workflows') ||
+      name.includes('scraper-announcement-flow') ||
+      name.includes('fallback-recovery') ||
+      name.includes('empty-notification-fallback')
+    ) {
+      return 'e2e';
+    }
+
+    // Performance test patterns
+    if (
+      name.includes('performance') ||
+      name.includes('load') ||
+      name.includes('benchmark') ||
+      name.includes('stress') ||
+      name.includes('load-tests')
+    ) {
+      return 'performance';
+    }
+
+    // Security test patterns
+    if (
+      name.includes('security') ||
+      name.includes('auth') ||
+      name.includes('credential') ||
+      name.includes('validation') ||
+      name.includes('input-validation') ||
+      name.includes('credential-handling') ||
+      name.includes('application-input-validation')
+    ) {
+      return 'security';
+    }
+
+    // Default to unit tests
+    return 'unit';
   }
 
   /**
@@ -494,7 +644,16 @@ class TestSummaryGenerator {
 
     for (const [testType, result] of Object.entries(this.summary.tests)) {
       const status = this.formatTestStatus(result.status);
-      const details = result.details || result.path || 'Standard test execution';
+      let details = 'No test results found';
+
+      if (result.status !== 'unknown') {
+        if (result.tests !== undefined) {
+          details = `${result.tests} tests, ${result.failures || 0} failures, ${(result.successRate || 0).toFixed(1)}% success`;
+        } else {
+          details = result.path || 'Standard test execution';
+        }
+      }
+
       report.push(`| ${testType.charAt(0).toUpperCase() + testType.slice(1)} | ${status} | ${details} |`);
     }
 
@@ -711,12 +870,12 @@ Examples:
     const generator = new TestSummaryGenerator();
 
     // Load all data
-    const hasCoverage = generator.loadCoverageData(searchPaths);
+    generator.loadCoverageData(searchPaths);
     await generator.loadTestResults(testResultsPath);
     generator.loadSecurityResults(searchPaths);
 
     // Generate reports
-    const { markdownPath, jsonPath } = generator.saveReports(outputDir);
+    generator.saveReports(outputDir);
 
     console.log('\n✅ Test summary generation completed successfully!');
 
