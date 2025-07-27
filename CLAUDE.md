@@ -282,7 +282,23 @@ const mockMetricsManager = {
 - **ContentCoordinator** (`src/core/content-coordinator.js`): Prevents race conditions between sources
 - **PersistentStorage** (`src/infrastructure/persistent-storage.js`): File-based storage for content states
 
-### Browser Configuration
+### Browser Architecture & Configuration
+
+#### Dual Browser Design
+The application uses **separate browser instances** for X and YouTube scrapers to prevent resource conflicts:
+
+- **X Scraper**: Independent PlaywrightBrowserService instance with isolated profile
+- **YouTube Scraper**: Separate PlaywrightBrowserService instance with isolated profile
+- **Dependency Injection**: Browser service registered as singleton but creates isolated instances per scraper
+- **Profile Isolation**: Each browser gets unique temporary profile directory (e.g., `profile-r2iRG5`, `profile-xjXqsz`)
+
+#### Browser Environment Requirements
+**Display Server**: Requires Xvfb virtual display for headless operation
+```bash
+# Required for browser automation in headless environments
+DISPLAY=:99 node index.js
+```
+
 **Anti-bot detection**: Use `headless: false` with Xvfb virtual display
 
 **Safe browser args**:
@@ -296,6 +312,24 @@ args: [
 
 **Avoid these flags** (trigger detection):
 - `--disable-web-security`, `--disable-extensions`, `--disable-ipc-flooding-protection`
+
+#### Common Browser Issues & Solutions
+
+**"Browser connection lost" Errors:**
+- **Cause**: Missing X server environment or browser instance conflicts
+- **Solution**: Ensure Xvfb is running and `DISPLAY=:99` is set
+- **Verification**: Check for multiple browser processes with different profile directories
+
+**"Browser is already running" Errors:**
+- **Cause**: Attempted to launch second browser instance in same service
+- **Architecture**: Resolved by dependency injection creating isolated instances per scraper
+
+**Browser Process Management:**
+```javascript
+// Each scraper gets its own browser instance automatically
+const scraperA = container.resolve('scraperApplication');  // Gets browser instance A
+const scraperB = container.resolve('youtubeScraperService'); // Gets browser instance B
+```
 
 ## Critical Safety Guards
 
@@ -344,11 +378,62 @@ sudo systemctl stop discord-bot.service     # Stop service
 sudo systemctl daemon-reload                # Reload after changes
 ```
 
+### Deployment Troubleshooting
+
+#### Systemd Service Issues
+**Node.js PATH Problems:**
+- **Issue**: `/usr/bin/env: 'node': No such file or directory`
+- **Cause**: Node.js not available in systemd service PATH
+- **Solution**: Update service file with explicit Node.js path or use deployment script
+
+**Browser Launch Failures:**
+- **Issue**: `Missing X server or $DISPLAY` errors
+- **Cause**: Browser requires display server for automation
+- **Solution**: Use deployment script with Xvfb or set `DISPLAY=:99`
+
+#### Manual Deployment (Development)
+```bash
+# Start with proper display environment
+DISPLAY=:99 node index.js
+
+# Or use deployment script
+bash scripts/deployment/discord-bot-start.sh
+```
+
+#### Verification Commands
+```bash
+# Check browser processes are running with separate profiles
+ps aux | grep chrome | grep profile
+
+# Verify Xvfb virtual display
+ps aux | grep Xvfb
+
+# Check bot process
+ps aux | grep "node index.js"
+```
+
 ### Logging Infrastructure
 - **File Logging**: Winston with daily rotation
 - **Discord Logging**: Optional log mirroring to Discord channel
 - **Log Levels**: error, warn, info, debug, verbose
 - **Structured Logging**: JSON format with contextual metadata
+
+### Common Operational Issues
+
+#### Browser Connection Errors
+**Symptoms**: `Browser connection lost` repeated in logs
+**Diagnosis**: 
+```bash
+# Check if both browser instances are running
+ps aux | grep chrome
+# Should show 2 separate browser processes with different profile directories
+```
+**Resolution**: Restart with proper Xvfb environment
+
+#### Scraper Conflicts
+**Symptoms**: One scraper working but other failing
+**Diagnosis**: Both scrapers should have separate browser profiles
+**Resolution**: Verify dependency injection is creating isolated instances
 
 ---
 
