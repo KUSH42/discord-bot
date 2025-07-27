@@ -247,7 +247,6 @@ jobs:
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=jest.ci.config.js \
-            --config=jest.ci.config.js \
             --coverage \
             --coverageDirectory=coverage/unit \
             --coverageReporters=lcov \
@@ -255,7 +254,6 @@ jobs:
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
             --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
@@ -506,14 +504,9 @@ jobs:
             --coverage \
             --coverageDirectory=coverage/integration \
             --coverageReporters=lcov \
-            --config=jest.ci.config.js \
-            --coverage \
-            --coverageDirectory=coverage/integration \
-            --coverageReporters=lcov \
             --testTimeout=15000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/integration/test-output.log
             --verbose=true 2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage
@@ -612,12 +605,7 @@ jobs:
           NODE_ENV: test
         run: |
           mkdir -p coverage/e2e
-          mkdir -p coverage/e2e
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
-          npm run test:e2e -- \
-            --coverage \
-            --coverageDirectory=coverage/e2e \
-            --coverageReporters=lcov \
           npm run test:e2e -- \
             --coverage \
             --coverageDirectory=coverage/e2e \
@@ -625,7 +613,8 @@ jobs:
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true
+            --verbose=true 2>&1 | tee coverage/integration/test-output.log
+
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
@@ -841,8 +830,9 @@ jobs:
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
             --testTimeout=20000 \
-            --forceExit 
-            
+            --forceExit \
+            --detectOpenHandles
+
       - name: Run security audit
         run: |
           npm audit --audit-level=moderate --json > security-audit.json || true
