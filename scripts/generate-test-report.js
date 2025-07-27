@@ -330,9 +330,18 @@ ${mergedFrom.length > 0 ? mergedFrom.map(f => `- \`${f}\``).join('\n') : '- No s
   // Set GitHub outputs for coverage validation
   const coverageStatus = overallCoverage >= 50 ? 'good' : overallCoverage >= 25 ? 'warning' : 'critical';
 
-  console.log(`::set-output name=coverage_pct::${formatPercentage(overallCoverage)}`);
-  console.log(`::set-output name=coverage_status::${coverageStatus}`);
-  console.log(`::set-output name=status::available`);
+  // Set GitHub outputs using environment files (modern approach)
+  const githubOutput = process.env.GITHUB_OUTPUT;
+  if (githubOutput) {
+    await fs.appendFile(githubOutput, `coverage_pct=${formatPercentage(overallCoverage)}\n`);
+    await fs.appendFile(githubOutput, `coverage_status=${coverageStatus}\n`);
+    await fs.appendFile(githubOutput, `status=available\n`);
+  } else {
+    // Fallback for local testing
+    console.log(`coverage_pct=${formatPercentage(overallCoverage)}`);
+    console.log(`coverage_status=${coverageStatus}`);
+    console.log(`status=available`);
+  }
 }
 
 // Run the script

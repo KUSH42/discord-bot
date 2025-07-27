@@ -1060,12 +1060,27 @@ jobs:
           echo "✅ Merged coverage file created with $(wc -l < coverage/merged/lcov.info) lines"
           
           # Extract coverage metrics from merged file
-          LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
-          BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          # Use lcov --summary for accurate metrics
+          COVERAGE_SUMMARY=$(lcov --summary coverage/merged/lcov.info 2>/dev/null)
+          
+          # Extract values from lcov summary output
+          LINES_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "lines\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
+          LINES_HIT=$(echo "$COVERAGE_SUMMARY" | grep "lines\.\.\.\.\.\." | awk '{print $4}' || echo "0")
+          FUNCTIONS_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "functions\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
+          FUNCTIONS_HIT=$(echo "$COVERAGE_SUMMARY" | grep "functions\.\.\.\.\.\." | awk '{print $4}' || echo "0")
+          BRANCHES_FOUND=$(echo "$COVERAGE_SUMMARY" | grep "branches\.\.\.\.\.\." | awk '{print $2}' | sed 's/(//' || echo "0")
+          BRANCHES_HIT=$(echo "$COVERAGE_SUMMARY" | grep "branches\.\.\.\.\.\." | awk '{print $4}' || echo "0")
+          
+          # Fallback to manual parsing if lcov --summary fails
+          if [ "$LINES_FOUND" = "0" ] || [ -z "$LINES_FOUND" ]; then
+            echo "⚠️ lcov --summary failed, using manual parsing"
+            LINES_FOUND=$(grep -E "^LF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+            LINES_HIT=$(grep -E "^LH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+            FUNCTIONS_FOUND=$(grep -E "^FNF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+            FUNCTIONS_HIT=$(grep -E "^FNH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+            BRANCHES_FOUND=$(grep -E "^BRF:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+            BRANCHES_HIT=$(grep -E "^BRH:" coverage/merged/lcov.info | awk -F: '{sum+=$2} END {print sum+0}' || echo "0")
+          fi
           
           # Calculate percentages
           LINES_PCT=$(awk -v hit="$LINES_HIT" -v found="$LINES_FOUND" 'BEGIN {
