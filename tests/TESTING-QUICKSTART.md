@@ -50,6 +50,9 @@ npm run test:runner coverage --verbose
 # Generate coverage report
 npm run test:coverage      # Creates coverage/ directory
 
+# Generate test summary with XML results  
+npm run test:summary
+
 # Check coverage thresholds
 # Global: 25% statements/lines, 20% branches, 25% functions
 # Core modules: 50% statements/lines, 40% branches, 55% functions
@@ -58,10 +61,21 @@ npm run test:coverage      # Creates coverage/ directory
 
 ## 🔧 Configuration Files
 
-- **`jest.config.js`** - Production config with full coverage enforcement
-- **`jest.dev.config.js`** - Development config for fast feedback
-- **`jest.e2e.config.js`** - End-to-end test configuration
-- **`jest.security.config.js`** - Security test configuration
+- **`jest.config.js`** - Production config with full coverage enforcement and JUnit XML output
+- **`jest.ci.config.js`** - CI configuration with structured test result reporting
+- **`tests/configs/jest.unit.config.js`** - Unit test configuration with XML reporting
+- **`tests/configs/jest.integration.config.js`** - Integration test configuration
+- **`tests/configs/jest.e2e.config.js`** - End-to-end test configuration
+- **`tests/configs/jest.performance.config.js`** - Performance test configuration
+- **`tests/configs/jest.security.config.js`** - Security test configuration
+
+### XML Test Result Output
+
+All Jest configurations now include **jest-junit** reporter for CI/CD integration:
+- **JUnit XML files**: Generated in `test-results/` directory
+- **File naming**: `{test-type}-tests.xml` (e.g., `unit-tests.xml`, `integration-tests.xml`)
+- **CI integration**: XML files provide structured test results for GitHub Actions
+- **Test summary**: Automated parsing via `scripts/testing/generate-test-summary.js`
 
 ## 🛠️ Common Development Workflow
 
@@ -115,15 +129,16 @@ npm run test:runner dev               # Development mode
 
 ## 📋 Quick Commands Reference
 
-| Command                 | Purpose                   |
-| ----------------------- | ------------------------- |
-| `npm run test:dev`      | Fast development testing  |
-| `npm run test:watch`    | Auto-run on file changes  |
-| `npm run test:changed`  | Git-aware testing         |
-| `npm run test:parallel` | Faster parallel execution |
-| `npm run test:debug`    | Debug with breakpoints    |
-| `npm run test:runner`   | Interactive test runner   |
-| `npm run test:coverage` | Generate coverage report  |
+| Command                 | Purpose                           |
+| ----------------------- | --------------------------------- |
+| `npm run test:dev`      | Fast development testing          |
+| `npm run test:watch`    | Auto-run on file changes          |
+| `npm run test:changed`  | Git-aware testing                 |
+| `npm run test:parallel` | Faster parallel execution         |
+| `npm run test:debug`    | Debug with breakpoints            |
+| `npm run test:runner`   | Interactive test runner           |
+| `npm run test:coverage` | Generate coverage report          |
+| `npm run test:summary`  | Generate comprehensive test report |
 
 ## 🐛 Common Testing Patterns & Gotchas
 

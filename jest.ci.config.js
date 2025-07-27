@@ -11,6 +11,24 @@ export default {
   cache: false,
   collectCoverage: true,
   coverageReporters: ['lcov', 'text-summary'],
+
+  // Override reporters for CI with structured output
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'ci-tests.xml',
+        classNameTemplate: '{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: false,
+      },
+    ],
+  ],
   // Ensure consistent behavior in CI
   clearMocks: true,
   resetMocks: true,

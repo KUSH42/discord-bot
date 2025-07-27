@@ -28,6 +28,7 @@
     "test:bail": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --bail",
     "test:dev": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.dev.config.js",
     "test:runner": "node tests/test-runner.js",
+    "test:summary": "node scripts/testing/generate-test-summary.js",
     "lint": "eslint .",
     "format": "prettier --check .",
     "lint:fix": "eslint . --fix",
@@ -60,8 +61,7 @@
     "playwright": "^1.44.1",
     "puppeteer-extra": "^3.3.6",
     "winston": "^3.17.0",
-    "winston-daily-rotate-file": "^5.0.0",
-    "xml2js": "^0.6.2"
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "repository": {
     "type": "git",
@@ -83,6 +83,7 @@
     "@eslint/json": "^0.13.0",
     "@eslint/markdown": "^7.0.0",
     "@jest/globals": "^30.0.4",
+    "@jest/reporters": "^30.0.5",
     "babel-jest": "^30.0.4",
     "core-js": "^3.44.0",
     "eslint": "^9.31.0",
@@ -93,9 +94,12 @@
     "husky": "^9.1.7",
     "inquirer": "^12.7.0",
     "jest": "^30.0.5",
+    "jest-json-reporter": "^1.2.2",
+    "jest-junit": "^16.0.0",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
-    "test-exclude": "^7.0.1"
+    "test-exclude": "^7.0.1",
+    "xml2js": "^0.6.2"
   },
   "overrides": {
     "glob": "^9.0.0",

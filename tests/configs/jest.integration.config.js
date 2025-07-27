@@ -44,6 +44,24 @@ export default {
   coverageDirectory: 'coverage/integration',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
 
+  // Integration test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'integration-tests.xml',
+        classNameTemplate: 'Integration.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
+
   // Realistic coverage thresholds for integration testing
   // Integration tests focus on module interactions, not exhaustive single-file coverage
   coverageThreshold: {

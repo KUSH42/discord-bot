@@ -16,4 +16,22 @@ export default {
   collectCoverage: false,
   testMatch: ['<rootDir>/tests/e2e/**/*.test.js', '<rootDir>/tests/e2e/**/*.spec.js'],
   testTimeout: 60000,
+
+  // E2E test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'e2e-tests.xml',
+        classNameTemplate: 'E2E.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
 };

@@ -44,8 +44,9 @@ This represents a **significant improvement** over the broken 0% results from th
    - **Avoids broken lcov-result-merger** that strips coverage summaries
    - Generates comprehensive summaries with quality scoring
 
-2. **Professional Test Summary Generator** (`scripts/generate-test-summary.js`)
+2. **Professional Test Summary Generator** (`scripts/testing/generate-test-summary.js`)
    - Aggregates results from all test types
+   - **Parses JUnit XML test results** for structured test data
    - Creates quality gate assessments
    - Generates professional markdown reports
    - Includes coverage analysis and recommendations
@@ -61,13 +62,46 @@ This represents a **significant improvement** over the broken 0% results from th
 ### Data Flow
 
 ```
-Test Execution → Coverage Generation → File Discovery → Deduplication → Merging → Summary Generation → Artifact Upload
-     ↓                    ↓                   ↓              ↓             ↓             ↓              ↓
-   unit tests          lcov.info files    Find all files   Remove dupes   Merge LCOV   JSON + MD     GitHub Artifacts
-integration tests                        across types                     properly     reports
+Test Execution → Coverage Generation → Test Result XML → File Discovery → Deduplication → Merging → Summary Generation → Artifact Upload
+     ↓                    ↓                     ↓                ↓              ↓             ↓             ↓              ↓
+   unit tests          lcov.info files      JUnit XML       Find all files   Remove dupes   Merge LCOV   JSON + MD     GitHub Artifacts
+integration tests                       jest-junit        across types                     properly     reports
   e2e tests
 performance tests
 ```
+
+## Enhanced Test Result Reporting
+
+### JUnit XML Integration
+
+All Jest configurations now generate **structured test results** via the `jest-junit` reporter:
+
+- **XML Output**: `test-results/{test-type}-tests.xml`
+- **Automatic Parsing**: Test summary generator reads XML files for detailed test statistics
+- **CI Integration**: Structured results enable better GitHub Actions reporting
+- **Test Metrics**: Pass/fail counts, execution time, test suite organization
+
+#### XML File Structure
+
+```xml
+<testsuites>
+  <testsuite name="Unit Tests" tests="1652" failures="0" errors="0" time="41.76">
+    <testcase classname="BotApplication" name="should initialize correctly" time="0.003"/>
+    <!-- ... more test cases ... -->
+  </testsuite>
+</testsuites>
+```
+
+#### Supported Test Types
+
+| Test Type | XML File | Configuration |
+|-----------|----------|---------------|
+| **Unit** | `unit-tests.xml` | `tests/configs/jest.unit.config.js` |
+| **Integration** | `integration-tests.xml` | `tests/configs/jest.integration.config.js` |
+| **E2E** | `e2e-tests.xml` | `tests/configs/jest.e2e.config.js` |
+| **Performance** | `performance-tests.xml` | `tests/configs/jest.performance.config.js` |
+| **Security** | `security-tests.xml` | `tests/configs/jest.security.config.js` |
+| **CI** | `ci-tests.xml` | `jest.ci.config.js` |
 
 ## Usage
 
@@ -88,10 +122,13 @@ node scripts/merge-coverage-enhanced.js --output ./merged/lcov.info
 #### Generate Test Summary
 ```bash
 # Standard test summary
-node scripts/generate-test-summary.js
+npm run test:summary
+
+# Or directly
+node scripts/testing/generate-test-summary.js
 
 # Custom paths
-node scripts/generate-test-summary.js --test-results ./artifacts/tests --output ./reports
+node scripts/testing/generate-test-summary.js --test-results ./artifacts/tests --output ./reports
 ```
 
 #### Test the System
@@ -195,7 +232,13 @@ test-results/
 │   └── node20/coverage/unit/lcov.info
 ├── integration/coverage/integration/lcov.info
 ├── e2e/coverage/e2e/lcov.info
-└── performance/coverage/performance/lcov.info
+├── performance/coverage/performance/lcov.info
+├── unit-tests.xml                   # JUnit XML results
+├── integration-tests.xml
+├── e2e-tests.xml
+├── performance-tests.xml
+├── security-tests.xml
+└── all-tests.xml                    # Main test run results
 ```
 
 ### Output Structure
@@ -208,6 +251,14 @@ coverage/
 reports/
 ├── test-summary.md                 # Professional report
 └── test-summary.json              # Machine-readable summary
+
+test-results/                       # JUnit XML test results
+├── unit-tests.xml
+├── integration-tests.xml
+├── e2e-tests.xml
+├── performance-tests.xml
+├── security-tests.xml
+└── all-tests.xml
 
 lcov-html-report/                   # Interactive HTML report
 ├── index.html
@@ -230,7 +281,9 @@ lcov-html-report/                   # Interactive HTML report
 ### Professional Reporting
 - Quality gate status with clear pass/fail indicators
 - Coverage analysis with industry benchmarks
-- Test results summary by type
+- **Structured test results from JUnit XML parsing**
+- Test results summary by type with pass/fail/error counts
+- Execution time analysis and performance metrics
 - Links to detailed artifacts
 - Executive summary format
 
@@ -345,6 +398,8 @@ This will provide detailed information about:
 ### Dependencies
 - **Python 3**: For primary merger (merge-coverage.py) - **RECOMMENDED**
 - **lcov**: System package for HTML generation
+- **jest-junit**: NPM package for JUnit XML test result generation
+- **xml2js**: NPM package for XML parsing in test summary generator
 - **lcov-result-merger**: ⚠️ **BROKEN** - DO NOT USE (strips coverage summaries)
 
 ### Updates

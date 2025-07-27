@@ -16,4 +16,22 @@ export default {
   collectCoverage: false,
   testMatch: ['**/tests/security/**/*.test.js', '**/tests/security/**/*.spec.js'],
   testTimeout: 45000,
+
+  // Security test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'security-tests.xml',
+        classNameTemplate: 'Security.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
 };

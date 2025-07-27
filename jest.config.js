@@ -24,6 +24,24 @@ export default {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
+
+  // Test result reporters for CI integration
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'all-tests.xml',
+        classNameTemplate: '{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
   // Re-enabled coverage thresholds after fixing hanging tests
   coverageThreshold: {
     global: {

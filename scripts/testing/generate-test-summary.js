@@ -9,6 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import xml2js from 'xml2js';
 
 class TestSummaryGenerator {
   constructor() {
@@ -85,7 +86,7 @@ class TestSummaryGenerator {
   /**
    * Load test results from various sources
    */
-  loadTestResults(testResultsPath = 'test-results') {
+  async loadTestResults(testResultsPath = 'test-results') {
     console.log('🧪 Loading test results...');
 
     if (!fs.existsSync(testResultsPath)) {
@@ -93,11 +94,17 @@ class TestSummaryGenerator {
       return;
     }
 
+    // First try to load from XML files (Jest JUnit output)
+    await this.loadJunitResults(testResultsPath);
+
+    // Then load from legacy directory structure
     const testTypes = ['unit', 'integration', 'e2e', 'performance', 'security'];
 
     for (const testType of testTypes) {
-      const typeResults = this.loadTestTypeResults(testResultsPath, testType);
-      this.summary.tests[testType] = typeResults;
+      if (this.summary.tests[testType].status === 'unknown') {
+        const typeResults = this.loadTestTypeResults(testResultsPath, testType);
+        this.summary.tests[testType] = typeResults;
+      }
     }
 
     // Calculate overall test passing rate
@@ -109,6 +116,118 @@ class TestSummaryGenerator {
       this.summary.qualityGates.testsPassing.passed =
         this.summary.qualityGates.testsPassing.actual >= this.summary.qualityGates.testsPassing.threshold;
     }
+  }
+
+  /**
+   * Load results from JUnit XML files
+   */
+  async loadJunitResults(testResultsPath) {
+    console.log('📋 Loading JUnit XML results...');
+
+    try {
+      const xmlFiles = this.findFiles(testResultsPath, /.*\.xml$/);
+      const parser = new xml2js.Parser();
+
+      for (const xmlFile of xmlFiles) {
+        const fileName = path.basename(xmlFile, '.xml');
+        let testType = 'unit'; // Default
+
+        // Determine test type from filename
+        if (fileName.includes('integration')) {
+          testType = 'integration';
+        } else if (fileName.includes('e2e')) {
+          testType = 'e2e';
+        } else if (fileName.includes('performance')) {
+          testType = 'performance';
+        } else if (fileName.includes('security')) {
+          testType = 'security';
+        } else if (fileName.includes('all') || fileName.includes('ci')) {
+          testType = 'unit'; // Main test run is treated as unit
+        }
+
+        try {
+          const xmlContent = fs.readFileSync(xmlFile, 'utf8');
+          const result = await parser.parseStringPromise(xmlContent);
+
+          if (result.testsuites || result.testsuite) {
+            const testSuiteResults = this.parseJunitXml(result, xmlFile);
+
+            // Update the summary with XML results
+            if (this.summary.tests[testType].status === 'unknown') {
+              this.summary.tests[testType] = testSuiteResults;
+              console.log(`✅ Loaded ${testType} results from ${xmlFile}`);
+            }
+          }
+        } catch (xmlError) {
+          console.log(`⚠️  Error parsing XML file ${xmlFile}: ${xmlError.message}`);
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️  Error loading JUnit results: ${error.message}`);
+    }
+  }
+
+  /**
+   * Parse JUnit XML format
+   */
+  parseJunitXml(xmlData, filePath) {
+    const testsuites = xmlData.testsuites || { testsuite: [xmlData.testsuite] };
+    const suites = Array.isArray(testsuites.testsuite) ? testsuites.testsuite : [testsuites.testsuite];
+
+    let totalTests = 0;
+    let totalFailures = 0;
+    let totalErrors = 0;
+    let totalSkipped = 0;
+    let totalTime = 0;
+
+    const details = {
+      suites: [],
+      path: filePath,
+    };
+
+    for (const suite of suites) {
+      if (!suite) {
+        continue;
+      }
+
+      const tests = parseInt(suite.$.tests || '0', 10);
+      const failures = parseInt(suite.$.failures || '0', 10);
+      const errors = parseInt(suite.$.errors || '0', 10);
+      const skipped = parseInt(suite.$.skipped || '0', 10);
+      const time = parseFloat(suite.$.time || '0');
+
+      totalTests += tests;
+      totalFailures += failures;
+      totalErrors += errors;
+      totalSkipped += skipped;
+      totalTime += time;
+
+      details.suites.push({
+        name: suite.$.name || 'Unknown',
+        tests,
+        failures,
+        errors,
+        skipped,
+        time: `${time}s`,
+      });
+    }
+
+    const hasFailures = totalFailures > 0 || totalErrors > 0;
+    const status = hasFailures ? 'failure' : 'success';
+
+    return {
+      status,
+      details: `${totalTests} tests, ${totalFailures} failures, ${totalErrors} errors, ${totalSkipped} skipped (${totalTime.toFixed(2)}s)`,
+      path: filePath,
+      summary: {
+        total: totalTests,
+        passed: totalTests - totalFailures - totalErrors - totalSkipped,
+        failed: totalFailures + totalErrors,
+        skipped: totalSkipped,
+        time: `${totalTime.toFixed(2)}s`,
+      },
+      extended: details,
+    };
   }
 
   /**
@@ -593,7 +712,7 @@ Examples:
 
     // Load all data
     const hasCoverage = generator.loadCoverageData(searchPaths);
-    generator.loadTestResults(testResultsPath);
+    await generator.loadTestResults(testResultsPath);
     generator.loadSecurityResults(searchPaths);
 
     // Generate reports

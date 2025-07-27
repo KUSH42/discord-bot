@@ -43,6 +43,24 @@ export default {
   coverageDirectory: 'coverage/performance',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
 
+  // Performance test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'performance-tests.xml',
+        classNameTemplate: 'Performance.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
+
   // No coverage thresholds for performance tests
   // They contribute to overall coverage but don't enforce minimums
   coverageThreshold: {},
