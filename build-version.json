@@ -1,8 +1,4 @@
 {
   "version": "0.2.0 α",
-<<<<<<< HEAD
   "build": 162
-=======
-  "build": 125
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
 }

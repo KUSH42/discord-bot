@@ -7,7 +7,7 @@ import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';
 import { ContentClassifier } from '../../src/core/content-classifier.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
-import { toISOStringUTC, nowUTC } from '../utilities/utc-time.js';
+import { toISOStringUTC, nowUTC } from '../utilities/utc-time-test.js';
 
 /**
  * End-to-End tests for the complete scraper announcement flow
