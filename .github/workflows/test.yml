@@ -960,7 +960,6 @@ jobs:
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
         run: |
-          set -e
           LCOV_REPORT_DIR="lcov-html-report"
           mkdir -p "$LCOV_REPORT_DIR"
           
@@ -969,15 +968,25 @@ jobs:
           fi
           
           if [ -f "coverage/merged/lcov.info" ]; then
-            genhtml coverage/merged/lcov.info \
+            if genhtml coverage/merged/lcov.info \
               --output-directory "$LCOV_REPORT_DIR" \
               --title "Enhanced Code Coverage Report" \
               --branch-coverage \
               --function-coverage \
               --prefix "$(pwd)" \
               --legend \
-              --show-details || echo "genhtml failed but continuing"
-            echo "✅ LCOV HTML report generated"
+              --show-details; then
+              echo "✅ LCOV HTML report generated successfully"
+              echo "lcov_html_generated=true" >> $GITHUB_ENV
+            else
+              echo "⚠️ genhtml failed, creating basic report"
+              echo "<html><body><h1>Coverage Report Generation Failed</h1><p>See coverage-summary.json for metrics</p></body></html>" > "$LCOV_REPORT_DIR/index.html"
+              echo "lcov_html_generated=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "⚠️ No merged LCOV info found, creating placeholder"
+            echo "<html><body><h1>No Coverage Data</h1><p>Coverage merging may have failed</p></body></html>" > "$LCOV_REPORT_DIR/index.html"
+            echo "lcov_html_generated=false" >> $GITHUB_ENV
           fi
 
       - name: Generate comprehensive test report
@@ -1036,12 +1045,13 @@ jobs:
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
-        if: always() # Always upload even if genhtml failed, for debugging
+        if: steps.coverage.outputs.status == 'available' && env.lcov_html_generated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: lcov-html-report
           path: lcov-html-report/
-          retention-days: 14 # Adjust retention as needed (e.g., 30 days)
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Comment commit with test results
         if: github.event_name == 'push'
