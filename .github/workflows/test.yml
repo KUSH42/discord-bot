@@ -613,7 +613,7 @@ jobs:
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/integration/test-output.log
+            --verbose=true 2>&1 | tee coverage/e2e/test-output.log
 
 
       - name: Upload unit test coverage
@@ -955,7 +955,7 @@ jobs:
       - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-          node scripts/ci-coverage-merger.js
+          node scripts/ci/ci-coverage-merger.js
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
