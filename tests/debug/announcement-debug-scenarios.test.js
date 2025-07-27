@@ -71,7 +71,6 @@ describe('Announcement Debug Scenarios', () => {
           X_QUERY_INTERVAL_MIN: '60000',
           X_QUERY_INTERVAL_MAX: '120000',
           ANNOUNCE_OLD_TWEETS: 'false',
-          CONTENT_BACKOFF_DURATION_HOURS: '2',
           MAX_CONTENT_AGE_HOURS: '24',
           DISCORD_BOT_SUPPORT_LOG_CHANNEL: '123456789012345683',
         };

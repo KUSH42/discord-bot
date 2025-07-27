@@ -3,6 +3,7 @@
  * This file contains both problematic and correct patterns for educational purposes
  * Run `npx eslint tests/fixtures/timezone-examples.js` to see rule violations
  */
+import { dateToISOString, timestampUTC } from '../../src/utilities/utc-time.js';
 
 // ❌ PROBLEMATIC PATTERNS (these will trigger ESLint errors)
 

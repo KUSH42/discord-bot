@@ -830,32 +830,64 @@ export class ScraperApplication {
 
     // Check: Have we seen this tweet before? (Primary duplicate detection)
     if (tweet.url && (await this.duplicateDetector.isDuplicate(tweet.url))) {
-      this.logger.debug(`Tweet ${tweet.tweetID} already known (duplicate), not new`);
+      this.logger.debug(`🔍 Tweet ${tweet.tweetID} already known (duplicate detection), not new`, {
+        tweetUrl: tweet.url,
+        duplicateDetectionMethod: 'url_based',
+        contentType: tweet.type || 'unknown',
+      });
       return false;
     }
 
-    // Check: Is the content too old based on configurable backoff duration?
-    const backoffHours = this.config.get('CONTENT_BACKOFF_DURATION_HOURS', '2'); // Default 2 hours
-    const backoffMs = parseInt(backoffHours) * 60 * 60 * 1000;
-    const cutoffTime = new Date(Date.now() - backoffMs);
+    // Check: Is the content too old based on MAX_CONTENT_AGE_HOURS?
+    const maxAgeHours = this.config.get('MAX_CONTENT_AGE_HOURS', '24'); // Default 24 hours
+    const maxAgeMs = parseInt(maxAgeHours) * 60 * 60 * 1000;
+    const cutoffTime = new Date(Date.now() - maxAgeMs);
 
     if (tweet.timestamp) {
       const tweetTime = new Date(tweet.timestamp);
+      const ageInMinutes = Math.floor((Date.now() - tweetTime.getTime()) / (1000 * 60));
+      const ageInHours = Math.floor(ageInMinutes / 60);
+
       if (tweetTime < cutoffTime) {
         this.logger.debug(
-          `Tweet ${tweet.tweetID} is too old (${tweetTime.toISOString()} < ${cutoffTime.toISOString()}), not new`
+          `⏰ Tweet ${tweet.tweetID} is too old - exceeds MAX_CONTENT_AGE_HOURS=${maxAgeHours}h, not new`,
+          {
+            tweetTime: tweetTime.toISOString(),
+            cutoffTime: cutoffTime.toISOString(),
+            ageInMinutes,
+            ageInHours,
+            maxAgeHours: parseInt(maxAgeHours),
+            contentType: tweet.type || 'unknown',
+            tweetUrl: tweet.url,
+          }
         );
         return false;
+      } else {
+        this.logger.debug(`⏰ Tweet ${tweet.tweetID} age check passed: ${ageInHours}h old (limit: ${maxAgeHours}h)`, {
+          ageInMinutes,
+          ageInHours,
+          maxAgeHours: parseInt(maxAgeHours),
+          contentType: tweet.type || 'unknown',
+        });
       }
     }
 
     // If no timestamp available, assume it's new (but will be caught by duplicate detection if seen again)
     if (!tweet.timestamp) {
-      this.logger.debug(`No timestamp for tweet ${tweet.tweetID}, considering as new`);
+      this.logger.debug(`⚠️ No timestamp for tweet ${tweet.tweetID}, considering as new`, {
+        tweetUrl: tweet.url,
+        contentType: tweet.type || 'unknown',
+        fallbackReason: 'missing_timestamp',
+      });
       return true;
     }
 
-    this.logger.debug(`Tweet ${tweet.tweetID} passed all checks, considering as new`);
+    this.logger.debug(`✅ Tweet ${tweet.tweetID} passed all checks, considering as new`, {
+      tweetUrl: tweet.url,
+      contentType: tweet.type || 'unknown',
+      timestamp: tweet.timestamp,
+      checksPerformed: ['duplicate_detection', 'age_filtering'],
+    });
     return true;
   }
 
@@ -1218,14 +1250,22 @@ export class ScraperApplication {
       const initializationWindow = initializationHours * 60 * 60 * 1000; // Convert hours to milliseconds
       const cutoffTime = new Date(Date.now() - initializationWindow);
 
-      // Navigate to user's profile to get recent content
+      let markedAsSeen = 0;
+
+      // First, scan Discord channels for already announced content to avoid duplicates
+      const discordScanResults = await this.scanDiscordChannelsForContent();
+      markedAsSeen += discordScanResults.totalMarked;
+      this.logger.info(
+        `Discord channel scan: marked ${discordScanResults.totalMarked} content items from ${discordScanResults.channelsScanned} unique channels`
+      );
+
+      // Then navigate to user's profile to get recent content from X directly
       await this.navigateToProfileTimeline(this.xUser);
 
       // Extract recent tweets
       const tweets = await this.extractTweets();
       this.logger.info(`Found ${tweets.length} recent tweets during initialization scan`);
 
-      let markedAsSeen = 0;
       for (const tweet of tweets) {
         // Only mark tweets that are within our initialization window
         const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
@@ -1233,7 +1273,7 @@ export class ScraperApplication {
         if (tweetTime && tweetTime >= cutoffTime) {
           // Mark as seen by adding to duplicate detector
           if (tweet.url) {
-            this.duplicateDetector.markAsSeen(tweet.url);
+            await this.duplicateDetector.markAsSeen(tweet.url);
             markedAsSeen++;
             this.logger.debug(`Marked tweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
           }
@@ -1248,8 +1288,8 @@ export class ScraperApplication {
             const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
 
             if (tweetTime && tweetTime >= cutoffTime && tweet.url) {
-              if (!this.duplicateDetector.isDuplicate(tweet.url)) {
-                this.duplicateDetector.markAsSeen(tweet.url);
+              if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
+                await this.duplicateDetector.markAsSeen(tweet.url);
                 markedAsSeen++;
                 this.logger.debug(`Marked retweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
               }
@@ -1267,6 +1307,120 @@ export class ScraperApplication {
       // Don't throw - this is a best-effort initialization
       this.logger.warn('Continuing with normal operation despite initialization error');
     }
+  }
+
+  /**
+   * Scan Discord channels for already announced content to mark as seen
+   * Prevents duplicate announcements by checking Discord channel history
+   * @returns {Promise<Object>} Scan results with channelsScanned and totalMarked counts
+   */
+  async scanDiscordChannelsForContent() {
+    const results = {
+      channelsScanned: 0,
+      totalMarked: 0,
+      errors: [],
+    };
+
+    try {
+      if (!this.discord?.client) {
+        this.logger.warn('Discord client not available for channel scanning');
+        return results;
+      }
+
+      // Get unique channel IDs to scan (avoid duplicates)
+      const channelIds = this.getUniqueDiscordChannelIds();
+      this.logger.info(`Scanning ${channelIds.length} unique Discord channels for existing content...`);
+
+      // Scan limit per channel (configurable)
+      const scanLimit = parseInt(this.config.get('DISCORD_SCAN_LIMIT', '200'), 10);
+
+      for (const channelId of channelIds) {
+        try {
+          const channel = await this.discord.client.channels.fetch(channelId);
+          if (!channel) {
+            this.logger.warn(`Could not fetch Discord channel ${channelId}`);
+            continue;
+          }
+
+          this.logger.debug(`Scanning Discord channel ${channelId} (${channel.name || 'unnamed'}) for X content...`);
+
+          // Scan for tweet URLs
+          const tweetScanResults = await this.duplicateDetector.scanDiscordChannelForTweets(channel, scanLimit);
+          results.totalMarked += tweetScanResults.tweetIdsAdded;
+          results.channelsScanned++;
+
+          this.logger.debug(
+            `Channel ${channelId}: found ${tweetScanResults.tweetIdsFound.length} tweets, marked ${tweetScanResults.tweetIdsAdded} new ones`
+          );
+
+          if (tweetScanResults.errors.length > 0) {
+            results.errors.push({
+              channelId,
+              type: 'tweet_scan_errors',
+              errors: tweetScanResults.errors,
+            });
+          }
+
+          // Rate limiting between channels
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          this.logger.warn(`Error scanning Discord channel ${channelId}:`, error.message);
+          results.errors.push({
+            channelId,
+            type: 'channel_access_error',
+            message: error.message,
+          });
+        }
+      }
+
+      this.logger.info(
+        `Discord channel scan complete: ${results.channelsScanned} channels scanned, ${results.totalMarked} content items marked as seen`
+      );
+    } catch (error) {
+      this.logger.error('Error during Discord channel scanning:', error);
+      results.errors.push({
+        type: 'general_scan_error',
+        message: error.message,
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get unique Discord channel IDs to prevent scanning the same channel multiple times
+   * @returns {Array<string>} Array of unique channel IDs
+   */
+  getUniqueDiscordChannelIds() {
+    const channelIds = new Set();
+
+    // Add X-related channels (these are the ones that would have X content)
+    const xPostsChannelId = this.config.get('DISCORD_X_POSTS_CHANNEL_ID');
+    const xRepliesChannelId = this.config.get('DISCORD_X_REPLIES_CHANNEL_ID');
+    const xQuotesChannelId = this.config.get('DISCORD_X_QUOTES_CHANNEL_ID');
+    const xRetweetsChannelId = this.config.get('DISCORD_X_RETWEETS_CHANNEL_ID');
+
+    if (xPostsChannelId) {
+      channelIds.add(xPostsChannelId);
+    }
+    if (xRepliesChannelId) {
+      channelIds.add(xRepliesChannelId);
+    }
+    if (xQuotesChannelId) {
+      channelIds.add(xQuotesChannelId);
+    }
+    if (xRetweetsChannelId) {
+      channelIds.add(xRetweetsChannelId);
+    }
+
+    // If retweets channel not configured, it defaults to posts channel (already added above)
+
+    this.logger.debug(
+      `Identified ${channelIds.size} unique Discord channels for X content scanning:`,
+      Array.from(channelIds)
+    );
+
+    return Array.from(channelIds);
   }
 
   async dispose() {

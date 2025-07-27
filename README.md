@@ -221,7 +221,7 @@ The bot uses **Playwright** for X and YouTube web scraping with comprehensive re
 All reliability features are configurable through environment variables (see
 [Configuration](#-configuration) section):
 
-- `MAX_CONTENT_AGE_HOURS=2` - Only announce content newer than 2 hours
+- `MAX_CONTENT_AGE_HOURS=24` - Only announce content newer than 24 hours
 - `ENABLE_CONTENT_FINGERPRINTING=true` - Enable advanced duplicate detection
 - `ENABLE_LIVESTREAM_MONITORING=true` - Enable livestream state tracking
 - `CONTENT_STORAGE_DIR=data` - Directory for persistent storage
@@ -513,7 +513,7 @@ All configuration is managed through the `.env` file.
 | `DISCORD_BURST_ALLOWANCE`          | Number of quick Discord messages allowed per burst period.                 | No       | `2`                   |
 | `DISCORD_MAX_BUFFER_SIZE`          | Maximum Discord log message buffer size before flushing.                   | No       | `30`                  |
 | **Content Detection Reliability**  |                                                                            |          |                       |
-| `MAX_CONTENT_AGE_HOURS`            | Maximum age in hours for content to be considered "new" and announced.     | No       | `2`                   |
+| `MAX_CONTENT_AGE_HOURS`            | Maximum age in hours for content to be considered "new" and announced.     | No       | `24`                  |
 | `ENABLE_CONTENT_FINGERPRINTING`    | Enable enhanced duplicate detection using content fingerprinting.          | No       | `true`                |
 | `ENABLE_LIVESTREAM_MONITORING`     | Enable scheduled livestream state monitoring and transitions.              | No       | `true`                |
 | `ENABLE_CROSS_VALIDATION`          | Enable cross-system content validation between detection sources.          | No       | `true`                |

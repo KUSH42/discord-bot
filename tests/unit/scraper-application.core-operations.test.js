@@ -105,7 +105,7 @@ describe('ScraperApplication Core Operations', () => {
         X_QUERY_INTERVAL_MAX: '600000',
         X_DEBUG_SAMPLING_RATE: '0.1',
         X_VERBOSE_LOG_SAMPLING_RATE: '0.05',
-        CONTENT_BACKOFF_DURATION_HOURS: '2',
+        MAX_CONTENT_AGE_HOURS: '24',
         INITIALIZATION_WINDOW_HOURS: '24',
         TWITTER_EMAIL: 'test@example.com',
       };
