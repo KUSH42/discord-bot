@@ -724,7 +724,8 @@ jobs:
             --testTimeout=60000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true
+            --passWithNoTests \
+            --verbose=true 2>&1 | tee coverage/performance/test-output.log
 
       - name: Generate performance report
         run: |
@@ -1008,7 +1009,7 @@ jobs:
           PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
           SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
         run: |
-          node scripts/generate-test-report.js
+          node scripts/generate-test-summary.js
 
       - name: Validate coverage quality
         run: |

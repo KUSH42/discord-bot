@@ -6,9 +6,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "setup-encryption": "node scripts/setup-encryption.js",
+    "setup-encryption": "node scripts/development/setup-encryption.js",
     "decrypt": "npx dotenvx run -- node index.js",
-    "validate": "node scripts/test-validation.js",
+    "validate": "node scripts/testing/test-validation.js",
     "prestart": "npm run validate",
     "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest",
     "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",

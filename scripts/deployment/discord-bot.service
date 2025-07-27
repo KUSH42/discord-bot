@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=%i
 Environment="DISPLAY=:99"
-ExecStart=%h/discord-bot/scripts/start-bot.sh
+ExecStart=%h/discord-bot/scripts/deployment/start-bot.sh
 Restart=on-failure
 RestartSec=10s
 StandardOutput=syslog

@@ -3,8 +3,8 @@
 /usr/bin/Xvfb :99 -screen 0 1280x720x24 -nolisten tcp &
 # Wait a few seconds for Xvfb to initialize
 sleep 2
-# Change to the project directory (assuming script is in project root)
-cd "$(dirname "$0")"
+# Change to the project directory (script is now in scripts/deployment/)
+cd "$(dirname "$0")/../.."
 # Install dependencies
 if command -v npm &> /dev/null; then
     npm install

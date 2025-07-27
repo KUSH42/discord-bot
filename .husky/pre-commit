@@ -22,7 +22,7 @@ fi
 
 # Increment build number
 echo "📈 Incrementing build number..."
-node scripts/increment-build.js
+node scripts/development/increment-build.js
 
 # Check if build increment succeeded
 if [ $? -ne 0 ]; then
