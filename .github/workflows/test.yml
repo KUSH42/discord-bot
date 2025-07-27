@@ -841,9 +841,8 @@ jobs:
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
             --testTimeout=20000 \
-            --forceExit \
-            --detectOpenHandles 
-
+            --forceExit 
+            
       - name: Run security audit
         run: |
           npm audit --audit-level=moderate --json > security-audit.json || true
