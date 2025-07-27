@@ -243,7 +243,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          mkdir -p coverage/unit
+          mkdir -p coverage/unit test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=jest.ci.config.js \
@@ -254,7 +254,10 @@ jobs:
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
+            --verbose=true \
+            --reporters=default \
+            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "unit-tests-node${{ matrix.node-version }}.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
+            2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
@@ -272,7 +275,7 @@ jobs:
           name: unit-test-results-node${{ matrix.node-version }}
           path: |
             coverage/unit/
-            junit.xml
+            test-results/unit-tests-node${{ matrix.node-version }}.xml
           retention-days: 7
 
 # Build and Push Docker Image
@@ -497,7 +500,7 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p coverage/integration
+          mkdir -p coverage/integration test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --config=jest.ci.config.js \
@@ -507,7 +510,10 @@ jobs:
             --testTimeout=15000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/integration/test-output.log
+            --verbose=true \
+            --reporters=default \
+            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "integration-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
+            2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v4
@@ -525,6 +531,7 @@ jobs:
           name: integration-test-results
           path: |
             coverage/integration/
+            test-results/integration-tests.xml
             logs/
           retention-days: 7
 
@@ -604,7 +611,7 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p coverage/e2e
+          mkdir -p coverage/e2e test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
             --coverage \
@@ -613,24 +620,18 @@ jobs:
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
-            --verbose=true 2>&1 | tee coverage/e2e/test-output.log
+            --verbose=true \
+            --reporters=default \
+            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "e2e-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
+            2>&1 | tee coverage/e2e/test-output.log
 
 
-      - name: Upload unit test coverage
+      - name: Upload E2E test coverage
         uses: codecov/codecov-action@v4
         with:
           file: coverage/e2e/lcov.info
-          flags: e2e-node${{ matrix.node-version }}
-          name: e2e-tests-node${{ matrix.node-version }}
-          fail_ci_if_error: false
-          plugins: ''
-
-      - name: Upload unit test coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/e2e/lcov.info
-          flags: e2e-node${{ matrix.node-version }}
-          name: e2e-tests-node${{ matrix.node-version }}
+          flags: e2e
+          name: e2e-tests
           fail_ci_if_error: false
           plugins: ''
 
@@ -641,11 +642,10 @@ jobs:
           name: e2e-test-results
           path: |
             coverage/e2e/
-            coverage/e2e/
+            test-results/e2e-tests.xml
             logs/
             screenshots/
             .env.e2e
-            test-results/e2e/
           retention-days: 7
           if-no-files-found: warn
 
@@ -700,7 +700,7 @@ jobs:
 
       - name: Run performance tests
         run: |
-          mkdir -p coverage/performance
+          mkdir -p coverage/performance test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
@@ -711,7 +711,10 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --passWithNoTests \
-            --verbose=true 2>&1 | tee coverage/performance/test-output.log
+            --verbose=true \
+            --reporters=default \
+            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "performance-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]' \
+            2>&1 | tee coverage/performance/test-output.log
 
       - name: Generate performance report
         run: |
@@ -772,6 +775,7 @@ jobs:
           name: performance-test-results
           path: |
             coverage/performance/
+            test-results/performance-tests.xml
             reports/
             performance-metrics.json
           retention-days: 30
@@ -825,13 +829,15 @@ jobs:
 
       - name: Run security tests
         run: |
-          mkdir -p test-results/security
+          mkdir -p test-results/security test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
             --testTimeout=20000 \
             --forceExit \
-            --detectOpenHandles
+            --detectOpenHandles \
+            --reporters=default \
+            --reporters='["jest-junit", {"outputDirectory": "test-results", "outputName": "security-tests.xml", "classNameTemplate": "{classname}", "titleTemplate": "{title}", "ancestorSeparator": " › ", "usePathForSuiteName": true, "addFileAttribute": true, "includeConsoleOutput": false}]'
 
       - name: Run security audit
         run: |
@@ -880,6 +886,7 @@ jobs:
           path: |
             security-audit.json
             security-report.json
+            test-results/security-tests.xml
             test-results/security/
           retention-days: 30
 
