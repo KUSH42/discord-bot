@@ -46,11 +46,7 @@ describe('ScraperApplication Content Detection', () => {
         X_QUERY_INTERVAL_MAX: '600000',
         X_DEBUG_SAMPLING_RATE: '0.1',
         X_VERBOSE_LOG_SAMPLING_RATE: '0.05',
-<<<<<<< HEAD
-        MAX_CONTENT_AGE_HOURS: '2',
-=======
         MAX_CONTENT_AGE_HOURS: '24',
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       };
       return defaults[key] || defaultValue;
     });
@@ -126,16 +122,15 @@ describe('ScraperApplication Content Detection', () => {
       expect(newTweets).toHaveLength(1);
       expect(newTweets[0].tweetID).toBe('2');
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweets[1].url);
-<<<<<<< HEAD
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Filtering results: 1 new, 1 duplicates, 0 old content',
+      // Check that operation was logged with success (uses info level)
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Tweet filtering completed'),
         expect.objectContaining({
-          module: 'scraper',
+          newTweets: 1,
+          duplicates: 1,
+          oldContent: 0,
         })
       );
-=======
-      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Filtering results:'));
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
     it('should filter out old content', async () => {
@@ -164,16 +159,15 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(newTweets).toHaveLength(1);
       expect(newTweets[0].tweetID).toBe('2');
-<<<<<<< HEAD
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Filtering results: 1 new, 0 duplicates, 1 old content',
+      // Check that operation was logged with success (uses info level)
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Tweet filtering completed'),
         expect.objectContaining({
-          module: 'scraper',
+          newTweets: 1,
+          duplicates: 0,
+          oldContent: 1,
         })
       );
-=======
-      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Filtering results:'));
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
     it('should log debug information with sampling', async () => {
@@ -264,15 +258,8 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(false);
       expect(mockLogger.debug).toHaveBeenCalledWith(
-<<<<<<< HEAD
-        'Tweet 1 already known (duplicate), not new',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-=======
         expect.stringContaining('Tweet 1 already known (duplicate'),
         expect.any(Object)
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
@@ -294,16 +281,7 @@ describe('ScraperApplication Content Detection', () => {
       const result = await scraperApp.isNewContent(tweet);
 
       expect(result).toBe(false);
-<<<<<<< HEAD
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Tweet 1 is too old'),
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
-=======
       expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Tweet 1 is too old'), expect.any(Object));
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
     it('should return true for content within max age', async () => {
@@ -325,15 +303,8 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(true);
       expect(mockLogger.debug).toHaveBeenCalledWith(
-<<<<<<< HEAD
-        'Tweet 1 passed all checks, considering as new',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-=======
         expect.stringContaining('Tweet 1 passed all checks, considering as new'),
         expect.any(Object)
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
@@ -350,15 +321,8 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(true);
       expect(mockLogger.debug).toHaveBeenCalledWith(
-<<<<<<< HEAD
-        'No timestamp for tweet 1, considering as new',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-=======
         expect.stringContaining('No timestamp for tweet 1, considering as new'),
         expect.any(Object)
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
@@ -379,13 +343,8 @@ describe('ScraperApplication Content Detection', () => {
 
       const result = await scraperApp.isNewContent(tweet);
 
-<<<<<<< HEAD
-      expect(result).toBe(false); // Should be false because default is 2 hours and tweet is 3 hours old
-      expect(mockConfig.get).toHaveBeenCalledWith('MAX_CONTENT_AGE_HOURS', '2');
-=======
       expect(result).toBe(true); // Should be true because default is 24 hours and tweet is 3 hours old
       expect(mockConfig.get).toHaveBeenCalledWith('MAX_CONTENT_AGE_HOURS', '24');
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
   });
 
@@ -417,8 +376,9 @@ describe('ScraperApplication Content Detection', () => {
 
       await scraperApp.performEnhancedRetweetDetection();
 
+      // Check that enhanced retweet detection operation was started (uses debug level)
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Performing enhanced retweet detection...',
+        expect.stringContaining('Starting operation: performEnhancedRetweetDetection'),
         expect.objectContaining({
           module: 'scraper',
         })
@@ -479,10 +439,12 @@ describe('ScraperApplication Content Detection', () => {
 
       await scraperApp.performEnhancedRetweetDetection();
 
+      // Check that error was logged with operation context (uses error level)
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error during enhanced retweet detection:',
+        expect.stringContaining('Error during enhanced retweet detection'),
         expect.objectContaining({
           module: 'scraper',
+          error: 'Retweet detection failed',
         })
       );
       // Should not rethrow error
@@ -522,10 +484,12 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(recentTweet.url);
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledTimes(2); // Once for each call
+      // Check that initialization completion was logged (uses info level)
       expect(mockLogger.info).toHaveBeenCalledWith(
-        '✅ Initialization complete: marked 2 recent posts as seen',
+        expect.stringContaining('Recent content initialization completed'),
         expect.objectContaining({
           module: 'scraper',
+          markedAsSeen: 2,
         })
       );
     });
@@ -536,14 +500,17 @@ describe('ScraperApplication Content Detection', () => {
 
       await scraperApp.initializeRecentContent();
 
+      // Check that initialization error was logged (uses error level)
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error during recent content initialization:',
+        expect.stringContaining('Error during recent content initialization'),
         expect.objectContaining({
           module: 'scraper',
+          error: 'Initialization failed',
         })
       );
+      // Check that warning was logged during initialization error
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Continuing with normal operation despite initialization error',
+        expect.stringContaining('Discord client not available'),
         expect.objectContaining({
           module: 'scraper',
         })
@@ -558,8 +525,9 @@ describe('ScraperApplication Content Detection', () => {
 
       await scraperApp.initializeRecentContent();
 
+      // Check for warning during retweet scan error
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Error during retweet initialization scan:',
+        expect.stringContaining('Discord client not available'),
         expect.objectContaining({
           module: 'scraper',
         })

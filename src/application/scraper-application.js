@@ -996,17 +996,10 @@ export class ScraperApplication {
       return false;
     }
 
-<<<<<<< HEAD
-    // Check: Is the content too old based on configurable backoff duration?
-    const backoffHours = this.config.get('MAX_CONTENT_AGE_HOURS', '2'); // Default 2 hours
-    const backoffMs = parseInt(backoffHours) * 60 * 60 * 1000;
-    const cutoffTime = new Date(Date.now() - backoffMs);
-=======
     // Check: Is the content too old based on MAX_CONTENT_AGE_HOURS?
     const maxAgeHours = this.config.get('MAX_CONTENT_AGE_HOURS', '24'); // Default 24 hours
     const maxAgeMs = parseInt(maxAgeHours) * 60 * 60 * 1000;
     const cutoffTime = new Date(Date.now() - maxAgeMs);
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
 
     if (tweet.timestamp) {
       const tweetTime = new Date(tweet.timestamp);
@@ -1461,37 +1454,23 @@ export class ScraperApplication {
     });
 
     try {
-<<<<<<< HEAD
-      operation.progress('Navigating to user profile for recent content scan');
-=======
       this.logger.info('Initializing with recent content to prevent old post announcements...');
-
-      // Scan recent content based on configuration to mark as seen
-      const initializationHours = parseInt(this.config.get('INITIALIZATION_WINDOW_HOURS', '24'), 10);
-      const initializationWindow = initializationHours * 60 * 60 * 1000; // Convert hours to milliseconds
-      const cutoffTime = new Date(Date.now() - initializationWindow);
-
-      let markedAsSeen = 0;
 
       // First, scan Discord channels for already announced content to avoid duplicates
       const discordScanResults = await this.scanDiscordChannelsForContent();
-      markedAsSeen += discordScanResults.totalMarked;
+      let markedAsSeen = discordScanResults.totalMarked;
       this.logger.info(
         `Discord channel scan: marked ${discordScanResults.totalMarked} content items from ${discordScanResults.channelsScanned} unique channels`
       );
 
       // Then navigate to user's profile to get recent content from X directly
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
+      operation.progress('Navigating to user profile for recent content scan');
       await this.navigateToProfileTimeline(this.xUser);
 
       operation.progress('Extracting recent tweets from profile');
       const tweets = await this.extractTweets();
 
-<<<<<<< HEAD
       operation.progress(`Marking recent tweets as seen within ${initializationHours}h window`);
-      let markedAsSeen = 0;
-=======
->>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       for (const tweet of tweets) {
         // Only mark tweets that are within our initialization window
         const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
