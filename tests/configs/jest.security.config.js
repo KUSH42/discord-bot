@@ -17,11 +17,11 @@ export default {
   testMatch: ['**/tests/security/**/*.test.js', '**/tests/security/**/*.spec.js'],
   testTimeout: 45000,
 
-  // Security test reporters
+  // Security test reporters - CI compatible configuration
   reporters: [
     'default',
     [
-      'jest-junit',
+      '<rootDir>/node_modules/jest-junit/index.js',
       {
         outputDirectory: 'test-results',
         outputName: 'security-tests.xml',
