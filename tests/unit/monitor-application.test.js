@@ -194,7 +194,13 @@ describe('MonitorApplication', () => {
 
       monitorApp.scheduleApiFallback();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Scheduling API fallback due to notification processing failure');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Scheduling API fallback due to notification processing failure',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.fallbackTimerId).toBeTruthy();
 
       // Fast forward the timer
@@ -209,7 +215,13 @@ describe('MonitorApplication', () => {
 
       monitorApp.scheduleApiFallback();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('API fallback is disabled');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'API fallback is disabled',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.fallbackTimerId).toBeNull();
       expect(monitorApp.performApiFallback).not.toHaveBeenCalled();
     });
@@ -220,7 +232,13 @@ describe('MonitorApplication', () => {
 
       monitorApp.scheduleApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('API fallback already scheduled, skipping');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'API fallback already scheduled, skipping',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should clear timer ID after fallback execution', async () => {
@@ -249,7 +267,13 @@ describe('MonitorApplication', () => {
       await Promise.resolve(); // Wait for async completion
 
       expect(monitorApp.fallbackTimerId).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith('API fallback execution failed:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'API fallback execution failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -271,14 +295,32 @@ describe('MonitorApplication', () => {
 
       await monitorApp.performApiFallback();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Performing API fallback check due to notification failure...');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Performing API fallback check due to notification failure...',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockYoutubeService.getChannelVideos).toHaveBeenCalledWith(monitorApp.youtubeChannelId, 5);
-      expect(mockLogger.warn).toHaveBeenCalledWith('API fallback found 2 videos from YouTube API.');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'API fallback found 2 videos from YouTube API.',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.processVideo).toHaveBeenCalledTimes(2);
       expect(monitorApp.processVideo).toHaveBeenCalledWith(mockVideos[0], 'api-fallback');
       expect(monitorApp.processVideo).toHaveBeenCalledWith(mockVideos[1], 'api-fallback');
       expect(monitorApp.stats.fallbackPolls).toBe(1);
-      expect(mockLogger.info).toHaveBeenCalledWith('API fallback check completed successfully');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'API fallback check completed successfully',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should handle case when no videos are found', async () => {
@@ -287,7 +329,13 @@ describe('MonitorApplication', () => {
 
       await monitorApp.performApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('No videos found in API fallback check');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'No videos found in API fallback check',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.processVideo).not.toHaveBeenCalled();
       expect(monitorApp.stats.fallbackPolls).toBe(1);
     });
@@ -298,7 +346,13 @@ describe('MonitorApplication', () => {
 
       await monitorApp.performApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('No videos found in API fallback check');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'No videos found in API fallback check',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.processVideo).not.toHaveBeenCalled();
     });
 
@@ -325,9 +379,18 @@ describe('MonitorApplication', () => {
       expect(monitorApp.processVideo).toHaveBeenCalledTimes(2);
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Error processing video video1 in API fallback:',
-        expect.any(Error)
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
       );
-      expect(mockLogger.info).toHaveBeenCalledWith('API fallback check completed successfully');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'API fallback check completed successfully',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should throw error when YouTube API call fails', async () => {
@@ -336,7 +399,13 @@ describe('MonitorApplication', () => {
 
       await expect(monitorApp.performApiFallback()).rejects.toThrow('YouTube API quota exceeded');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('API fallback check failed:', apiError);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'API fallback check failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.stats.fallbackPolls).toBe(1);
     });
   });
@@ -394,7 +463,13 @@ describe('MonitorApplication', () => {
       monitorApp.stopFallbackPolling();
 
       expect(monitorApp.fallbackTimerId).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith('Scheduled API fallback cleared');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Scheduled API fallback cleared',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should do nothing when no timer is scheduled', () => {

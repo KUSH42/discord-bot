@@ -30,7 +30,7 @@ I've analyzed the deeply flawed coverage merging system in your CI pipeline and 
 node scripts/merge-coverage-enhanced.js --search-paths "test-results,coverage" --output coverage/merged/lcov.info
 ```
 
-## 2. Professional Test Summary Generator (`scripts/generate-test-summary.js`)
+## 2. Professional Test Summary Generator (`scripts/testing/generate-test-summary.js`)
 
 **Features:**
 - **Quality Gates Assessment**: Coverage, test success rate, security checks
@@ -227,18 +227,18 @@ After implementation, you should see:
 ## Files Delivered
 
 ### Core Scripts
-1. **`scripts/merge-coverage-enhanced.js`** - Advanced LCOV merging with deduplication
-2. **`scripts/generate-test-summary.js`** - Professional test report generation
-3. **`scripts/ci-coverage-merger.js`** - GitHub Actions specialized coverage processor
-4. **`scripts/test-coverage-simple.js`** - Comprehensive system validation
+1. **`scripts/coverage/merge-coverage-enhanced.js`** - Advanced LCOV merging with deduplication
+2. **`scripts/testing/generate-test-summary.js`** - Professional test report generation
+3. **`scripts/ci/ci-coverage-merger.js`** - GitHub Actions specialized coverage processor
+4. **`scripts/coverage/test-coverage-simple.js`** - Comprehensive system validation
 
 ### Configuration & Documentation
-5. **`scripts/github-actions-coverage-replacement.yml`** - Updated CI workflow section
+5. **`scripts/ci/github-actions-coverage-replacement.yml`** - Updated CI workflow section
 6. **`docs/ENHANCED-COVERAGE-SYSTEM.md`** - Complete system documentation
 7. **`COVERAGE-SOLUTION-SUMMARY.md`** - This comprehensive overview
 
 ### Existing Enhanced
-8. **`scripts/merge-coverage.py`** - Python fallback merger (already existed, now integrated)
+8. **`scripts/coverage/merge-coverage.py`** - Python fallback merger (already existed, now integrated)
 
 ## Validation Results
 
