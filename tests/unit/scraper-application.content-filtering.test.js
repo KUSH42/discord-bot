@@ -56,6 +56,7 @@ describe('Content Filtering Logic', () => {
         const values = {
           X_QUERY_INTERVAL_MIN: '300000',
           X_QUERY_INTERVAL_MAX: '600000',
+          MAX_CONTENT_AGE_HOURS: '24',
         };
         return values[key] || defaultValue;
       }),
@@ -147,7 +148,7 @@ describe('Content Filtering Logic', () => {
 
       const oldTweet = {
         tweetID: '1234567890123456789',
-        timestamp: new Date(timestampUTC() - 24 * 60 * 60 * 1000).toISOString(), // 24 hours ago (older than 2h backoff)
+        timestamp: new Date(timestampUTC() - 25 * 60 * 60 * 1000).toISOString(), // 25 hours ago (older than 24h limit)
         url: 'https://x.com/testuser/status/1234567890123456789',
       };
 
@@ -160,7 +161,7 @@ describe('Content Filtering Logic', () => {
 
       const oldTweet = {
         tweetID: '1234567890123456789',
-        timestamp: new Date(timestampUTC() - 24 * 60 * 60 * 1000).toISOString(), // 24 hours ago (older than 2h backoff)
+        timestamp: new Date(timestampUTC() - 25 * 60 * 60 * 1000).toISOString(), // 25 hours ago (older than 24h limit)
         url: 'https://x.com/testuser/status/1234567890123456789',
       };
 
@@ -168,12 +169,12 @@ describe('Content Filtering Logic', () => {
       expect(result).toBe(false);
     });
 
-    it('should return true for tweets within the backoff window', async () => {
+    it('should return true for tweets within the content age limit', async () => {
       mockConfig.getBoolean.mockReturnValue(false);
 
       const newTweet = {
         tweetID: '1234567890123456781',
-        timestamp: new Date(timestampUTC() - 30 * 60 * 1000).toISOString(), // 30 minutes ago (within 2h backoff)
+        timestamp: new Date(timestampUTC() - 30 * 60 * 1000).toISOString(), // 30 minutes ago (within 24h limit)
         url: 'https://x.com/testuser/status/1234567890123456781',
       };
 

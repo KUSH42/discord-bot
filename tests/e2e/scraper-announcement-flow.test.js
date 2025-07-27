@@ -7,6 +7,7 @@ import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';
 import { ContentClassifier } from '../../src/core/content-classifier.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
+import { toISOStringUTC, nowUTC } from '../utilities/utc-time.js';
 
 /**
  * End-to-End tests for the complete scraper announcement flow
@@ -145,7 +146,7 @@ describe('Scraper Announcement Flow E2E', () => {
           X_QUERY_INTERVAL_MIN: '60000',
           X_QUERY_INTERVAL_MAX: '120000',
           ANNOUNCE_OLD_TWEETS: 'false',
-          MAX_CONTENT_AGE_HOURS: '2',
+          MAX_CONTENT_AGE_HOURS: '24',
           DISCORD_X_RETWEETS_CHANNEL_ID: '123456789012345682',
           DISCORD_X_REPLIES_CHANNEL_ID: '123456789012345680',
           DISCORD_X_QUOTES_CHANNEL_ID: '123456789012345681',

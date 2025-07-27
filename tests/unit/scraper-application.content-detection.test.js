@@ -46,7 +46,11 @@ describe('ScraperApplication Content Detection', () => {
         X_QUERY_INTERVAL_MAX: '600000',
         X_DEBUG_SAMPLING_RATE: '0.1',
         X_VERBOSE_LOG_SAMPLING_RATE: '0.05',
+<<<<<<< HEAD
         MAX_CONTENT_AGE_HOURS: '2',
+=======
+        MAX_CONTENT_AGE_HOURS: '24',
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       };
       return defaults[key] || defaultValue;
     });
@@ -122,12 +126,16 @@ describe('ScraperApplication Content Detection', () => {
       expect(newTweets).toHaveLength(1);
       expect(newTweets[0].tweetID).toBe('2');
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweets[1].url);
+<<<<<<< HEAD
       expect(mockLogger.debug).toHaveBeenCalledWith(
         'Filtering results: 1 new, 1 duplicates, 0 old content',
         expect.objectContaining({
           module: 'scraper',
         })
       );
+=======
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Filtering results:'));
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
     it('should filter out old content', async () => {
@@ -156,12 +164,16 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(newTweets).toHaveLength(1);
       expect(newTweets[0].tweetID).toBe('2');
+<<<<<<< HEAD
       expect(mockLogger.debug).toHaveBeenCalledWith(
         'Filtering results: 1 new, 0 duplicates, 1 old content',
         expect.objectContaining({
           module: 'scraper',
         })
       );
+=======
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Filtering results:'));
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
     it('should log debug information with sampling', async () => {
@@ -252,14 +264,19 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(false);
       expect(mockLogger.debug).toHaveBeenCalledWith(
+<<<<<<< HEAD
         'Tweet 1 already known (duplicate), not new',
         expect.objectContaining({
           module: 'scraper',
         })
+=======
+        expect.stringContaining('Tweet 1 already known (duplicate'),
+        expect.any(Object)
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
-    it('should return false for content older than backoff duration', async () => {
+    it('should return false for content older than max age', async () => {
       mockDuplicateDetector.isDuplicate.mockReturnValue(false);
       mockConfig.get.mockImplementation((key, defaultValue) => {
         if (key === 'MAX_CONTENT_AGE_HOURS') {
@@ -277,15 +294,19 @@ describe('ScraperApplication Content Detection', () => {
       const result = await scraperApp.isNewContent(tweet);
 
       expect(result).toBe(false);
+<<<<<<< HEAD
       expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('Tweet 1 is too old'),
         expect.objectContaining({
           module: 'scraper',
         })
       );
+=======
+      expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Tweet 1 is too old'), expect.any(Object));
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
 
-    it('should return true for content within backoff duration', async () => {
+    it('should return true for content within max age', async () => {
       mockDuplicateDetector.isDuplicate.mockReturnValue(false);
       mockConfig.get.mockImplementation((key, defaultValue) => {
         if (key === 'MAX_CONTENT_AGE_HOURS') {
@@ -304,10 +325,15 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(true);
       expect(mockLogger.debug).toHaveBeenCalledWith(
+<<<<<<< HEAD
         'Tweet 1 passed all checks, considering as new',
         expect.objectContaining({
           module: 'scraper',
         })
+=======
+        expect.stringContaining('Tweet 1 passed all checks, considering as new'),
+        expect.any(Object)
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
@@ -324,14 +350,19 @@ describe('ScraperApplication Content Detection', () => {
 
       expect(result).toBe(true);
       expect(mockLogger.debug).toHaveBeenCalledWith(
+<<<<<<< HEAD
         'No timestamp for tweet 1, considering as new',
         expect.objectContaining({
           module: 'scraper',
         })
+=======
+        expect.stringContaining('No timestamp for tweet 1, considering as new'),
+        expect.any(Object)
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
       );
     });
 
-    it('should use default backoff duration when not configured', async () => {
+    it('should use default max age when not configured', async () => {
       mockDuplicateDetector.isDuplicate.mockReturnValue(false);
       mockConfig.get.mockImplementation((key, defaultValue) => {
         if (key === 'MAX_CONTENT_AGE_HOURS') {
@@ -348,8 +379,13 @@ describe('ScraperApplication Content Detection', () => {
 
       const result = await scraperApp.isNewContent(tweet);
 
+<<<<<<< HEAD
       expect(result).toBe(false); // Should be false because default is 2 hours and tweet is 3 hours old
       expect(mockConfig.get).toHaveBeenCalledWith('MAX_CONTENT_AGE_HOURS', '2');
+=======
+      expect(result).toBe(true); // Should be true because default is 24 hours and tweet is 3 hours old
+      expect(mockConfig.get).toHaveBeenCalledWith('MAX_CONTENT_AGE_HOURS', '24');
+>>>>>>> 4083e71 (fix: Removed all mentions of CONTENT_BACKOFF_DURATION_HOURS:)
     });
   });
 
