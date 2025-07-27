@@ -122,14 +122,14 @@ export class ContentCoordinator {
     });
 
     try {
-      operation.progress('Starting content coordination');
+      operation.progress('🔄 Starting content coordination');
 
       // Check if content already exists in state management
-      operation.progress('Checking existing content state');
+      operation.progress('🔍 Checking existing content state');
       const existingState = this.contentStateManager.getContentState(contentId);
 
       if (existingState) {
-        operation.progress('Content already exists in state', {
+        operation.progress('📋 Content already exists in state', {
           existingSource: existingState.source,
           announced: existingState.announced,
         });
@@ -139,7 +139,7 @@ export class ContentCoordinator {
 
         if (!shouldProcess) {
           this.metrics.sourcePrioritySkips++;
-          operation.success('Skipping due to source priority', {
+          operation.success('⏭️ Skipping due to source priority', {
             existingSource: existingState.source,
             sourcePriority: this.sourcePriority,
           });
@@ -155,7 +155,7 @@ export class ContentCoordinator {
         // Check if already announced
         if (existingState.announced) {
           this.metrics.duplicatesSkipped++;
-          operation.success('Content already announced, skipping', {
+          operation.success('⏭️ Content already announced, skipping', {
             existingSource: existingState.source,
             announcedAt: existingState.lastUpdated,
           });
@@ -168,16 +168,16 @@ export class ContentCoordinator {
           };
         }
       } else {
-        operation.progress('New content detected');
+        operation.progress('✨ New content detected');
       }
 
       // Check for duplicates using enhanced detection
-      operation.progress('Checking for duplicates', { url: contentData.url });
+      operation.progress('🔍 Checking for duplicates', { url: contentData.url });
       const isDuplicate = await this.checkForDuplicates(contentData);
 
       if (isDuplicate) {
         this.metrics.duplicatesSkipped++;
-        operation.success('Duplicate content detected, skipping', { url: contentData.url });
+        operation.success('⏭️ Duplicate content detected, skipping', { url: contentData.url });
         return {
           action: 'skip',
           reason: 'duplicate_detected',
@@ -185,17 +185,17 @@ export class ContentCoordinator {
           contentId,
         };
       }
-      operation.progress('No duplicates found');
+      operation.progress('✅ No duplicates found');
 
       // Check if content is new enough to announce
-      operation.progress('Checking content age', {
+      operation.progress('📅 Checking content age', {
         publishedAt: contentData.publishedAt,
         currentTime: nowUTC().toISOString(),
       });
       const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, nowUTC());
 
       if (!isNew) {
-        operation.success('Content too old, skipping', {
+        operation.success('⏭️ Content too old, skipping', {
           publishedAt: contentData.publishedAt,
           currentTime: nowUTC().toISOString(),
         });
@@ -207,7 +207,7 @@ export class ContentCoordinator {
           publishedAt: contentData.publishedAt,
         };
       }
-      operation.progress('Content is new enough', { publishedAt: contentData.publishedAt });
+      operation.progress('✅ Content is new enough', { publishedAt: contentData.publishedAt });
 
       // Add to content state management if not exists
       if (!existingState) {
