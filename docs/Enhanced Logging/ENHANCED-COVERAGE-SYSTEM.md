@@ -37,7 +37,7 @@ This represents a **significant improvement** over the broken 0% results from th
 
 ### Core Components
 
-1. **Enhanced Coverage Merger** (`scripts/merge-coverage-enhanced.js`)
+1. **Enhanced Coverage Merger** (`scripts/coverage/merge-coverage-enhanced.js`)
    - Discovers coverage files across test types
    - Deduplicates identical files (e.g., Node 18/20 unit tests)
    - **Uses proven Python merger** for accurate statistics
@@ -52,7 +52,7 @@ This represents a **significant improvement** over the broken 0% results from th
    - Includes coverage analysis and recommendations
    - Links to CI artifacts and detailed reports
 
-3. **CI Coverage Merger** (`scripts/ci-coverage-merger.js`)
+3. **CI Coverage Merger** (`scripts/ci/ci-coverage-merger.js`)
    - Specialized for GitHub Actions environment
    - Handles artifact collection and organization
    - Sets GitHub Action outputs for workflow decisions
@@ -110,13 +110,13 @@ All Jest configurations now generate **structured test results** via the `jest-j
 #### Generate Coverage Summary
 ```bash
 # Use existing coverage files
-node scripts/merge-coverage-enhanced.js
+node scripts/coverage/merge-coverage-enhanced.js
 
 # Custom search paths
-node scripts/merge-coverage-enhanced.js --search-paths "test-results,coverage,artifacts"
+node scripts/coverage/merge-coverage-enhanced.js --search-paths "test-results,coverage,artifacts"
 
 # Specify output location
-node scripts/merge-coverage-enhanced.js --output ./merged/lcov.info
+node scripts/coverage/merge-coverage-enhanced.js --output ./merged/lcov.info
 ```
 
 #### Generate Test Summary
@@ -134,7 +134,7 @@ node scripts/testing/generate-test-summary.js --test-results ./artifacts/tests -
 #### Test the System
 ```bash
 # Run comprehensive tests
-node scripts/test-coverage-simple.js
+node scripts/coverage/test-coverage-simple.js
 
 # This validates:
 # - LCOV parsing and merging
@@ -156,7 +156,7 @@ Replace the existing coverage section in `.github/workflows/test.yml` with the e
       - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-          node scripts/ci-coverage-merger.js
+          node scripts/ci/ci-coverage-merger.js
 
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
@@ -273,7 +273,7 @@ lcov-html-report/                   # Interactive HTML report
 - Preserves unique coverage from different test types
 
 ### Robust Merging
-- **Primary: Custom Python merger** (scripts/merge-coverage.py)
+- **Primary: Custom Python merger** (scripts/coverage/merge-coverage.py)
 - **Deprecated: lcov-result-merger** ⚠️ **BROKEN** - strips essential coverage summary lines
 - Validates merged output with comprehensive statistics
 - Handles edge cases gracefully with intelligent fallbacks
@@ -357,7 +357,7 @@ lcov-html-report/                   # Interactive HTML report
 
 Enable verbose logging by setting debug flags:
 ```bash
-DEBUG=1 node scripts/ci-coverage-merger.js
+DEBUG=1 node scripts/ci/ci-coverage-merger.js
 ```
 
 This will provide detailed information about:
@@ -447,7 +447,7 @@ BRH:106     # Branches Hit
 
 ### Recommended Solution
 
-**Use the Python merger** (`scripts/merge-coverage.py`) which:
+**Use the Python merger** (`scripts/coverage/merge-coverage.py`) which:
 - ✅ Preserves all coverage summary lines
 - ✅ Provides accurate statistics (78% lines, 86% functions, 88% branches)
 - ✅ Handles file-level merging correctly
@@ -461,7 +461,7 @@ For issues with the enhanced coverage system:
 
 1. **Check the troubleshooting section** above
 2. **Review GitHub Actions logs** for detailed error messages
-3. **Run local tests** with `node scripts/test-coverage-simple.js`
+3. **Run local tests** with `node scripts/coverage/test-coverage-simple.js`
 4. **Create an issue** with:
    - Error messages and logs
    - Coverage files (if not sensitive)

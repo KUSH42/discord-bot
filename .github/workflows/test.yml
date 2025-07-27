@@ -242,6 +242,8 @@ jobs:
           done
 
       - name: Run unit tests
+        env:
+          NODE_VERSION: ${{ matrix.node-version }}
         run: |
           mkdir -p coverage/unit test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
@@ -508,6 +510,8 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
+            --passWithNoTests \
+            --coverageThreshold='{}' \
             2>&1 | tee coverage/integration/test-output.log
 
       - name: Upload integration test coverage

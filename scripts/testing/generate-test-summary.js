@@ -147,6 +147,10 @@ class TestSummaryGenerator {
               if (this.summary.tests[testType].status === 'unknown') {
                 this.summary.tests[testType] = testSuiteResults;
                 console.log(`✅ Loaded ${testType} results from ${xmlFile}`);
+              } else {
+                // Merge results from multiple XML files of the same type (e.g., unit-tests-node18.xml, unit-tests-node20.xml)
+                this.mergeTestResults(testType, testSuiteResults, xmlFile);
+                console.log(`🔄 Merged ${testType} results from ${xmlFile}`);
               }
             }
           }
@@ -157,6 +161,80 @@ class TestSummaryGenerator {
     } catch (error) {
       console.log(`⚠️  Error loading JUnit results: ${error.message}`);
     }
+  }
+
+  /**
+   * Merge results from multiple XML files of the same test type
+   */
+  mergeTestResults(testType, newResults, xmlFile) {
+    const existing = this.summary.tests[testType];
+
+    // Merge summary numbers
+    if (existing.summary && newResults.summary) {
+      existing.summary.total += newResults.summary.total || 0;
+      existing.summary.passed += newResults.summary.passed || 0;
+      existing.summary.failed += newResults.summary.failed || 0;
+      existing.summary.skipped += newResults.summary.skipped || 0;
+
+      // Parse and add time durations
+      const existingTime = this.parseTimeToSeconds(existing.summary.time);
+      const newTime = this.parseTimeToSeconds(newResults.summary.time);
+      existing.summary.time = this.formatSecondsToTime(existingTime + newTime);
+    }
+
+    // Merge extended suite data
+    if (existing.extended && newResults.extended) {
+      existing.extended.suites = existing.extended.suites || [];
+      if (newResults.extended.suites) {
+        existing.extended.suites.push(...newResults.extended.suites);
+      }
+    }
+
+    // Update status - fail if any part fails
+    if (newResults.status === 'failure') {
+      existing.status = 'failure';
+    }
+
+    // Update details to show merged information
+    const totalTests = existing.summary?.total || 0;
+    const totalFailures = existing.summary?.failed || 0;
+    const totalErrors = 0; // We don't track errors separately in our current format
+    const totalSkipped = existing.summary?.skipped || 0;
+    const totalTime = existing.summary?.time || '0s';
+
+    existing.details = `${totalTests} tests, ${totalFailures} failures, ${totalErrors} errors, ${totalSkipped} skipped (${totalTime})`;
+    existing.path = `${existing.path}, ${xmlFile}`; // Show both file paths
+  }
+
+  /**
+   * Parse time string to seconds (handles formats like "28.53s", "1m 30s", etc.)
+   */
+  parseTimeToSeconds(timeStr) {
+    if (!timeStr) {
+      return 0;
+    }
+
+    // Handle simple seconds format like "28.53s"
+    const secondsMatch = timeStr.match(/^([\d.]+)s?$/);
+    if (secondsMatch) {
+      return parseFloat(secondsMatch[1]);
+    }
+
+    // Handle more complex formats if needed
+    return 0;
+  }
+
+  /**
+   * Format seconds back to time string
+   */
+  formatSecondsToTime(seconds) {
+    if (seconds < 60) {
+      return `${seconds.toFixed(2)}s`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds.toFixed(2)}s`;
   }
 
   /**

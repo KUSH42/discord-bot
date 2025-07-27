@@ -340,12 +340,12 @@ async function setupDiscordLogging(container, config) {
   if (supportChannelId && process.env.NODE_ENV !== 'test') {
     const logger = container.resolve('logger');
     const discordService = container.resolve('discordService');
-    const logLevel = config.get('LOG_LEVEL', 'info');
+    const logLevel = config.get('LOG_LEVEL', 'debug');
 
     // Add Discord transport to existing logger with balanced rate limiting
     // Only log warn and above to Discord to reduce spam
     const discordTransport = new DiscordTransport({
-      level: 'warn', // Only log warnings, errors, and above to Discord
+      level: logLevel, // Only log warnings, errors, and above to Discord
       client: discordService.client,
       channelId: supportChannelId,
       flushInterval: 3000, // 3 seconds to match send delay

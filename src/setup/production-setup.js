@@ -350,7 +350,6 @@ async function setupLogging(container, config) {
         level: logLevel,
         format: createConsoleLogFormat(),
       }),
-
       // File transport with rotation
       new winston.transports.DailyRotateFile({
         level: logLevel,

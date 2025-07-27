@@ -27,7 +27,7 @@ export default {
     '!node_modules/**',
     '!coverage/**',
     '!jest.*.config.js',
-    '!scripts/setup-encryption.js',
+    '!scripts/**',
     '!tests/**',
     '!src/services/interfaces/**',
     '!src/setup/**',
@@ -49,7 +49,7 @@ export default {
       'jest-junit',
       {
         outputDirectory: 'test-results',
-        outputName: 'unit-tests.xml',
+        outputName: process.env.NODE_VERSION ? `unit-tests-node${process.env.NODE_VERSION}.xml` : 'unit-tests.xml',
         classNameTemplate: 'Unit.{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',

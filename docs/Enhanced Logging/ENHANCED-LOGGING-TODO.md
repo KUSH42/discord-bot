@@ -64,16 +64,10 @@ The enhanced logging system consists of:
 
 ### 🚧 **Pending Integrations**
 
-#### Browser Services - MEDIUM PRIORITY
+##### ContentClassifier
 - **Status**: 🚧 Not Started
-- **Module Name**: `browser`
-- **Location**: `src/services/implementations/playwright-browser-service.js`
-- **Complexity**: Medium (browser automation operations)
-- **Key Operations**:
-  - `launch()` - Browser initialization
-  - `goto()` - Page navigation
-  - `evaluate()` - Script execution
-- **Expected Benefits**: Browser automation debugging, page load tracking
+- **Module Name**: `api`
+- **Location**: `src/core/content-classifier.js`
 
 #### ContentCoordinator ✅ FULLY INTEGRATED
 - **Status**: ✅ Complete
@@ -83,12 +77,7 @@ The enhanced logging system consists of:
 - **Commands**: `!debug state true/false`, `!debug-level state 1-5`
 - **Benefits**: Content coordination visibility, race condition debugging, content processing pipeline tracking
 
-#### Core Services - LOW PRIORITY
-
-##### ContentClassifier
-- **Status**: 🚧 Not Started
-- **Module Name**: `api`
-- **Location**: `src/core/content-classifier.js`
+#### Core Services - MEDIUM PRIORITY
 
 ##### ContentStateManager  
 - **Status**: 🚧 Not Started
@@ -106,6 +95,17 @@ The enhanced logging system consists of:
 - **Location**: `src/core/command-processor.js`
 - **Key Operations**: Already has enhanced logging integration for debug commands
 - **Note**: May only need minor updates
+
+#### Browser Service - LOW PRIORITY - SERVICE TO BE REPLACED
+- **Status**: 🚧 Not Started
+- **Module Name**: `browser`
+- **Location**: `src/services/implementations/playwright-browser-service.js`
+- **Complexity**: Medium (browser automation operations)
+- **Key Operations**:
+  - `launch()` - Browser initialization
+  - `goto()` - Page navigation
+  - `evaluate()` - Script execution
+- **Expected Benefits**: Browser automation debugging, page load tracking
 
 ## Integration Checklist Template
 
