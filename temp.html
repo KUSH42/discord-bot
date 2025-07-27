@@ -1,0 +1,14 @@
+Apparently our enhanced retweet detection logic is flawed. It seems like the bot is also picking up tweets that are not retweets of our monitored X User Profile.
+We need to ensure that only actual retweets retweeted by our monitored user are considered for announcements.
+This is what the decorator of retweets roughly looks like:
+
+<article>
+    <!-- several other nested HTML elements-->
+    <a href="/{$X_USER_HANDLE}">
+        <span testid="socialContext">
+            <span>
+                <span></span>
+            </span>
+        </span>
+    </a>
+</article>

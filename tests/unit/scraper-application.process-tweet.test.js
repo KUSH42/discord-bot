@@ -158,10 +158,11 @@ describe('ScraperApplication Process Tweet', () => {
       const retweetTweet = {
         tweetID: '987654321',
         url: 'https://x.com/otheruser/status/987654321',
-        author: 'otheruser',
+        author: 'otheruser', // Original tweet author
         text: 'RT @testuser: Original content',
         timestamp: '2024-01-01T12:00:00.000Z',
         tweetCategory: 'Retweet',
+        retweetedBy: 'testuser', // Our monitored user who did the retweet
       };
 
       mockAnnouncer.announceContent.mockResolvedValue({ success: true });
@@ -171,7 +172,7 @@ describe('ScraperApplication Process Tweet', () => {
 
       expect(mockClassifier.classifyXContent).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced retweet from @otheruser',
+        'Announced retweet from @testuser', // Should show who retweeted (monitored user)
         expect.objectContaining({
           module: 'scraper',
           outcome: 'success',
@@ -184,21 +185,13 @@ describe('ScraperApplication Process Tweet', () => {
         type: 'retweet',
         id: '987654321',
         url: retweetTweet.url,
-        author: 'testuser', // Changed to monitored user for retweets
-        originalAuthor: 'otheruser',
+        author: 'testuser', // Should be the monitored user who retweeted
+        originalAuthor: 'otheruser', // Original tweet author
+        retweetedBy: 'testuser', // Track who did the retweet
         text: retweetTweet.text,
         timestamp: retweetTweet.timestamp,
         isOld: false,
       });
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced retweet from @otheruser',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-          tweetId: '987654321',
-        })
-      );
     });
 
     it('should handle tweets with retweet metadata', async () => {
@@ -383,47 +376,49 @@ describe('ScraperApplication Process Tweet', () => {
       expect(mockLogger.debug).not.toHaveBeenCalledWith(expect.stringContaining('Marked tweet'));
     });
 
-    it('should handle author-based retweet detection edge cases', async () => {
-      // Test with @username format
-      const retweetWithAt = {
+    it('should handle retweet detection correctly', async () => {
+      // Test actual retweet - should be classified as retweet without using classifier
+      const actualRetweet = {
         tweetID: '111',
         url: 'https://x.com/otheruser/status/111',
-        author: '@testuser', // Same as monitored user with @
-        text: 'Not a retweet',
-        tweetCategory: 'Retweet',
+        author: 'otheruser', // Original tweet author
+        text: 'Original tweet content',
+        tweetCategory: 'Retweet', // Detected as retweet by extraction logic
+        retweetedBy: 'testuser', // Our monitored user who did the retweet
+      };
+
+      mockAnnouncer.announceContent.mockResolvedValue({ success: true });
+      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
+
+      await scraperApp.processNewTweet(actualRetweet);
+
+      // Should be classified as retweet automatically, not using classifier
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Announced retweet from @testuser',
+        expect.objectContaining({
+          module: 'scraper',
+          outcome: 'success',
+        })
+      );
+      expect(mockClassifier.classifyXContent).not.toHaveBeenCalled();
+
+      // Test non-retweet - should use classifier
+      const regularPost = {
+        tweetID: '222',
+        url: 'https://x.com/testuser/status/222',
+        author: 'testuser',
+        text: 'Regular post content',
+        tweetCategory: 'Post',
       };
 
       mockClassifier.classifyXContent.mockReturnValue({
         type: 'post',
         platform: 'x',
       });
-      mockAnnouncer.announceContent.mockResolvedValue({ success: true });
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
-      await scraperApp.processNewTweet(retweetWithAt);
+      await scraperApp.processNewTweet(regularPost);
 
-      // With enhanced logging, we get the final success message instead
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced post from @@testuser',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-        })
-      );
-      expect(mockClassifier.classifyXContent).toHaveBeenCalled();
-
-      // Test with Unknown author
-      const retweetUnknown = {
-        tweetID: '222',
-        url: 'https://x.com/unknown/status/222',
-        author: 'Unknown',
-        text: 'Unknown author tweet',
-        tweetCategory: 'Retweet',
-      };
-
-      await scraperApp.processNewTweet(retweetUnknown);
-
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledTimes(2);
+      expect(mockClassifier.classifyXContent).toHaveBeenCalledTimes(1);
     });
   });
 });

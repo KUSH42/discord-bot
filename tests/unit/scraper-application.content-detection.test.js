@@ -211,7 +211,7 @@ describe('ScraperApplication Content Detection', () => {
       await scraperApp.filterNewTweets(tweets);
 
       expect(mockLogger.verbose).toHaveBeenCalledWith(
-        expect.stringContaining('Filtered out old tweet: 1 - timestamp:'),
+        expect.stringContaining('Filtered out old tweet: 1 - "Old tweet..." - timestamp:'),
         expect.objectContaining({
           module: 'scraper',
         })
@@ -425,7 +425,7 @@ describe('ScraperApplication Content Detection', () => {
       await scraperApp.performEnhancedRetweetDetection();
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Skipping tweet 1 as it is old.',
+        expect.stringContaining('Skipping old tweet 1 - "'),
         expect.objectContaining({
           module: 'scraper',
         })

@@ -434,10 +434,11 @@ describe('Tweet Processing Pipeline', () => {
     const mockRetweet = {
       tweetID: '1234567890',
       url: 'https://x.com/testuser/status/1234567890',
-      author: 'differentuser', // Different from xUser
+      author: 'differentuser', // Different from xUser (original tweet author)
       text: 'Some retweet content',
       timestamp: '2024-01-01T00:01:00Z',
       tweetCategory: 'Retweet',
+      retweetedBy: 'testuser', // Our monitored user who did the retweet
     };
 
     await scraperApp.processNewTweet(mockRetweet);
@@ -445,12 +446,13 @@ describe('Tweet Processing Pipeline', () => {
     // Should NOT call the classifier since it's an author-based retweet
     expect(mockContentClassifier.classifyXContent).not.toHaveBeenCalled();
 
-    // Should still announce the content as a retweet with correct author
+    // Should still announce the content as a retweet with correct author structure
     expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'retweet',
-        author: 'testuser', // Should be the monitored user, not the original author
+        author: 'testuser', // Should be the monitored user who retweeted
         originalAuthor: 'differentuser', // Original author stored separately
+        retweetedBy: 'testuser', // Track who did the retweet
         platform: 'x',
       })
     );

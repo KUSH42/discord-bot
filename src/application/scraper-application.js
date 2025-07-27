@@ -718,9 +718,10 @@ export class ScraperApplication {
           this.stats.totalTweetsAnnounced++;
           processedCount++;
         } else {
-          // Reduce frequency of old tweet skip logs
+          // Log filtered content with beginning of tweet text
           if (this.shouldLogVerbose()) {
-            this.logger.debug(`Skipping tweet ${tweet.tweetID} as it is old.`);
+            const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
+            this.logger.debug(`Skipping old tweet ${tweet.tweetID} - "${contentPreview}..." (${tweet.tweetCategory})`);
           }
           skippedCount++;
         }
@@ -856,24 +857,31 @@ export class ScraperApplication {
               tweetCategory = 'Quote';
             }
 
-            // Check for retweet - enhanced detection with author comparison
+            // Check for retweet - only when monitored user retweets someone else's content
             let isRetweet = false;
 
-            // Method 1: Check if author is different from monitored user
-            if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
-              isRetweet = true;
-            }
-
-            // Method 2: Check for social context element (modern retweet indicator)
-            if (!isRetweet) {
-              const socialContext = article.querySelector('[data-testid="socialContext"]');
-              if (socialContext && socialContext.innerText.includes('reposted')) {
+            // Method 1: Check for social context element with monitored user link (most reliable)
+            const socialContext = article.querySelector('[data-testid="socialContext"]');
+            if (socialContext) {
+              // Look for a link to our monitored user within the social context
+              const monitoredUserLink = socialContext.querySelector(`a[href="/${monitoredUser}"]`);
+              if (monitoredUserLink && socialContext.innerText.includes('reposted')) {
                 isRetweet = true;
               }
             }
 
-            // Method 3: Check for classic RT @ pattern
-            if (!isRetweet && text.startsWith('RT @')) {
+            // Method 2: Check for classic RT @ pattern (only if it's our monitored user doing the RT)
+            if (!isRetweet && text.startsWith('RT @') && (author === monitoredUser || author === `@${monitoredUser}`)) {
+              isRetweet = true;
+            }
+
+            // Method 3: Fallback - if social context says "reposted" and we're on the monitored user's timeline
+            if (
+              !isRetweet &&
+              socialContext &&
+              socialContext.innerText.includes('reposted') &&
+              window.location.href.includes(`/${monitoredUser}`)
+            ) {
               isRetweet = true;
             }
 
@@ -881,14 +889,21 @@ export class ScraperApplication {
               tweetCategory = 'Retweet';
             }
 
-            tweets.push({
+            const tweetData = {
               tweetID,
               url,
               author,
               text,
               timestamp,
               tweetCategory,
-            });
+            };
+
+            // For retweets, add retweetedBy property to track who did the retweet
+            if (isRetweet) {
+              tweetData.retweetedBy = monitoredUser;
+            }
+
+            tweets.push(tweetData);
           } catch (_err) {
             // console.error('Error extracting tweet:', _err);
           }
@@ -947,13 +962,17 @@ export class ScraperApplication {
             this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${tweet.text.substring(0, 50)}...`);
           } else {
             oldContentCount++;
-            // Reduce frequency of old tweet filtering logs
-            this.logger.verbose(`Filtered out old tweet: ${tweet.tweetID} - timestamp: ${tweet.timestamp}`);
+            // Log filtered content with beginning of tweet text
+            const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
+            this.logger.verbose(
+              `Filtered out old tweet: ${tweet.tweetID} - "${contentPreview}..." - timestamp: ${tweet.timestamp}`
+            );
           }
         } else {
           duplicateCount++;
-          // Reduce frequency of duplicate filtering logs
-          this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID}`);
+          // Log filtered duplicate content with beginning of tweet text
+          const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
+          this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID} - "${contentPreview}..."`);
         }
       }
 
@@ -1085,7 +1104,7 @@ export class ScraperApplication {
       }
 
       operation.progress('Classifying tweet content');
-      // Check if this is a retweet based on author comparison (bypass classifier)
+      // Check if this is a retweet (where our monitored user retweeted someone else's content)
       let classification;
       if (
         tweet.tweetCategory === 'Retweet' &&
@@ -1093,19 +1112,20 @@ export class ScraperApplication {
         tweet.author !== `@${this.xUser}` &&
         tweet.author !== 'Unknown'
       ) {
-        // Bypass classifier for author-based retweets - send directly to retweet channel
+        // True retweet: monitored user retweeted someone else's content
         classification = {
           type: 'retweet',
           confidence: 0.99,
           platform: 'x',
           details: {
             statusId: tweet.tweetID,
-            author: tweet.author,
-            detectionMethod: 'author-based',
+            originalAuthor: tweet.author, // The original tweet author
+            retweetedBy: this.xUser, // Our monitored user who did the retweet
+            detectionMethod: 'social-context-based',
           },
         };
       } else {
-        // Use classifier for other tweets
+        // Use classifier for other tweets (including same-author tweets incorrectly marked as retweet)
         classification = this.classifier.classifyXContent(tweet.url, tweet.text, metadata);
       }
 
@@ -1116,8 +1136,9 @@ export class ScraperApplication {
         type: classification.type,
         id: tweet.tweetID,
         url: tweet.url,
-        author: classification.type === 'retweet' ? this.xUser : tweet.author,
-        originalAuthor: tweet.author, // Store original author for retweets
+        author: tweet.retweetedBy || tweet.author, // Use retweetedBy for retweets, otherwise original author
+        originalAuthor: tweet.author, // Always store the original tweet author
+        retweetedBy: tweet.retweetedBy, // Track who did the retweet (if applicable)
         text: tweet.text,
         timestamp: tweet.timestamp,
         isOld: !(await this.isNewContent(tweet)),
@@ -1140,7 +1161,8 @@ export class ScraperApplication {
       });
 
       if (result.success) {
-        operation.success(`Announced ${classification.type} from @${tweet.author}`, {
+        const authorInfo = tweet.retweetedBy ? `@${tweet.retweetedBy}` : `@${tweet.author}`;
+        operation.success(`Announced ${classification.type} from ${authorInfo}`, {
           tweetId: tweet.tweetID,
           classificationType: classification.type,
           announcementResult: result,
@@ -1157,6 +1179,7 @@ export class ScraperApplication {
           {
             tweetId: tweet.tweetID,
             author: tweet.author,
+            retweetedBy: tweet.retweetedBy,
             classificationType: classification.type,
           }
         );
