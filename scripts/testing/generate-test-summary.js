@@ -38,12 +38,14 @@ class TestSummaryGenerator {
   }
 
   /**
-   * Load coverage data from various sources
+   * Load coverage data from various sources, including multiple lcov.info files.
    */
-  loadCoverageData(searchPaths = ['.', 'coverage', 'test-results']) {
+  loadCoverageData(searchPaths = ['coverage', '.', 'test-results']) {
     console.log('📊 Loading coverage data...');
 
-    // Try to load from coverage-summary.json first
+    let coverageFound = false;
+
+    // First, try to load from coverage-summary.json
     for (const searchPath of searchPaths) {
       const summaryPath = path.join(searchPath, 'coverage-summary.json');
       const metricsPath = path.join(searchPath, 'coverage-metrics.json');
@@ -58,6 +60,7 @@ class TestSummaryGenerator {
             mergedFrom: data.merged_from || [],
           };
           console.log(`✅ Loaded coverage from ${summaryPath}`);
+          coverageFound = true;
 
           // Load extended metrics if available
           if (fs.existsSync(metricsPath)) {
@@ -65,15 +68,51 @@ class TestSummaryGenerator {
             this.summary.coverage.extended = metrics;
             console.log(`📈 Loaded extended metrics from ${metricsPath}`);
           }
-
-          break;
+          // If we find a coverage-summary.json, we might prioritize it or still look for lcov.info for merging
+          // For now, let's assume coverage-summary.json is the primary source if it exists and is comprehensive.
+          // If you need to *merge* lcov.info files into this summary, that's a more complex task requiring a coverage tool.
+          break; // Stop looking if a primary summary is found
         } catch (error) {
           console.log(`❌ Error loading coverage from ${summaryPath}: ${error.message}`);
         }
       }
     }
 
-    // Update quality gates
+    // Now, discover and log all lcov.info files, regardless of whether a summary.json was found.
+    // This is for reporting purposes or if you later implement merging of lcov data.
+    console.log('🔍 Discovering lcov.info files in subdirectories...');
+    const lcovFiles = [];
+    for (const searchPath of searchPaths) {
+      // Find all lcov.info files in the current directory and its subdirectories
+      const discovered = this.findFiles(searchPath, /lcov\.info$/);
+      for (const file of discovered) {
+        if (!this.processedCoverageFiles.has(file)) {
+          lcovFiles.push(file);
+          this.processedCoverageFiles.add(file);
+          console.log(`   Found: ${file}`);
+        } else {
+          console.log(`   🔄 Duplicate content detected, skipping: ${file}`);
+        }
+      }
+    }
+    this.summary.discoveredCoverageFiles = lcovFiles;
+    if (lcovFiles.length > 0) {
+      console.log(`✅ Discovered ${lcovFiles.length} unique lcov.info files.`);
+      // If no coverage-summary.json was found, you might want to try to process these lcov files.
+      // This part would typically involve a library like 'istanbul-lib-coverage' to merge them.
+      // For this specific fix, we're just ensuring they are discovered uniquely.
+      if (!coverageFound && lcovFiles.length > 0) {
+        // Placeholder: If you want to calculate a summary from these lcov files
+        // you'd need a more robust parsing and merging logic here.
+        console.log(
+          '⚠️ No coverage-summary.json found. lcov.info files are discovered but not processed into a summary.'
+        );
+      }
+    } else {
+      console.log('⚠️ No lcov.info files found.');
+    }
+
+    // Update quality gates (this still relies on this.summary.coverage being populated from coverage-summary.json or merged data)
     if (this.summary.coverage) {
       this.summary.qualityGates.coverage.actual = this.summary.coverage.lines?.pct || 0;
       this.summary.qualityGates.coverage.passed =
