@@ -40,7 +40,7 @@ export default {
     '!src/setup/**',
   ],
 
-  coverageDirectory: 'coverage/performance',
+  coverageDirectory: 'coverage/performance-tests',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
 
   // Performance test reporters

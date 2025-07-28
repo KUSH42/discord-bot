@@ -12,8 +12,7 @@ export default {
       lines: 0,
     },
   },
-  // Disable coverage for E2E tests by default since they don't exercise source code directly
-  collectCoverage: false,
+  collectCoverage: true,
   testMatch: ['<rootDir>/tests/e2e/**/*.test.js', '<rootDir>/tests/e2e/**/*.spec.js'],
   testTimeout: 60000,
 

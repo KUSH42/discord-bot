@@ -39,7 +39,7 @@ export default {
 
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 
-  coverageDirectory: 'coverage/unit',
+  coverageDirectory: `coverage/unit-tests-node${process.env.NODE_VERSION}`,
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
 
   // Unit test reporters

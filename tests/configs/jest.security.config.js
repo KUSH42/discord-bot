@@ -13,7 +13,7 @@ export default {
     },
   },
   // Disable coverage for security tests by default since they focus on input validation
-  collectCoverage: false,
+  collectCoverage: true,
   testMatch: ['**/tests/security/**/*.test.js', '**/tests/security/**/*.spec.js'],
   testTimeout: 45000,
 
