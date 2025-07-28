@@ -16,6 +16,7 @@ class CICoverageMerger {
   constructor() {
     this.workingDir = process.cwd();
     this.testResults = 'test-results';
+    this.coverageArtifacts = 'coverage-artifacts';
     this.outputDir = 'coverage';
     this.mergedDir = path.join(this.outputDir, 'merged');
     this.summary = {
@@ -40,6 +41,7 @@ class CICoverageMerger {
       console.log('🚀 CI Enhanced Coverage Merger Starting...');
       console.log(`📂 Working directory: ${this.workingDir}`);
       console.log(`📊 Test results path: ${this.testResults}`);
+      console.log(`📁 Coverage artifacts path: ${this.coverageArtifacts}`);
 
       // Step 1: Install required tools
       await this.installTools();
@@ -78,6 +80,16 @@ class CICoverageMerger {
             this.debugListDirectory('test-results', 2);
           } catch (error) {
             console.log(`  Error listing test-results: ${error.message}`);
+          }
+        }
+
+        // Debug: Check if coverage-artifacts exists and what's in it
+        if (fs.existsSync('coverage-artifacts')) {
+          console.log('🔧 Debug: coverage-artifacts directory contents:');
+          try {
+            this.debugListDirectory('coverage-artifacts', 2);
+          } catch (error) {
+            console.log(`  Error listing coverage-artifacts: ${error.message}`);
           }
         }
 
@@ -193,7 +205,14 @@ class CICoverageMerger {
       'coverage/performance-tests/lcov.info',
       'coverage/security-tests/lcov.info',
 
-      // GitHub Actions artifact patterns - CORRECTED PATHS
+      // GitHub Actions coverage artifact patterns (NEW - from coverage-artifacts/)
+      'coverage-artifacts/unit-tests-coverage-node18/lcov.info',
+      'coverage-artifacts/unit-tests-coverage-node20/lcov.info',
+      'coverage-artifacts/integration-tests-coverage/lcov.info',
+      'coverage-artifacts/e2e-tests-coverage/lcov.info',
+      'coverage-artifacts/performance-tests-coverage/lcov.info',
+
+      // GitHub Actions artifact patterns - LEGACY PATHS (fallback)
       // Based on actual workflow: coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }}
       'test-results/unit-tests-node18/lcov.info',
       'test-results/unit-tests-node20/lcov.info',
@@ -294,7 +313,12 @@ class CICoverageMerger {
         this.scanDirectoryForLcov('coverage', dynamicPaths);
       }
 
-      // Scan test-results directory if it exists (GitHub Actions artifacts)
+      // Scan coverage-artifacts directory if it exists (GitHub Actions coverage artifacts)
+      if (fs.existsSync('coverage-artifacts')) {
+        this.scanDirectoryForLcov('coverage-artifacts', dynamicPaths);
+      }
+
+      // Scan test-results directory if it exists (GitHub Actions artifacts - legacy)
       if (fs.existsSync('test-results')) {
         this.scanDirectoryForLcov('test-results', dynamicPaths);
       }
