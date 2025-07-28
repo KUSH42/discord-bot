@@ -262,7 +262,7 @@ jobs:
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: ccoverage/unit-test-node${{ matrix.node-version }}/lcov.info
+          file: coverage/unit-tests-node${{ matrix.node-version }}/lcov.info
           flags: unit-node${{ matrix.node-version }}
           name: unit-tests-node${{ matrix.node-version }}
           fail_ci_if_error: false
@@ -956,13 +956,12 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          pattern: '*-test-results*'
+          pattern: '*-test*'
           merge-multiple: true
           path: test-results/
 
       - name: Install enhanced coverage tools
         run: |
-          npm install --no-save lcov-result-merger || echo "Will use fallback merger"
           sudo apt-get update && sudo apt-get install -y lcov || echo "lcov install failed"
 
       - name: Enhanced coverage merging and analysis
@@ -973,21 +972,22 @@ jobs:
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
         run: |
-          LCOV_REPORT_DIR="lcov-html-report"
+          LCOV_REPORT_DIR="coverage/merged"
           mkdir -p "$LCOV_REPORT_DIR"
           
           if [ -d "assets/lcov" ]; then
-            find assets/lcov -name "*.css" -exec cp {} "$LCOV_REPORT_DIR/" \;
+            find assets/lcov -name "*.css" -exec cp {} "$LCOV_REPORT_DIR" \;
           fi
           
           if [ -f "coverage/merged/lcov.info" ]; then
             if genhtml coverage/merged/lcov.info \
               --output-directory "$LCOV_REPORT_DIR" \
-              --rc lcov_branch_coverage=1 \ 
-              --rc derive_function_end_line=0 \
+              --branch_coverage=1 \ 
+              --derive_function_end_line=0 \
               --title "Discord Bot - Enhanced Code Coverage Report" \
               --function-coverage \
               --prefix "$(pwd)" \
+              --include "-/**/lcov.info" \
               --legend \
               --show-details; then
               echo "✅ LCOV HTML report generated successfully"
@@ -1050,12 +1050,11 @@ jobs:
         with:
           name: comprehensive-test-report-${{ github.run_id }}
           path: |
-            coverage /
-            test-results /
-            reports /
-            coverage-summary.json /
-            coverage-metrics.json /
-            test-results 
+            coverage/
+            test-results/
+            reports/
+            coverage-summary.json
+            coverage-metrics.json
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
@@ -1063,7 +1062,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lcov-html-report
-          path: lcov-html-report/
+          path: coverage/html/
           retention-days: 14
           if-no-files-found: warn
 

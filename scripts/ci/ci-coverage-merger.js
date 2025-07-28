@@ -369,6 +369,11 @@ class CICoverageMerger {
         const fullPath = path.join(dirPath, entry.name);
 
         if (entry.isFile() && entry.name === 'lcov.info') {
+          // Skip files in the merged output directory to prevent circular merging
+          if (fullPath.includes('/merged/') && fullPath.includes('lcov.info')) {
+            console.log(`⏭️  Skipping merged file: ${fullPath}`);
+            continue;
+          }
           foundPaths.push(fullPath);
         } else if (entry.isDirectory() && maxDepth > 1) {
           this.scanDirectoryForLcov(fullPath, foundPaths, maxDepth - 1);
@@ -444,35 +449,34 @@ class CICoverageMerger {
   }
 
   /**
-   * Merge multiple LCOV files
+   * Merge multiple LCOV files using Python merger
    */
   async mergeMultipleLcovFiles(filePaths, outputPath) {
     console.log(`🔧 Merging ${filePaths.length} LCOV files...`);
 
     try {
-      // Try lcov-result-merger first
+      // Use proven Python merger directly (lcov-result-merger is broken)
+      const pythonMerger = path.join(path.dirname(new URL(import.meta.url).pathname), '../coverage/merge-coverage.py');
       const quotedPaths = filePaths.map(p => `"${p}"`).join(' ');
-      const command = `npx lcov-result-merger ${quotedPaths} "${outputPath}"`;
+      const command = `python3 "${pythonMerger}" ${quotedPaths} -o "${outputPath}"`;
 
       console.log(`Executing: ${command}`);
-      execSync(command, { stdio: 'pipe', encoding: 'utf8' });
-      console.log('✅ Used lcov-result-merger');
+      execSync(command, { stdio: 'inherit' });
+      console.log('✅ Used Python merger for accurate coverage');
 
-      // Check if the merge actually worked
-      if (fs.existsSync(outputPath)) {
-        const content = fs.readFileSync(outputPath, 'utf8');
-        if (content.trim().length < 10) {
-          console.log('⚠️  lcov-result-merger produced empty output, trying manual merge');
-          this.manualMergeLcovFiles(filePaths, outputPath);
-        } else {
-          console.log(`✅ lcov-result-merger succeeded: ${content.length} characters`);
-        }
-      } else {
-        console.log('⚠️  lcov-result-merger did not create output file, trying manual merge');
-        this.manualMergeLcovFiles(filePaths, outputPath);
+      // Verify the output file was created
+      if (!fs.existsSync(outputPath)) {
+        throw new Error('Python merger did not create output file');
       }
+
+      const content = fs.readFileSync(outputPath, 'utf8');
+      if (content.trim().length < 10) {
+        throw new Error('Python merger produced empty output');
+      }
+
+      console.log(`✅ Python merger succeeded: ${content.length} characters`);
     } catch (error) {
-      console.log(`⚠️  lcov-result-merger failed: ${error.message}`);
+      console.log(`⚠️  Python merger failed: ${error.message}`);
       console.log('Using manual merge fallback...');
       this.manualMergeLcovFiles(filePaths, outputPath);
     }

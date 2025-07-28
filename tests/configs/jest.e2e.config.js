@@ -48,7 +48,7 @@ export default {
       'jest-junit',
       {
         outputDirectory: 'test-results',
-        outputName: 'integration-tests.xml',
+        outputName: 'e2e-tests.xml',
         classNameTemplate: 'Integration.{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',
