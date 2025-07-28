@@ -64,6 +64,17 @@ try {
 }
 ```
 
+### Logging Objects
+- **String Templates**: Use `${JSON.stringify(object)}` to properly log object contents
+- **Enhanced Logger**: Objects as second parameter may not display properly - use JSON.stringify()
+```javascript
+// ❌ Incorrect - logs [object Object]
+operation.success('Completed with stats', stats);
+
+// ✅ Correct - shows actual object properties
+operation.success(`Completed with stats: ${JSON.stringify(stats)}`);
+```
+
 ### Browser Automation
 - Use `AsyncMutex` for operation synchronization
 - Validate browser/page health before operations

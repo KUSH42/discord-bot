@@ -954,7 +954,7 @@ export class ScraperApplication {
         }, {}),
       };
 
-      operation.success('Tweet extraction completed', stats);
+      operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);
 
       return tweets;
     } catch (error) {
