@@ -87,9 +87,9 @@ class TestSummaryGenerator {
       // Find all lcov.info files in the current directory and its subdirectories
       const discovered = this.findFiles(searchPath, /lcov\.info$/);
       for (const file of discovered) {
-        if (!this.processedCoverageFiles.has(file)) {
+        if (!this.summary.processedCoverageFiles.has(file)) {
           lcovFiles.push(file);
-          this.processedCoverageFiles.add(file);
+          this.summary.processedCoverageFiles.add(file);
           console.log(`   Found: ${file}`);
         } else {
           console.log(`   🔄 Duplicate content detected, skipping: ${file}`);
