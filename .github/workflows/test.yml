@@ -622,7 +622,7 @@ jobs:
             --verbose=true \
             2>&1 | tee coverage/e2e-tests/test-output.log
           echo "echo "Current working directory: $(pwd)""
-          ls -a
+          $(echo ls -a -F)
 
 
       - name: Upload E2E test coverage
@@ -713,9 +713,9 @@ jobs:
             --verbose=true \
             2>&1 | tee coverage/performance-tests/test-output.log
           echo "Current working directory: $(pwd)"
-          $(echo ll -a)
+          $(echo ls -a -F)
           cd coverage
-          $(echo ll -a)
+          $(echo ls -a -F)
           cd ..
 
 
@@ -841,7 +841,7 @@ jobs:
             --detectOpenHandles
           echo "Current working directory: $(pwd)"
           cd coverage
-          ls -a
+          ls -aF
           cd ..
 
       - name: Run security audit
