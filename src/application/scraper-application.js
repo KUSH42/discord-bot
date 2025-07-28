@@ -579,36 +579,13 @@ export class ScraperApplication {
       const searchUrl = this.generateSearchUrl(true);
       await this.browser.goto(searchUrl);
 
-      operation.progress('Waiting for content to load');
-      const contentSelectors = [
-        'article[data-testid="tweet"]',
-        'article[role="article"]',
-        'div[data-testid="cellInnerDiv"]',
-        'main[role="main"]',
-      ];
+      operation.progress('Waiting for search results to load');
+      // Wait for the primary column to load (same as profile timeline)
+      await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
 
-      let contentLoaded = false;
-      for (const selector of contentSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          contentLoaded = true;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!contentLoaded) {
-        operation.progress('No content selectors found, proceeding anyway');
-      }
-
-      operation.progress('Scrolling to load additional content');
-      for (let i = 0; i < 3; i++) {
-        /* eslint-disable no-undef */
-        await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        /* eslint-enable no-undef */
-        await this.delay(3000);
-      }
+      operation.progress('Performing enhanced scrolling to load search results');
+      // Use the same enhanced scrolling as retweet detection
+      await this.performEnhancedScrolling();
 
       operation.progress('Extracting tweets from page');
       const tweets = await this.extractTweets();
