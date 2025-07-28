@@ -171,9 +171,32 @@ async function startApplications(container, config) {
   const botApp = container.resolve('botApplication');
   await botApp.start();
 
-  // Start YouTube Monitor
-  const monitorApp = container.resolve('monitorApplication');
-  await monitorApp.start();
+  // Start YouTube Monitor with retry logic
+  let monitorStarted = false;
+  const maxRetries = 3;
+
+  for (let attempt = 1; attempt <= maxRetries && !monitorStarted; attempt++) {
+    try {
+      logger.info(`Starting YouTube Monitor (attempt ${attempt}/${maxRetries})...`);
+      const monitorApp = container.resolve('monitorApplication');
+      await monitorApp.start();
+      logger.info('✅ YouTube Monitor started successfully');
+      monitorStarted = true;
+    } catch (error) {
+      logger.error(`❌ YouTube Monitor startup attempt ${attempt} failed:`, error.message);
+
+      if (attempt < maxRetries) {
+        const delayMs = attempt * 2000; // 2s, 4s delays
+        logger.info(`Retrying YouTube Monitor startup in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        hasErrors = true;
+        logger.error('❌ Failed to start YouTube Monitor after all attempts');
+        logger.warn('YouTube Monitor will be disabled - bot will continue with limited functionality');
+        logger.warn('⚠️ This means YouTube duplicate detection will be disabled and old videos may be re-announced');
+      }
+    }
+  }
 
   // Start X Scraper (if enabled)
   const xUser = config.get('X_USER_HANDLE');
@@ -181,6 +204,7 @@ async function startApplications(container, config) {
     try {
       const scraperApp = container.resolve('scraperApplication');
       await scraperApp.start();
+      logger.info('✅ X Scraper started successfully');
     } catch (error) {
       hasErrors = true;
       logger.error('❌ Failed to start X Scraper application:', error.message);

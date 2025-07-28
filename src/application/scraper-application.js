@@ -1245,6 +1245,7 @@ export class ScraperApplication {
         retweetedBy: tweet.retweetedBy, // Track who did the retweet (if applicable)
         text: tweet.text,
         timestamp: tweet.timestamp,
+        publishedAt: tweet.timestamp, // ContentCoordinator expects publishedAt field
         tweetCategory: tweet.tweetCategory, // Pass category for classification
         xUser: this.xUser, // Pass monitored user for retweet detection
         isOld: !(await this.isNewContent(tweet)),

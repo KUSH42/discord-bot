@@ -96,10 +96,16 @@ describe('Tweet Processing and Duplicate Detection', () => {
       isAuthenticated: jest.fn().mockResolvedValue(true),
     };
 
+    // Mock content coordinator
+    const mockContentCoordinator = {
+      processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
+    };
+
     // Create scraper application instance
     scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
       contentClassifier: mockContentClassifier,
+      contentCoordinator: mockContentCoordinator,
       contentAnnouncer: mockContentAnnouncer,
       config: mockConfig,
       stateManager: mockStateManager,
@@ -329,10 +335,16 @@ describe('Tweet Processing Pipeline', () => {
       isAuthenticated: jest.fn().mockResolvedValue(true),
     };
 
+    // Mock content coordinator
+    const mockContentCoordinator = {
+      processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
+    };
+
     // Create scraper application instance
     scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
       contentClassifier: mockContentClassifier,
+      contentCoordinator: mockContentCoordinator,
       contentAnnouncer: mockContentAnnouncer,
       config: mockConfig,
       stateManager: mockStateManager,

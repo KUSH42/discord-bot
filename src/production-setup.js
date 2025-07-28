@@ -464,6 +464,50 @@ export function setupWebhookEndpoints(app, container) {
       res.status(503).send('Not Ready');
     }
   });
+
+  // Duplicate detector health check endpoint
+  app.get('/health/duplicate-detectors', (req, res) => {
+    try {
+      const scraperApp = container.resolve('scraperApplication');
+      const monitorApp = container.resolve('monitorApplication');
+
+      const scraperDetector = scraperApp.duplicateDetector;
+      const monitorDetector = monitorApp.duplicateDetector;
+
+      const scraperStats = scraperDetector ? scraperDetector.getStats() : null;
+      const monitorStats = monitorDetector ? monitorDetector.getStats() : null;
+
+      const health = {
+        scraperDuplicateDetector: {
+          available: !!scraperDetector,
+          stats: scraperStats,
+          healthy: !!(scraperDetector && scraperStats),
+        },
+        monitorDuplicateDetector: {
+          available: !!monitorDetector,
+          stats: monitorStats,
+          healthy: !!(monitorDetector && monitorStats),
+        },
+        overall: {
+          allHealthy: !!(scraperDetector && monitorDetector),
+          criticalIssue: !monitorDetector
+            ? 'YouTube duplicate detection disabled - old videos may be re-announced'
+            : null,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      const httpStatus = health.overall.allHealthy ? 200 : 503;
+      res.status(httpStatus).json(health);
+    } catch (error) {
+      logger.error('Error checking duplicate detector health:', error);
+      res.status(500).json({
+        error: 'Failed to check duplicate detector health',
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 }
 
 /**

@@ -1,7 +1,12 @@
 import { jest } from '@jest/globals';
-import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
-import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
+import {
+  createMockDependenciesWithEnhancedLogging,
+  createMockEnhancedLogger,
+} from '../utils/enhanced-logging-mocks.js';
+
+// Import the ContentCoordinator after mocking
+const { ContentCoordinator } = await import('../../src/core/content-coordinator.js');
 
 describe('ContentCoordinator', () => {
   let coordinator;
@@ -49,6 +54,7 @@ describe('ContentCoordinator', () => {
       mockContentStateManager,
       mockContentAnnouncer,
       mockDuplicateDetector,
+      { classify: jest.fn() }, // classifier
       mockLogger,
       mockConfig,
       mockDependencies.debugManager,
@@ -83,7 +89,7 @@ describe('ContentCoordinator', () => {
         mockContentAnnouncer,
         mockDuplicateDetector,
         mockLogger,
-        undefined, // no config
+        null, // no config
         mockDependencies.debugManager,
         mockDependencies.metricsManager
       );

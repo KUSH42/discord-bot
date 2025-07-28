@@ -37,7 +37,7 @@ class CoverageMerger {
    * Find all LCOV files in specified directories
    */
   findCoverageFiles(searchPaths) {
-    const patterns = ['coverage/**/lcov.info', 'test-results/**/lcov.info', '**/coverage/**/lcov.info'];
+    const patterns = ['C', './test-results/**/lcov.info', './coverage/**/lcov.info'];
 
     console.log('🔍 Searching for coverage files...');
 

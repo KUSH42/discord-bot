@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import crypto from 'crypto';
+import {
+  createMockWinstonLogger,
+  createMockDebugFlagManager,
+  createMockMetricsManager,
+  createMockEnhancedLogger,
+} from '../utils/enhanced-logging-mocks.js';
 import { MonitorApplication } from '../../src/application/monitor-application.js';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
@@ -216,38 +222,11 @@ describe('Scraper Announcement Flow E2E', () => {
     };
 
     // Mock enhanced logging dependencies
-    const mockDebugManager = {
-      isEnabled: jest.fn(() => false),
-      getLevel: jest.fn(() => 1),
-      toggleFlag: jest.fn(),
-      setLevel: jest.fn(),
-    };
+    const mockDebugManager = createMockDebugFlagManager();
+    const mockMetricsManager = createMockMetricsManager();
 
-    const mockMetricsManager = {
-      recordMetric: jest.fn(),
-      startTimer: jest.fn(() => ({ end: jest.fn() })),
-      incrementCounter: jest.fn(),
-      setGauge: jest.fn(),
-      recordHistogram: jest.fn(),
-    };
-
-    // Mock logger with actual console output for debugging
-    const mockLogger = {
-      info: jest.fn((msg, ...args) => console.log('INFO:', msg, ...args)),
-      warn: jest.fn((msg, ...args) => console.log('WARN:', msg, ...args)),
-      error: jest.fn((msg, ...args) => console.log('ERROR:', msg, ...args)),
-      debug: jest.fn((msg, ...args) => console.log('DEBUG:', msg, ...args)),
-      verbose: jest.fn((msg, ...args) => console.log('VERBOSE:', msg, ...args)),
-      child: jest.fn(() => mockLogger),
-      startOperation: jest.fn((name, context) => ({
-        progress: jest.fn(),
-        success: jest.fn((message, data) => data),
-        error: jest.fn((error, message, context) => {
-          throw error;
-        }),
-      })),
-      forOperation: jest.fn(() => mockLogger),
-    };
+    // Mock logger with proper Winston interface for enhanced logging
+    const mockLogger = createMockWinstonLogger();
 
     // Create core components
     contentClassifier = new ContentClassifier(mockConfig, mockLogger);
@@ -275,8 +254,11 @@ describe('Scraper Announcement Flow E2E', () => {
       contentStateManager,
       contentAnnouncer,
       duplicateDetector,
+      contentClassifier,
       mockLogger,
-      mockConfig
+      mockConfig,
+      mockDebugManager,
+      mockMetricsManager
     );
 
     // Set up mock dependencies
@@ -852,13 +834,7 @@ describe('Scraper Announcement Flow E2E', () => {
         return state[key] !== undefined ? state[key] : defaultValue;
       });
 
-      const mockLoggerWithCapture = {
-        ...mockDependencies.logger,
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-      };
+      const mockLoggerWithCapture = createMockEnhancedLogger();
 
       // Replace logger in all components
       contentAnnouncer.logger = mockLoggerWithCapture;

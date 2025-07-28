@@ -262,9 +262,9 @@ jobs:
             2>&1 | tee coverage/unit-tests-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/test-results-action@v1
         with:
-          file: coverage/unit-tests-node${{ matrix.node-version }}/lcov.info
+          file: test-results/unit-tests-node${{ matrix.node-version }}/unit-tests-node${{ matrix.node-version }}
           flags: unit-node${{ matrix.node-version }}
           name: unit-tests-node${{ matrix.node-version }}
           fail_ci_if_error: false

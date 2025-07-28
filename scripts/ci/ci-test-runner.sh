@@ -77,6 +77,7 @@ case "$TEST_TYPE" in
     ;;
   e2e)
     npm run test:e2e -- \
+      --coverage \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
       --coverageDirectory=coverage/$TEST_TYPE-tests \
@@ -100,6 +101,7 @@ case "$TEST_TYPE" in
     npm run test:security -- \
       --coverage \
       --coverageDirectory=coverage/$TEST_TYPE-tests \
+      --coverageReporters=lcov \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
       --forceExit \

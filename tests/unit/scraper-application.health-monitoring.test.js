@@ -49,7 +49,7 @@ describe('ScraperApplication Health Monitoring', () => {
       off: jest.fn(),
     };
 
-    mockLogger = enhancedLoggingMocks.logger;
+    mockLogger = enhancedLoggingMocks.enhancedLogger;
 
     mockContentCoordinator = {
       processContent: jest.fn().mockResolvedValue({ success: true }),
@@ -120,14 +120,15 @@ describe('ScraperApplication Health Monitoring', () => {
         errors: [],
       });
 
+      // Spy on the logger that actually gets used
+      const loggerSpy = jest.spyOn(scraperApp.logger, 'startOperation');
+
       scraperApp.startHealthMonitoring();
 
       expect(scraperApp.healthCheckInterval).toBeDefined();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Health monitoring started',
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'startHealthMonitoring',
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
           intervalMs: 300000,
           intervalSeconds: 300,
         })
@@ -137,11 +138,14 @@ describe('ScraperApplication Health Monitoring', () => {
     it('should start health monitoring with custom interval', () => {
       const customInterval = 120000; // 2 minutes
 
+      // Spy on the logger that actually gets used
+      const loggerSpy = jest.spyOn(scraperApp.logger, 'startOperation');
+
       scraperApp.startHealthMonitoring(customInterval);
 
       expect(scraperApp.healthCheckInterval).toBeDefined();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Health monitoring started',
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'startHealthMonitoring',
         expect.objectContaining({
           intervalMs: customInterval,
           intervalSeconds: 120,
@@ -166,17 +170,17 @@ describe('ScraperApplication Health Monitoring', () => {
       const performHealthCheckSpy = jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue({
         errors: [],
       });
+      const mockOperation = { success: jest.fn(), error: jest.fn() };
+      mockLogger.startOperation.mockReturnValue(mockOperation);
 
-      scraperApp.startHealthMonitoring(10000); // 10 seconds for testing
+      scraperApp.startHealthMonitoring(100); // 100ms for testing
 
       // Fast forward time to trigger health check
-      jest.advanceTimersByTime(10000);
-
-      // Allow async operations to complete
-      await new Promise(resolve => setImmediate(resolve));
+      jest.advanceTimersByTime(100);
+      await jest.runAllTimersAsync();
 
       expect(performHealthCheckSpy).toHaveBeenCalled();
-    });
+    }, 2000);
 
     it('should handle successful health checks', async () => {
       const healthResult = {
@@ -188,23 +192,17 @@ describe('ScraperApplication Health Monitoring', () => {
       };
 
       jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue(healthResult);
+      const mockOperation = { success: jest.fn(), error: jest.fn() };
+      mockLogger.startOperation.mockReturnValue(mockOperation);
 
-      scraperApp.startHealthMonitoring(10000);
+      scraperApp.startHealthMonitoring(100);
 
       // Trigger health check
-      jest.advanceTimersByTime(10000);
+      jest.advanceTimersByTime(100);
+      await jest.runAllTimersAsync();
 
-      // Allow async operations to complete
-      await new Promise(resolve => setImmediate(resolve));
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Health check passed',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-        })
-      );
-    });
+      expect(mockOperation.success).toHaveBeenCalledWith('Health check passed', healthResult);
+    }, 2000);
 
     it('should handle health check failures', async () => {
       const healthResult = {
@@ -217,49 +215,42 @@ describe('ScraperApplication Health Monitoring', () => {
 
       jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue(healthResult);
       jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
+      const mockOperation = { success: jest.fn(), error: jest.fn() };
+      mockLogger.startOperation.mockReturnValue(mockOperation);
 
-      scraperApp.startHealthMonitoring(10000);
+      scraperApp.startHealthMonitoring(100);
 
       // Trigger health check
-      jest.advanceTimersByTime(10000);
+      jest.advanceTimersByTime(100);
 
-      // Allow async operations to complete
-      await new Promise(resolve => setImmediate(resolve));
+      await jest.runAllTimersAsync();
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(mockOperation.error).toHaveBeenCalledWith(
+        expect.any(Error),
         'Health check detected problems',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'error',
-        })
+        healthResult
       );
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalled();
-    });
+    }, 2000);
 
     it('should handle health check exceptions', async () => {
       const healthCheckError = new Error('Health check crashed');
 
       jest.spyOn(scraperApp, 'performHealthCheck').mockRejectedValue(healthCheckError);
       jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
+      const mockOperation = { success: jest.fn(), error: jest.fn() };
+      mockLogger.startOperation.mockReturnValue(mockOperation);
 
-      scraperApp.startHealthMonitoring(10000);
+      scraperApp.startHealthMonitoring(100);
 
       // Trigger health check
-      jest.advanceTimersByTime(10000);
+      jest.advanceTimersByTime(100);
 
-      // Allow async operations to complete
-      await new Promise(resolve => setImmediate(resolve));
+      await jest.runAllTimersAsync();
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Health check failed',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'error',
-          error: 'Health check crashed',
-        })
-      );
+      expect(mockOperation.error).toHaveBeenCalledWith(healthCheckError, 'Health check failed');
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalledWith(healthCheckError);
-    });
+    }, 2000);
   });
 
   describe('stopHealthMonitoring', () => {
@@ -469,19 +460,19 @@ describe('ScraperApplication Health Monitoring', () => {
 
       jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
 
-      scraperApp.startHealthMonitoring(10000);
+      scraperApp.startHealthMonitoring(100);
 
       // Trigger first health check (should fail)
-      jest.advanceTimersByTime(10000);
-      await new Promise(resolve => setImmediate(resolve));
+      jest.advanceTimersByTime(100);
+      await jest.runAllTimersAsync();
 
       // Trigger second health check (should succeed)
-      jest.advanceTimersByTime(10000);
-      await new Promise(resolve => setImmediate(resolve));
+      jest.advanceTimersByTime(100);
+      await jest.runAllTimersAsync();
 
       expect(healthCheckCallCount).toBe(2);
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalledTimes(1);
-    });
+    }, 2000);
 
     it('should handle concurrent health monitoring operations safely', async () => {
       jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue({ errors: [] });
@@ -496,9 +487,9 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger health check
       jest.advanceTimersByTime(15000);
-      await new Promise(resolve => setImmediate(resolve));
+      await jest.runAllTimersAsync();
 
       expect(scraperApp.performHealthCheck).toHaveBeenCalled();
-    });
+    }, 2000);
   });
 });

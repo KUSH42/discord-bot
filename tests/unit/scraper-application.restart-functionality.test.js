@@ -15,29 +15,78 @@ describe('ScraperApplication Restart Functionality', () => {
   let mockMetricsManager;
 
   beforeEach(() => {
-    mockDependencies = createMockDependenciesWithEnhancedLogging();
+    // Create mock config
+    mockConfig = {
+      xUserHandle: 'testuser',
+      xPollingInterval: 30000,
+      isAnnouncingEnabled: jest.fn(() => true),
+      getRequired: jest.fn(key => {
+        const values = {
+          X_USER_HANDLE: 'testuser',
+          TWITTER_USERNAME: 'testuser',
+          TWITTER_PASSWORD: 'testpass',
+        };
+        return values[key];
+      }),
+    };
+
+    // Create additional mocks
+    mockBrowserService = {
+      isHealthy: jest.fn(() => true),
+      launch: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+      isRunning: jest.fn(() => true),
+    };
+
+    mockAuthManager = {
+      login: jest.fn().mockResolvedValue({ success: true }),
+      isAuthenticated: jest.fn(() => true),
+      ensureAuthenticated: jest.fn(),
+    };
+
+    mockContentAnnouncer = {
+      announceContent: jest.fn(() => Promise.resolve({ success: true })),
+    };
+
+    mockContentClassifier = {
+      classifyXContent: jest.fn(() => ({ type: 'post' })),
+    };
+
+    const mockContentCoordinator = {
+      processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
+    };
+
+    mockDependencies = createMockDependenciesWithEnhancedLogging({
+      config: mockConfig,
+      browserService: mockBrowserService,
+      authManager: mockAuthManager,
+      contentAnnouncer: mockContentAnnouncer,
+      contentClassifier: mockContentClassifier,
+      contentCoordinator: mockContentCoordinator,
+      stateManager: {
+        getLastScrapedTimestamp: jest.fn(() => null),
+        updateLastScrapedTimestamp: jest.fn(),
+        isKilled: jest.fn(() => false),
+      },
+      eventBus: {
+        emit: jest.fn(),
+        on: jest.fn(),
+      },
+      discordService: {
+        sendMessage: jest.fn(),
+      },
+      persistentStorage: {
+        hasFingerprint: jest.fn().mockResolvedValue(false),
+        storeFingerprint: jest.fn().mockResolvedValue(),
+        hasUrl: jest.fn().mockResolvedValue(false),
+        addUrl: jest.fn().mockResolvedValue(),
+      },
+    });
 
     // Extract mocks from dependencies
-    mockConfig = mockDependencies.config;
-    mockBrowserService = mockDependencies.browserService;
-    mockAuthManager = mockDependencies.authManager;
-    mockContentAnnouncer = mockDependencies.contentAnnouncer;
-    mockContentClassifier = mockDependencies.contentClassifier;
     mockLogger = mockDependencies.logger;
     mockDebugManager = mockDependencies.debugManager;
     mockMetricsManager = mockDependencies.metricsManager;
-
-    // Configure default behavior
-    mockConfig.xUserHandle = 'testuser';
-    mockConfig.xPollingInterval = 30000;
-    mockConfig.isAnnouncingEnabled = jest.fn(() => true);
-
-    mockBrowserService.isHealthy = jest.fn(() => true);
-    mockBrowserService.launch = jest.fn().mockResolvedValue(undefined);
-    mockBrowserService.close = jest.fn().mockResolvedValue(undefined);
-
-    mockAuthManager.login = jest.fn().mockResolvedValue({ success: true });
-    mockAuthManager.isAuthenticated = jest.fn(() => true);
     mockAuthManager.getCurrentSession = jest.fn(() => ({
       isValid: true,
       expiresAt: Date.now() + 3600000,

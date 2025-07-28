@@ -19,7 +19,7 @@ export default {
       'jest-junit',
       {
         outputDirectory: 'test-results',
-        outputName: 'ci-tests.xml',
+        outputName: `unit-tests-node${process.env.NODE_VERSION || 'unknown'}.xml`,
         classNameTemplate: '{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',

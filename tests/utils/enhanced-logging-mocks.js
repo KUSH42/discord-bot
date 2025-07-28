@@ -150,6 +150,8 @@ export function createMockDependenciesWithEnhancedLogging(additionalMocks = {}) 
     logger: enhancedMocks.mockBaseLogger,
     debugManager: enhancedMocks.mockDebugManager,
     metricsManager: enhancedMocks.mockMetricsManager,
+    // Also provide enhanced logger directly for components that expect it
+    enhancedLogger: enhancedMocks.mockEnhancedLogger,
     ...additionalMocks,
   };
 }

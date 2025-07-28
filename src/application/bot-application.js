@@ -827,7 +827,15 @@ export class BotApplication {
       // Get duplicate detector from monitor application
       const duplicateDetector = this.monitorApplication?.duplicateDetector;
       if (!duplicateDetector) {
-        this.logger.debug('Duplicate detector not available, skipping Discord history scanning');
+        this.logger.warn('⚠️ YouTube Monitor duplicate detector not available - YouTube duplicate detection disabled!');
+        this.logger.warn('This means old YouTube videos may be re-announced as new content');
+
+        // Emit event with error flag
+        this.eventBus.emit('bot.initialization.complete', {
+          timestamp: nowUTC(),
+          historyScanned: false,
+          error: 'YouTube Monitor duplicate detector not available',
+        });
         return;
       }
 

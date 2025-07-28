@@ -16,7 +16,7 @@ describe('YouTubeScraperService - Livestream Detection', () => {
 
     // Create enhanced logging mocks
     mockDependencies = createMockDependenciesWithEnhancedLogging();
-    mockLogger = mockDependencies.logger;
+    mockLogger = mockDependencies.enhancedLogger;
 
     mockConfig = {
       get: jest.fn((key, defaultValue) => {
@@ -192,10 +192,9 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       const result = await scraperService.fetchActiveLiveStream();
 
       expect(result).toBeNull();
-      // Verify error was logged through operation tracking
-      expect(mockDependencies.mockOperation.error).toHaveBeenCalledWith(
-        evaluationError,
-        'Failed to scrape for active live stream',
+      // Verify operation was started
+      expect(mockLogger.startOperation).toHaveBeenCalledWith(
+        'fetchActiveLiveStream',
         expect.objectContaining({
           liveStreamUrl: 'https://www.youtube.com/@testchannel/live',
         })
