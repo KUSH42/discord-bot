@@ -983,6 +983,8 @@ export class ScraperApplication {
       operation.progress(`Processing ${tweets.length} tweets for filtering`);
 
       for (const tweet of tweets) {
+        const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
+
         if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
           // Mark as seen immediately to prevent future duplicates
           this.duplicateDetector.markAsSeen(tweet.url);
@@ -990,11 +992,10 @@ export class ScraperApplication {
           // Check if tweet is new enough based on bot start time
           if (await this.isNewContent(tweet)) {
             newTweets.push(tweet);
-            this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${tweet.text.substring(0, 50)}...`);
+            this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${contentPreview}...`);
           } else {
             oldContentCount++;
             // Log filtered content with beginning of tweet text
-            const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
             this.logger.verbose(
               `Filtered out old tweet: ${tweet.tweetID} - "${contentPreview}..." - timestamp: ${tweet.timestamp}`
             );
@@ -1002,7 +1003,6 @@ export class ScraperApplication {
         } else {
           duplicateCount++;
           // Log filtered duplicate content with beginning of tweet text
-          const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
           this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID} - "${contentPreview}..."`);
         }
       }

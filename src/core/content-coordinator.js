@@ -188,14 +188,14 @@ export class ContentCoordinator {
       operation.progress('✅ No duplicates found');
 
       // Check if content is new enough to announce
-      operation.progress('📅 Checking content age', {
+      operation.progress(`📅 Checking ${contentData.type} age`, {
         publishedAt: contentData.publishedAt,
         currentTime: nowUTC().toISOString(),
       });
       const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, nowUTC());
 
       if (!isNew) {
-        operation.success('⏭️ Content too old, skipping', {
+        operation.success(`⏭️ ${contentData.type} too old ${contentData.publishedAt}, skipping: ${contentData.title}`, {
           publishedAt: contentData.publishedAt,
           currentTime: nowUTC().toISOString(),
         });
@@ -207,7 +207,7 @@ export class ContentCoordinator {
           publishedAt: contentData.publishedAt,
         };
       }
-      operation.progress('✅ Content is new enough', { publishedAt: contentData.publishedAt });
+      operation.progress(`✅ ${contentData.type} is new enough: ${contentData.publishedAt}`);
 
       // Add to content state management if not exists
       if (!existingState) {
