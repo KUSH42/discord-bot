@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
+import { toISOStringUTC } from '../utilities/utc-time.js';
 
 class CICoverageMerger {
   constructor() {
@@ -20,7 +21,7 @@ class CICoverageMerger {
     this.outputDir = 'coverage';
     this.mergedDir = path.join(this.outputDir, 'merged');
     this.summary = {
-      timestamp: new Date().toISOString(),
+      timestamp: toISOStringUTC(),
       totalFiles: 0,
       coverageByType: {},
       mergedCoverage: null,
@@ -171,7 +172,7 @@ class CICoverageMerger {
         console.log('📦 Installing lcov-result-merger...');
         execSync('npm install --no-save lcov-result-merger', { stdio: 'inherit' });
         console.log('✅ lcov-result-merger installed');
-      } catch (error) {
+      } catch (_error) {
         console.log('⚠️  Failed to install lcov-result-merger, will use fallback merger');
       }
     }
@@ -222,12 +223,12 @@ class CICoverageMerger {
       'test-results/security-tests/lcov.info',
 
       // Alternative artifact patterns with coverage subdirectory
-      'test-results/unit-tests-node18/coverage/lcov.info',
-      'test-results/unit-tests-node20/coverage/lcov.info',
-      'test-results/integration-tests/coverage/lcov.info',
-      'test-results/e2e-tests/coverage/lcov.info',
-      'test-results/performance-tests/coverage/lcov.info',
-      'test-results/security-tests/coverage/lcov.info',
+      'test-results/coverage/unit-tests-node18/lcov.info',
+      'test-results/coverage/unit-tests-node20/lcov.info',
+      'test-results/coverage/integration-tests/lcov.info',
+      'test-results/coverage/e2e-tests/lcov.info',
+      'test-results/coverage/performance-tests/lcov.info',
+      'test-results/coverage/security-tests/lcov.info',
 
       // Direct artifact directory access (when artifacts are merged into test-results/)
       'test-results/unit-tests-node18/coverage/unit-tests-node18/lcov.info',
@@ -373,7 +374,7 @@ class CICoverageMerger {
           this.scanDirectoryForLcov(fullPath, foundPaths, maxDepth - 1);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Skip directories we can't read
     }
   }
@@ -672,12 +673,10 @@ class CICoverageMerger {
         `"${lcovFile}"`,
         `--output-directory "${htmlDir}"`,
         '--title "Discord Bot Coverage Report"',
-        '--branch-coverage',
-        '--function-coverage',
-        `--prefix "${this.workingDir}"`,
         '--legend',
         '--show-details',
         '--dark-mode',
+        ` && lcov --extract lcov.info --rc lcov_branch_coverage=1 --rc derive_function_end_line=0 -o lcov.info 'src/*' && genhtml lcov.info --rc branch_coverage=1 --rc derive_function_end_line=0 -o coverage`,
       ].join(' ');
 
       console.log(`Executing: ${command}`);
@@ -829,7 +828,7 @@ class CICoverageMerger {
         branches: { total: 0, covered: 0, pct: 0 },
       },
       merged_from: [],
-      timestamp: new Date().toISOString(),
+      timestamp: toISOStringUTC(),
     };
 
     fs.writeFileSync(path.join(this.outputDir, 'coverage-summary.json'), JSON.stringify(emptySummary, null, 2));

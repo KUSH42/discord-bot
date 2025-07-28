@@ -262,28 +262,20 @@ jobs:
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage/unit-tests-node${{ matrix.node-version }}/lcov.info
+          file: ccoverage/unit-test-node${{ matrix.node-version }}/lcov.info
           flags: unit-node${{ matrix.node-version }}
           name: unit-tests-node${{ matrix.node-version }}
           fail_ci_if_error: false
           plugins: ''
 
-      - name: Store unit test coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: unit-tests-coverage-node${{ matrix.node-version }}
-          path: coverage/unit-tests-node${{ matrix.node-version }}/
-          retention-days: 7
-
       - name: Store unit test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: unit-tests-results-node${{ matrix.node-version }}
+          name: unit-tests-node${{ matrix.node-version }}
           path: |
+            coverage/unit-tests-node${{ matrix.node-version }}/
             test-results/unit-tests-node${{ matrix.node-version }}.xml
-            coverage/unit-tests-node${{ matrix.node-version }}.log
           retention-days: 7
 
 # Build and Push Docker Image
@@ -531,22 +523,14 @@ jobs:
           fail_ci_if_error: false
           plugins: ''
 
-      - name: Store integration test coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: integration-tests-coverage
-          path: coverage/integration-tests/
-          retention-days: 7
-
       - name: Store integration test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-tests-results
+          name: integration-tests
           path: |
+            coverage/integration-tests/
             test-results/integration-tests.xml
-            coverage/integration-tests/test-output.log
             logs/
           retention-days: 7
 
@@ -637,8 +621,8 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee coverage/e2e-tests/test-output.log
-          echo "Current working directory: $(pwd)"
-          ls -a -F
+          echo "echo "Current working directory: $(pwd)""
+          $(echo ls -a -F)
 
 
       - name: Upload E2E test coverage
@@ -650,22 +634,14 @@ jobs:
           fail_ci_if_error: false
           plugins: ''
 
-      - name: Store E2E test coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: e2e-tests-coverage
-          path: coverage/e2e-tests/
-          retention-days: 7
-
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: e2e-tests-results
+          name: e2e-tests
           path: |
+            coverage/e2e-tests/
             test-results/e2e-tests.xml
-            coverage/e2e-tests/test-output.log
             logs/
             screenshots/
             .env.e2e
@@ -737,9 +713,9 @@ jobs:
             --verbose=true \
             2>&1 | tee coverage/performance-tests/test-output.log
           echo "Current working directory: $(pwd)"
-          ls -a -F
+          $(echo ls -a -F)
           cd coverage
-          ls -a -F
+          $(echo ls -a -F)
           cd ..
 
 
@@ -795,22 +771,14 @@ jobs:
           fail_ci_if_error: false
           plugins: ''
 
-      - name: Store performance test coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: performance-tests-coverage
-          path: coverage/performance-tests/
-          retention-days: 30
-
       - name: Store performance test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: performance-tests-results
+          name: performance-test-results
           path: |
+            coverage/performance-tests/
             test-results/performance-tests.xml
-            coverage/performance-tests/test-output.log
             reports/
             performance-metrics.json
           retention-days: 30
@@ -872,7 +840,9 @@ jobs:
             --forceExit \
             --detectOpenHandles
           echo "Current working directory: $(pwd)"
-          cd coverage && ls -aF && cd ..
+          cd coverage
+          ls -aF
+          cd ..
 
       - name: Run security audit
         run: |
@@ -917,7 +887,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: security-tests-results
+          name: security-test-results
           path: |
             security-audit.json
             security-report.json
@@ -982,19 +952,11 @@ jobs:
             fi
           done
 
-      - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          pattern: '*-coverage*'
-          merge-multiple: true
-          path: coverage-artifacts/
-
       - name: Download test results
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          pattern: '*-results*'
+          pattern: '*-test-results'
           merge-multiple: true
           path: test-results/
 
@@ -1021,8 +983,9 @@ jobs:
           if [ -f "coverage/merged/lcov.info" ]; then
             if genhtml coverage/merged/lcov.info \
               --output-directory "$LCOV_REPORT_DIR" \
-              --title "Enhanced Code Coverage Report" \
-              --branch-coverage \
+              --rc lcov_branch_coverage=1 \ 
+              --rc derive_function_end_line=0 \
+              --title "Discord Bot - Enhanced Code Coverage Report" \
               --function-coverage \
               --prefix "$(pwd)" \
               --legend \
@@ -1087,11 +1050,12 @@ jobs:
         with:
           name: comprehensive-test-report-${{ github.run_id }}
           path: |
-            coverage/
-            test-results/
-            reports/
-            coverage-summary.json
-            coverage-metrics.json
+            coverage /
+            test-results /
+            reports /
+            coverage-summary.json /
+            coverage-metrics.json /
+            test-results 
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact

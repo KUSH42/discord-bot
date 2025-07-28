@@ -1,7 +1,7 @@
 import { PlaywrightBrowserService } from './playwright-browser-service.js';
 import { AsyncMutex } from '../../utilities/async-mutex.js';
 import { parseRelativeTime } from '../../utilities/time-parser.js';
-import { nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
+import { nowUTC } from '../utilities/utc-time.js';
 
 /**
  * YouTube web scraper service for near-instantaneous content detection
@@ -736,18 +736,20 @@ export class YouTubeScraperService {
         });
 
         if (liveStream) {
-          this.logger.debug('Successfully scraped active live stream', {
-            videoId: liveStream.id,
-            title: liveStream.title,
-          });
+          this.logger.debug(
+            `Successfully scraped active live stream:\n${JSON.stringify({
+              videoId: liveStream.id,
+              title: liveStream.title,
+              liveStreamUrl: this.liveStreamUrl,
+            })}`
+          );
         }
 
         return liveStream;
       } catch (error) {
-        this.logger.error('Failed to scrape for active live stream', {
-          error: error.message,
-          liveStreamUrl: this.liveStreamUrl,
-        });
+        this.logger.error(
+          `Failed to scrape for active live stream:\n${JSON.stringify({ error: error.message, liveStreamUrl: this.liveStreamUrl })}`
+        );
         return null;
       }
     }); // End of browserMutex.runExclusive

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-07-28T05:45:39.975Z",
+  "timestamp": "2025-07-28T12:50:33.175Z",
   "commit": "unknown",
   "branch": "unknown",
   "trigger": "manual",
@@ -7,162 +7,991 @@
   "repository": "local",
   "coverage": {
     "source": "coverage/coverage-summary.json",
-    "files": 47,
+    "files": 44,
     "lines": {
-      "total": 19668,
-      "covered": 15080,
-      "pct": 76.67276794793574
+      "total": 6160,
+      "covered": 4244,
+      "pct": 68.8961038961039
     },
     "functions": {
-      "total": 747,
-      "covered": 616,
-      "pct": 82.46318607764391
+      "total": 961,
+      "covered": 708,
+      "pct": 73.6732570239334
     },
     "branches": {
-      "total": 2929,
-      "covered": 2502,
-      "pct": 85.42164561283715
+      "total": 3601,
+      "covered": 2251,
+      "pct": 62.510413773951676
     },
     "statements": {
-      "total": 19668,
-      "covered": 15080,
-      "pct": 76.67276794793574
+      "total": 6160,
+      "covered": 4244,
+      "pct": 68.8961038961039
     },
-    "qualityScore": 81.03455668631861,
+    "qualityScore": 68.41354279780708,
     "mergedFrom": [
-      "coverage/unit/lcov.info",
-      "coverage/integration/lcov.info",
-      "coverage/performance/lcov.info",
-      "coverage/lcov.info",
-      "coverage/merged/lcov.info"
+      "coverage/unit-tests-node20/lcov.info",
+      "coverage/e2e-tests/lcov.info",
+      "coverage/performance-tests/lcov.info"
     ],
     "extended": {
-      "timestamp": "2025-07-28T05:45:39.447Z",
+      "timestamp": "2025-07-28T12:50:32.665Z",
       "totalFiles": 0,
       "coverageByType": {
         "unit": [
           {
-            "path": "coverage/unit/lcov.info",
-            "nodeVersion": "unknown",
-            "size": 259332
+            "path": "coverage/unit-tests-node20/lcov.info",
+            "nodeVersion": "20",
+            "size": 160027
           }
         ],
-        "integration": [
+        "e2e": [
           {
-            "path": "coverage/integration/lcov.info",
+            "path": "coverage/e2e-tests/lcov.info",
             "nodeVersion": "unknown",
-            "size": 225396
+            "size": 115920
           }
         ],
         "performance": [
           {
-            "path": "coverage/performance/lcov.info",
+            "path": "coverage/performance-tests/lcov.info",
             "nodeVersion": "unknown",
-            "size": 156077
-          }
-        ],
-        "unknown": [
-          {
-            "path": "coverage/lcov.info",
-            "nodeVersion": "unknown",
-            "size": 261749
-          },
-          {
-            "path": "coverage/merged/lcov.info",
-            "nodeVersion": "unknown",
-            "size": 262832
+            "size": 161477
           }
         ]
       },
       "mergedCoverage": {
-        "files": 47,
+        "files": 44,
         "lines": {
-          "total": 19668,
-          "covered": 15080,
-          "pct": 76.67276794793574
+          "total": 6160,
+          "covered": 4244,
+          "pct": 68.8961038961039
         },
         "functions": {
-          "total": 747,
-          "covered": 616,
-          "pct": 82.46318607764391
+          "total": 961,
+          "covered": 708,
+          "pct": 73.6732570239334
         },
         "branches": {
-          "total": 2929,
-          "covered": 2502,
-          "pct": 85.42164561283715
+          "total": 3601,
+          "covered": 2251,
+          "pct": 62.510413773951676
         },
         "statements": {
-          "total": 19668,
-          "covered": 15080,
-          "pct": 76.67276794793574
+          "total": 6160,
+          "covered": 4244,
+          "pct": 68.8961038961039
         }
       },
       "sources": [
         {
-          "path": "coverage/unit/lcov.info",
+          "path": "coverage/unit-tests-node20/lcov.info",
           "type": "unit",
-          "nodeVersion": "unknown",
-          "size": 259332,
-          "hash": "9ff9ba1a"
+          "nodeVersion": "20",
+          "size": 160027,
+          "hash": "fb882f26"
         },
         {
-          "path": "coverage/integration/lcov.info",
-          "type": "integration",
+          "path": "coverage/e2e-tests/lcov.info",
+          "type": "e2e",
           "nodeVersion": "unknown",
-          "size": 225396,
-          "hash": "b9e28908"
+          "size": 115920,
+          "hash": "32441799"
         },
         {
-          "path": "coverage/performance/lcov.info",
+          "path": "coverage/performance-tests/lcov.info",
           "type": "performance",
           "nodeVersion": "unknown",
-          "size": 156077,
-          "hash": "d3bd4243"
-        },
-        {
-          "path": "coverage/lcov.info",
-          "type": "unknown",
-          "nodeVersion": "unknown",
-          "size": 261749,
-          "hash": "8f80ee57"
-        },
-        {
-          "path": "coverage/merged/lcov.info",
-          "type": "unknown",
-          "nodeVersion": "unknown",
-          "size": 262832,
-          "hash": "05f1d6a5"
+          "size": 161477,
+          "hash": "98f8f87d"
         }
       ],
-      "qualityScore": 81.03455668631861,
+      "qualityScore": 68.41354279780708,
       "tests": {
         "total": 0,
         "passed": 0,
         "failed": 0,
-        "suites": 4
+        "suites": 3
       }
     }
   },
   "tests": {
     "unit": {
-      "status": "skipped",
-      "details": "No test results found"
+      "status": "failure",
+      "details": "1763 tests, 73 failures, 0 errors, 0 skipped (1m 23.67s)",
+      "path": "test-results/unit-tests-node18.xml, test-results/unit-tests-node20.xml, test-results/unit-tests.xml",
+      "summary": {
+        "total": 1763,
+        "passed": 1690,
+        "failed": 73,
+        "skipped": 0,
+        "time": "1m 23.67s"
+      },
+      "extended": {
+        "suites": [
+          {
+            "name": "Credential Handling Security Tests",
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "28.369s"
+          },
+          {
+            "name": "Application Input Validation Security Tests",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.097s"
+          },
+          {
+            "name": "Security and Input Validation Tests",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.06s"
+          },
+          {
+            "name": "Credential Handling Security Tests",
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "28.369s"
+          },
+          {
+            "name": "Application Input Validation Security Tests",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.097s"
+          },
+          {
+            "name": "Security and Input Validation Tests",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.06s"
+          },
+          {
+            "name": "BotApplication",
+            "tests": 68,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "8.611s"
+          },
+          {
+            "name": "YouTubeScraperService",
+            "tests": 51,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.504s"
+          },
+          {
+            "name": "YouTubeApiService",
+            "tests": 86,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.535s"
+          },
+          {
+            "name": "ContentAnnouncer",
+            "tests": 44,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.178s"
+          },
+          {
+            "name": "ContentStateManager",
+            "tests": 56,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.149s"
+          },
+          {
+            "name": "ContentClassifier",
+            "tests": 77,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.153s"
+          },
+          {
+            "name": "LivestreamStateMachine",
+            "tests": 48,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.127s"
+          },
+          {
+            "name": "Rate Limiting Tests",
+            "tests": 28,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.154s"
+          },
+          {
+            "name": "ContentCoordinator",
+            "tests": 46,
+            "failures": 46,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.165s"
+          },
+          {
+            "name": "Configuration Validation Tests",
+            "tests": 50,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.107s"
+          },
+          {
+            "name": "Duplicate Detection Logic Tests",
+            "tests": 27,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "1.182s"
+          },
+          {
+            "name": "AuthManager",
+            "tests": 39,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "8.166s"
+          },
+          {
+            "name": "DependencyContainer",
+            "tests": 50,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.134s"
+          },
+          {
+            "name": "ScraperApplication Core Operations",
+            "tests": 39,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.282s"
+          },
+          {
+            "name": "PersistentStorage",
+            "tests": 40,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.114s"
+          },
+          {
+            "name": "Tweet Processing and Duplicate Detection",
+            "tests": 12,
+            "failures": 7,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.094s"
+          },
+          {
+            "name": "PubSubHubbub Failure Handling Tests",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.08s"
+          },
+          {
+            "name": "StateManager",
+            "tests": 58,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.147s"
+          },
+          {
+            "name": "CommandProcessor - Debug Commands",
+            "tests": 36,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.155s"
+          },
+          {
+            "name": "Main Entry Point Error Handling",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.07s"
+          },
+          {
+            "name": "ScraperApplication Content Detection",
+            "tests": 19,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.084s"
+          },
+          {
+            "name": "MonitorApplication - Scheduled Content Polling",
+            "tests": 30,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.152s"
+          },
+          {
+            "name": "MonitorApplication",
+            "tests": 26,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.097s"
+          },
+          {
+            "name": "RetryableError",
+            "tests": 39,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.092s"
+          },
+          {
+            "name": "CommandProcessor",
+            "tests": 43,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.117s"
+          },
+          {
+            "name": "MonitorApplication - Core Operations",
+            "tests": 29,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.102s"
+          },
+          {
+            "name": "MonitorApplication - PubSubHubbub Operations",
+            "tests": 20,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.093s"
+          },
+          {
+            "name": "EventBus",
+            "tests": 41,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.254s"
+          },
+          {
+            "name": "Logger Utils Tests",
+            "tests": 32,
+            "failures": 2,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.508s"
+          },
+          {
+            "name": "RateLimitError",
+            "tests": 34,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.082s"
+          },
+          {
+            "name": "MetricsManager",
+            "tests": 35,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.134s"
+          },
+          {
+            "name": "Discord Client Service",
+            "tests": 27,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.112s"
+          },
+          {
+            "name": "ScraperApplication Process Tweet",
+            "tests": 9,
+            "failures": 9,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.095s"
+          },
+          {
+            "name": "MonitorApplication - Video Processing",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.072s"
+          },
+          {
+            "name": "MonitorApplication - Signature Verification",
+            "tests": 15,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.066s"
+          },
+          {
+            "name": "DebugFlagManager",
+            "tests": 32,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.121s"
+          },
+          {
+            "name": "ScraperApplication Initialization",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.073s"
+          },
+          {
+            "name": "Discord Transport Error Handling",
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.818s"
+          },
+          {
+            "name": "URL Regex Pattern Tests",
+            "tests": 29,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.068s"
+          },
+          {
+            "name": "Tweet Category Classification",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.06s"
+          },
+          {
+            "name": "Enhanced Duplicate Detection with Fingerprinting",
+            "tests": 14,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.065s"
+          },
+          {
+            "name": "ScraperApplication Email Verification",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.086s"
+          },
+          {
+            "name": "Message",
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.068s"
+          },
+          {
+            "name": "Search and Retweet Logic",
+            "tests": 8,
+            "failures": 3,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.076s"
+          },
+          {
+            "name": "Browser Service Dependency Injection",
+            "tests": 10,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.221s"
+          },
+          {
+            "name": "Persistent Cookie Storage",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.072s"
+          },
+          {
+            "name": "ScraperApplication Authentication Verification",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.078s"
+          },
+          {
+            "name": "Configuration",
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.079s"
+          },
+          {
+            "name": "Browser Configuration Utility",
+            "tests": 21,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.064s"
+          },
+          {
+            "name": "MessageQueue",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.067s"
+          },
+          {
+            "name": "Enhanced Retweet Detection",
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.064s"
+          },
+          {
+            "name": "Enhanced Scrolling and Profile Navigation",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.069s"
+          },
+          {
+            "name": "Discord Utils Tests",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.066s"
+          },
+          {
+            "name": "Timezone Safety ESLint Rules",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.149s"
+          },
+          {
+            "name": "Content Filtering Logic",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.062s"
+          },
+          {
+            "name": "Login Flow",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.064s"
+          },
+          {
+            "name": "TimeParser",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.062s"
+          },
+          {
+            "name": "ScraperApplication Tweet Extraction",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.091s"
+          },
+          {
+            "name": "Duplicate Detector Integration",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.062s"
+          },
+          {
+            "name": "Browser Initialization",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.057s"
+          },
+          {
+            "name": "Polling Logic",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.06s"
+          },
+          {
+            "name": "FetchHttpService",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.063s"
+          },
+          {
+            "name": "PlaywrightBrowserService",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.156s"
+          },
+          {
+            "name": "Playwright Browser Service",
+            "tests": 2,
+            "failures": 2,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.062s"
+          },
+          {
+            "name": "X Scraper Entry Point",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.051s"
+          },
+          {
+            "name": "YouTube Monitor Entry Point",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.051s"
+          },
+          {
+            "name": "Delay Utility",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.051s"
+          },
+          {
+            "name": "EnhancedLogger",
+            "tests": 28,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.102s"
+          },
+          {
+            "name": "UTC Time Utilities",
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.083s"
+          }
+        ],
+        "path": "test-results/unit-tests-node18.xml"
+      }
     },
     "integration": {
-      "status": "skipped",
-      "details": "No test results found"
+      "status": "failure",
+      "details": "192 tests, 45 failures, 0 errors, 0 skipped (3.11s)",
+      "path": "test-results/integration-tests.xml",
+      "summary": {
+        "total": 192,
+        "passed": 147,
+        "failed": 45,
+        "skipped": 0,
+        "time": "3.11s"
+      },
+      "extended": {
+        "suites": [
+          {
+            "name": "Application Startup and Shutdown Integration Tests",
+            "tests": 14,
+            "failures": 12,
+            "errors": 0,
+            "skipped": 0,
+            "time": "1.019s"
+          },
+          {
+            "name": "Production Setup Validation",
+            "tests": 18,
+            "failures": 5,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.256s"
+          },
+          {
+            "name": "Source Module Integration Tests",
+            "tests": 10,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.178s"
+          },
+          {
+            "name": "Production Setup",
+            "tests": 4,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.156s"
+          },
+          {
+            "name": "Content Announcement Flow Integration",
+            "tests": 18,
+            "failures": 18,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.134s"
+          },
+          {
+            "name": "ContentCoordinator Debug Integration",
+            "tests": 8,
+            "failures": 8,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.101s"
+          },
+          {
+            "name": "Application Startup Integration Test",
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.551s"
+          },
+          {
+            "name": "Enhanced Logging Integration",
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.104s"
+          },
+          {
+            "name": "Discord Integration Tests",
+            "tests": 30,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.102s"
+          },
+          {
+            "name": "External API Integration Tests",
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.096s"
+          },
+          {
+            "name": "MonitorApplication - Fallback Integration Tests",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.098s"
+          },
+          {
+            "name": "Discord Service Integration",
+            "tests": 21,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.093s"
+          },
+          {
+            "name": "Retweet Workflows Integration",
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.086s"
+          },
+          {
+            "name": "PubSubHubbub Security Integration Tests",
+            "tests": 7,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.07s"
+          },
+          {
+            "name": "Placeholder Test",
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.063s"
+          }
+        ],
+        "path": "test-results/integration-tests.xml"
+      }
     },
     "e2e": {
-      "status": "skipped",
-      "details": "No test results found"
+      "status": "failure",
+      "details": "81 tests, 17 failures, 0 errors, 0 skipped (1.68s)",
+      "path": "test-results/e2e-tests.xml",
+      "summary": {
+        "total": 81,
+        "passed": 64,
+        "failed": 17,
+        "skipped": 0,
+        "time": "1.68s"
+      },
+      "extended": {
+        "suites": [
+          {
+            "name": "Scraper Announcement Flow E2E",
+            "tests": 17,
+            "failures": 17,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.701s"
+          },
+          {
+            "name": "Empty PubSubHubbub Notification Fallback E2E Tests",
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.308s"
+          },
+          {
+            "name": "End-to-End Command Processing Workflows",
+            "tests": 36,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.257s"
+          },
+          {
+            "name": "End-to-End Fallback Recovery Tests",
+            "tests": 9,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.198s"
+          },
+          {
+            "name": "End-to-End Announcement Workflows",
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.215s"
+          }
+        ],
+        "path": "test-results/e2e-tests.xml"
+      }
     },
     "performance": {
-      "status": "skipped",
-      "details": "No test results found"
+      "status": "success",
+      "details": "14 tests, 0 failures, 0 errors, 0 skipped (2.74s)",
+      "path": "test-results/performance-tests.xml",
+      "summary": {
+        "total": 14,
+        "passed": 14,
+        "failed": 0,
+        "skipped": 0,
+        "time": "2.74s"
+      },
+      "extended": {
+        "suites": [
+          {
+            "name": "Performance and Load Tests",
+            "tests": 14,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "2.738s"
+          }
+        ],
+        "path": "test-results/performance-tests.xml"
+      }
     },
     "security": {
-      "status": "skipped",
-      "details": "No test results found"
+      "status": "success",
+      "details": "49 tests, 0 failures, 0 errors, 0 skipped (28.53s)",
+      "path": "test-results/security-tests.xml",
+      "summary": {
+        "total": 49,
+        "passed": 49,
+        "failed": 0,
+        "skipped": 0,
+        "time": "28.53s"
+      },
+      "extended": {
+        "suites": [
+          {
+            "name": "Credential Handling Security Tests",
+            "tests": 20,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "28.369s"
+          },
+          {
+            "name": "Application Input Validation Security Tests",
+            "tests": 17,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.097s"
+          },
+          {
+            "name": "Security and Input Validation Tests",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "time": "0.06s"
+          }
+        ],
+        "path": "test-results/security-tests.xml"
+      }
     }
   },
   "artifacts": [],
@@ -170,18 +999,26 @@
     "coverage": {
       "passed": true,
       "threshold": 25,
-      "actual": 76.67276794793574
+      "actual": 68.8961038961039
     },
     "testsPassing": {
       "passed": false,
       "threshold": 95,
-      "actual": 0
+      "actual": 40
     },
     "security": {
       "passed": false,
       "vulnerabilities": 0
     }
   },
-  "generated": "2025-07-28T05:45:39.984Z",
+  "processedCoverageFiles": {},
+  "discoveredCoverageFiles": [
+    "coverage/e2e-tests/lcov.info",
+    "coverage/lcov.info",
+    "coverage/merged/lcov.info",
+    "coverage/performance-tests/lcov.info",
+    "coverage/unit-tests-node20/lcov.info"
+  ],
+  "generated": "2025-07-28T12:50:36.932Z",
   "version": "2.0"
 }
