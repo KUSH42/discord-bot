@@ -640,7 +640,7 @@ jobs:
         with:
           name: e2e-tests
           path: |
-            coverage/e2e-tests/
+            coverage/e2e-tests/lcov.info
             test-results/e2e-tests.xml
             logs/
             screenshots/
@@ -777,7 +777,7 @@ jobs:
         with:
           name: performance-test-results
           path: |
-            coverage/performance-tests/
+            coverage/performance-tests/lcov.inf
             test-results/performance-tests.xml
             reports/
             performance-metrics.json
@@ -893,6 +893,7 @@ jobs:
             security-report.json
             test-results/security-tests.xml
             test-results/security-tests/
+            coverage/security-tests/lcov.info
           retention-days: 30
 
   # Aggregate results and report

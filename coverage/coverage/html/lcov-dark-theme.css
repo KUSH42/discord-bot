@@ -1,0 +1,318 @@
+/* lcov-dark-theme.css */
+
+/* --- Custom Properties (CSS Variables) for Dark Theme --- */
+:root {
+    --background-dark: #202228; /* Deep charcoal background */
+    --surface-dark: #282c34;    /* Slightly lighter dark for cards/panels, similar to Atom One Dark */
+    --text-primary: #abb2bf;    /* Light gray for general text (Atom One Dark) */
+    --text-secondary: #636d83;  /* Muted gray for secondary text */
+    --border-color: #3b4048;    /* Subtle border for separation */
+    --link-color: #61afef;      /* Blue for links */
+    --link-hover-color: #569cd6; /* Darker blue on link hover */
+    --code-background: #1d1f23; /* Very dark background for code blocks */
+    --table-header-bg: #323842; /* Background for table headers */
+    --scrollbar-thumb: #565d6a; /* Scrollbar thumb color */
+    --scrollbar-track: #282c34; /* Scrollbar track color */
+
+    /* LCOV Specific Overrides - based on your base.css and prettify.css */
+    --lcov-low-coverage-bg: #4a1921; /* Darker red for low coverage lines */
+    --lcov-low-coverage-text: #e06c75; /* Red text for low coverage */
+    --lcov-medium-coverage-bg: #5f4a1f; /* Darker yellow/orange for medium coverage */
+    --lcov-medium-coverage-text: #e5c07b; /* Yellow text for medium coverage */
+    --lcov-high-coverage-bg: #2a3d2e; /* Darker green for high coverage lines */
+    --lcov-high-coverage-text: #98c379; /* Green text for high coverage */
+    --lcov-neutral-line-bg: #2e323a; /* Background for neutral lines */
+    --lcov-missing-branch-bg: #e06c75; /* Red for missing branch indicator */
+    --lcov-missing-branch-text: #fff; /* White text on missing branch */
+    --lcov-fraction-bg: #3a404b; /* Darker background for fractions */
+    --lcov-fraction-text: #abb2bf; /* Lighter text for fractions */
+}
+
+/* --- Base Overrides (from base.css) --- */
+body, html {
+    background-color: var(--background-dark);
+    color: var(--text-primary);
+}
+
+body {
+    font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-size: 14px; /* Retain base.css font size */
+}
+
+h1, h2 { /* Adjust existing h1, h2 from base.css */
+    color: var(--text-primary);
+    margin: 0; /* Keep base.css margin */
+}
+h1 { font-size: 24px; } /* Make main title a bit larger */
+h2 { font-size: 16px; }
+
+pre {
+    font-family: 'Fira Code', 'JetBrains Mono', 'Consolas', "Liberation Mono", Menlo, Courier, monospace;
+    color: var(--text-primary);
+    background-color: var(--code-background); /* Override default pre background */
+    padding: 15px !important; /* Add some padding to pre blocks */
+    border-radius: 8px; /* Add border-radius */
+    border: 1px solid var(--border-color); /* Add a subtle border */
+    overflow-x: auto; /* Ensure horizontal scroll for long lines */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    /* Retain base.css tab-size */
+    -moz-tab-size: 2;
+    -o-tab-size:  2;
+    tab-size: 2;
+}
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+    color: var(--link-hover-color);
+}
+
+.fraction {
+    background: var(--lcov-fraction-bg);
+    color: var(--lcov-fraction-text);
+    border-radius: 4px; /* Slightly larger radius */
+    padding: 3px 6px; /* Adjust padding */
+}
+
+div.path a:link, div.path a:visited {
+    color: var(--link-color); /* Ensure path links are visible */
+}
+
+/* --- Table Overrides --- */
+table.coverage, .coverage-summary {
+    background-color: var(--surface-dark);
+    border: 1px solid var(--border-color); /* Add border to table */
+    border-collapse: collapse; /* Ensure collapse */
+    border-radius: 8px; /* Apply border radius */
+    overflow: hidden; /* Important for border-radius on tables */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
+}
+
+table.coverage td, .coverage-summary td, .coverage-summary th {
+    border-color: var(--border-color);
+    color: var(--text-primary);
+    padding: 12px 15px; /* Adjust padding */
+}
+
+table.coverage td.line-count, table.coverage td.line-coverage {
+    color: var(--text-secondary); /* Mute line counts */
+}
+
+.coverage-summary tr { border-bottom: 1px solid var(--border-color); } /* From base.css */
+.coverage-summary tbody { border: 1px solid var(--border-color); } /* From base.css */
+.coverage-summary td { border-right: 1px solid var(--border-color); } /* From base.css */
+
+.coverage-summary th {
+    background-color: var(--table-header-bg);
+    color: var(--text-primary);
+    font-weight: bold; /* Make headers bold */
+    text-transform: uppercase; /* Make headers uppercase */
+    font-size: 0.9em; /* Slightly smaller font */
+    letter-spacing: 0.05em; /* Add letter spacing */
+}
+
+/* Stripe effect for table rows */
+.coverage-summary tbody tr:nth-child(even),
+table.coverage tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.05); /* Subtle stripe for readability */
+}
+
+/* --- Coverage Highlighting Overrides (from base.css) --- */
+/* These are crucial for LCOV's visual feedback */
+
+/* High Coverage (Green) */
+.high, .cline-yes {
+    background: var(--lcov-high-coverage-bg) !important;
+    color: var(--lcov-high-coverage-text) !important;
+}
+.cstat-yes {
+    background: var(--lcov-high-coverage-bg) !important;
+    color: var(--lcov-high-coverage-text) !important;
+}
+.status-line.high, .high .cover-fill {
+    background: var(--lcov-high-coverage-text) !important; /* Use text color for fill */
+}
+.high .chart { border:1px solid var(--lcov-high-coverage-text) !important; }
+
+/* Medium Coverage (Yellow/Gold) */
+.medium {
+    background: var(--lcov-medium-coverage-bg) !important;
+    color: var(--lcov-medium-coverage-text) !important;
+}
+.status-line.medium, .medium .cover-fill {
+    background: var(--lcov-medium-coverage-text) !important;
+}
+.medium .chart { border:1px solid var(--lcov-medium-coverage-text) !important; }
+
+/* Low Coverage (Red) */
+.red.solid, .status-line.low, .low .cover-fill {
+    background: var(--lcov-low-coverage-text) !important;
+}
+.low .chart { border:1px solid var(--lcov-low-coverage-text) !important; }
+.highlighted,
+.highlighted .cstat-no, .highlighted .fstat-no, .highlighted .cbranch-no{
+    background: var(--lcov-low-coverage-text) !important; /* Keep as bright red */
+    color: var(--text-primary) !important; /* Ensure text is visible */
+}
+.cstat-no, .fstat-no {
+    background: var(--lcov-low-coverage-bg) !important;
+    color: var(--lcov-low-coverage-text) !important;
+}
+.low, .cline-no {
+    background: var(--lcov-low-coverage-bg) !important;
+    color: var(--lcov-low-coverage-text) !important;
+}
+
+/* Specific Branch Coverage */
+.cbranch-no {
+    background: var(--lcov-missing-branch-bg) !important; /* Red background for missing branch */
+    color: var(--lcov-missing-branch-text) !important; /* White text on red */
+    padding: 0 4px; /* Ensure padding from base.css is kept */
+    border-radius: 3px; /* Ensure border-radius from base.css is kept */
+}
+
+.missing-if-branch {
+    background: var(--lcov-missing-branch-bg) !important;
+    color: var(--lcov-missing-branch-text) !important;
+}
+
+/* Skipped Coverage */
+.cstat-skip, .fstat-skip, .cbranch-skip {
+    background: var(--lcov-neutral-line-bg) !important;
+    color: var(--text-secondary) !important; /* Muted text for skipped */
+}
+span.cline-neutral {
+    background: var(--lcov-neutral-line-bg) !important;
+    color: var(--text-secondary) !important;
+}
+
+/* LCOV source line classes (ensure they work with prettify) */
+.line-number { /* from previous theme */
+    display: inline-block;
+    width: 40px;
+    text-align: right;
+    padding-right: 15px;
+    color: var(--text-secondary);
+    user-select: none;
+}
+.hit { /* from previous theme */
+    display: inline-block;
+    width: 30px;
+    text-align: right;
+    padding-right: 5px;
+    color: var(--text-secondary);
+}
+
+/* --- Prettify.css Overrides --- */
+/* These directly adjust the syntax highlighting for dark theme */
+.pln { color: var(--text-primary) !important; } /* Plain text */
+.str { color: #98c379 !important; } /* String (green) */
+.kwd { color: #c678dd !important; } /* Keyword (purple) */
+.com { color: #5c6370 !important; } /* Comment (muted gray) */
+.typ { color: #e5c07b !important; } /* Type (yellow) */
+.lit { color: #d19a66 !important; } /* Literal (orange/brown) */
+.pun, .opn, .clo { color: #abb2bf !important; } /* Punctuation (light gray) */
+.tag { color: #e06c75 !important; } /* HTML Tag (red) */
+.atn { color: #e5c07b !important; } /* Attribute Name (yellow) */
+.atv { color: #98c379 !important; } /* Attribute Value (green) */
+.dec, .var { color: #e06c75 !important; } /* Declaration, Variable (red) */
+.fun { color: #61afef !important; } /* Function (blue) */
+
+/* Prettify line numbering */
+ol.linenums {
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 0; /* Remove default padding for number list */
+    color: var(--text-secondary);
+}
+li.L0, li.L1, li.L2, li.L3, li.L5, li.L6, li.L7, li.L8 {
+    list-style-type: none; /* Keep base.css style */
+    background: transparent !important; /* Remove background from prettify.css */
+}
+li.L1, li.L3, li.L5, li.L7, li.L9 {
+    background: transparent !important; /* Remove background from prettify.css */
+}
+/* Subtle line background for odd lines in prettify */
+ol.linenums li:nth-child(odd) {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* --- Custom Layout for Overall Report --- */
+.wrapper {
+    background-color: var(--background-dark);
+}
+
+.head {
+    background-color: var(--surface-dark);
+    padding: 20px 30px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    border-radius: 0 0 10px 10px; /* Rounded bottom corners for header */
+}
+
+.head h1 {
+    color: var(--link-color); /* Main title */
+    font-size: 2.5em;
+    margin: 0;
+    text-align: center;
+}
+
+.timestamp {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    text-align: center;
+    margin-top: 5px;
+}
+
+/* Info section (summary table often) */
+.info {
+    background-color: var(--surface-dark);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.footer {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    height: 48px; /* Maintain from base.css */
+}
+
+/* Fixes unreadable text in header */
+.quiet {
+  color: rgba(192,192,192,0.8);
+}
+
+.quiet a { opacity: 0.8; }
+
+/* --- Scrollbar Styling (Webkit - Chrome, Safari) --- */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+    border: 2px solid var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--link-color);
+}

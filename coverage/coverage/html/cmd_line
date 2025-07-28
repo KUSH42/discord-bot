@@ -1,0 +1,1 @@
+genhtml coverage/merged/lcov.info --output-directory coverage/html --title 'Discord Bot Coverage Report' --legend --show-details --dark-mode
