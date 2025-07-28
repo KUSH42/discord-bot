@@ -15,7 +15,7 @@ export default {
   },
 
   // Test discovery - only integration tests
-  testMatch: ['<rootDir>/tests/security/**/*.test.js'],
+  testMatch: ['<rootDir>/tests/**/*security*'],
 
   // Coverage collection - ENABLED for integration tests
   collectCoverage: true,
@@ -38,7 +38,7 @@ export default {
   setupFiles: ['<rootDir>/scripts/setup-env.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 
-  coverageDirectory: 'coverage/security',
+  coverageDirectory: 'coverage/security-tests1',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
 
   // Integration test reporters
@@ -49,7 +49,7 @@ export default {
       {
         outputDirectory: 'test-results',
         outputName: 'security-tests.xml',
-        classNameTemplate: 'Security.{classname}',
+        classNameTemplate: 'Integration.{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',
         usePathForSuiteName: true,
@@ -75,7 +75,7 @@ export default {
 
   // Integration test optimizations
   cache: true,
-  cacheDirectory: '<rootDir>/.jest-cache-securityn',
+  cacheDirectory: '<rootDir>/.jest-cache-security',
 
   // Error handling
   errorOnDeprecated: false,

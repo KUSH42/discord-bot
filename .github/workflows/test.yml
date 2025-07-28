@@ -188,6 +188,7 @@ jobs:
     timeout-minutes: 20
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: [pre-flight, lint]
     if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'unit')
     strategy:
@@ -275,8 +276,8 @@ jobs:
         with:
           name: unit-tests-node${{ matrix.node-version }}
           path: |
-            coverage/unit-tests-node${{ matrix.node-version }}/
-            test-results/unit-tests-node${{ matrix.node-version }}.xml
+            coverage/unit-tests-node${{ matrix.node-version }}/lcov.info
+            test-results/unit-tests-node${{ matrix.node-version }}/*.xml
           retention-days: 7
 
 # Build and Push Docker Image
@@ -513,7 +514,7 @@ jobs:
             --verbose=true \
             --passWithNoTests \
             --coverageThreshold='{}' \
-            2>&1 | tee coverage/integration-tests/test-output.log
+            2>&1 | tee test-results/integration-tests/test-output.log
 
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v4
@@ -530,8 +531,8 @@ jobs:
         with:
           name: integration-tests
           path: |
-            coverage/integration-tests/
-            test-results/integration-tests.xml
+            coverage/integration-tests/lcov.info
+            test-results/integration-tests/integration-tests.xml
             logs/
           retention-days: 7
 
@@ -539,12 +540,14 @@ jobs:
   e2e-tests:
     name: End-to-End Tests
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 20
     needs: [pre-flight, lint]
     if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'e2e')
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -621,7 +624,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee coverage/e2e-tests/test-output.log
+            2>&1 | tee test-results/e2e-tests/test-output.log
           echo "echo "Current working directory: $(pwd)""
           $(echo ls -a -F)
 
@@ -656,11 +659,11 @@ jobs:
     timeout-minutes: 20
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: [pre-flight, lint]
     if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'performance')
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -712,13 +715,7 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            2>&1 | tee coverage/performance-tests/test-output.log
-          echo "Current working directory: $(pwd)"
-          $(echo ls -a -F)
-          cd coverage
-          $(echo ls -a -F)
-          cd ..
-
+            2>&1 | tee test.results/performance-tests/test-output.log
 
       - name: Generate performance report
         run: |
@@ -776,10 +773,10 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: performance-test-results
+          name: performance-tests
           path: |
             coverage/performance-tests/lcov.inf
-            test-results/performance-tests.xml
+            test-results/performance-tests/performance-tests.xml
             reports/
             performance-metrics.json
           retention-days: 30
@@ -840,10 +837,6 @@ jobs:
             --testTimeout=20000 \
             --forceExit \
             --detectOpenHandles
-          echo "Current working directory: $(pwd)"
-          cd coverage
-          ls -aF
-          cd ..
 
       - name: Run security audit
         run: |
@@ -888,12 +881,11 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: security-test-results
+          name: security-tests
           path: |
             security-audit.json
             security-report.json
-            test-results/security-tests.xml
-            test-results/security-tests/
+            test-results/security tests/security-tests.xml
             coverage/security-tests/lcov.info
           retention-days: 30
 
@@ -960,7 +952,7 @@ jobs:
         with:
           pattern: '*-test*'
           merge-multiple: true
-          path: test-results/
+          path: .
 
       - name: Install enhanced coverage tools
         run: |
@@ -1066,7 +1058,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lcov-html-report
-          path: coverage/html/
+          path: coverage/merged/
           retention-days: 14
           if-no-files-found: warn
 
