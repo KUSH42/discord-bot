@@ -924,7 +924,6 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Current working directory: $(pwd)"
-          ech
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
