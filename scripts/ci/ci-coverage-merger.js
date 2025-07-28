@@ -27,9 +27,9 @@ class CICoverageMerger {
     };
 
     // Debug working directory issues
-    console.log(`🔧 Debug: Working directory: ${this.workingDir}`);
-    console.log(`🔧 Debug: GITHUB_WORKSPACE: ${process.env.GITHUB_WORKSPACE || 'not set'}`);
-    console.log(`🔧 Debug: PWD: ${process.env.PWD || 'not set'}`);
+    //console.log(`🔧 Debug: Working directory: ${this.workingDir}`);
+    //console.log(`🔧 Debug: GITHUB_WORKSPACE: ${process.env.GITHUB_WORKSPACE || 'not set'}`);
+    //console.log(`🔧 Debug: PWD: ${process.env.PWD || 'not set'}`);
   }
 
   /**
@@ -272,6 +272,7 @@ class CICoverageMerger {
       // Scan test-results directory if it exists
       if (fs.existsSync('test-results')) {
         this.scanDirectoryForLcov('test-results', dynamicPaths);
+        this.scanDirectoryForLcov('coverage', dynamicPaths);
       }
 
       // Scan current directory for artifact directories
