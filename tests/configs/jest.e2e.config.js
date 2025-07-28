@@ -14,7 +14,7 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 
-  // Test discovery - only integration tests
+  // Test discovery - only e2e tests
   testMatch: ['<rootDir>/tests/e2e/**/*.test.js'],
 
   // Coverage collection - ENABLED for integration tests

@@ -59,11 +59,25 @@ function runCommand(command, args, options = {}) {
 
 async function runTests(testType, extraArgs = []) {
   const commands = {
-    unit: ['npx', 'jest', '--config', 'jest.unit.config.js', 'tests/unit', ...extraArgs],
-    integration: ['npx', 'jest', '--config', 'jest.integration.config.js', 'tests/integration', ...extraArgs],
+    unit: ['npx', 'jest', '--config', 'jest.unit.config.js', `test-results/unit-tests-node20`, ...extraArgs],
+    integration: [
+      'npx',
+      'jest',
+      '--config',
+      'jest.integration.config.js',
+      'test-results/integration-tests',
+      ...extraArgs,
+    ],
     e2e: ['npx', 'jest', '--config', 'jest.e2e.config.js', ...extraArgs],
-    security: ['npx', 'jest', '--config', 'jest.security.config.js', ...extraArgs],
-    performance: ['npx', 'jest', '--config', 'jest.performance.config.js', 'tests/performance', ...extraArgs],
+    security: ['npx', 'jest', '--config', 'jest.security.config.js', 'test-results/security-tests', ...extraArgs],
+    performance: [
+      'npx',
+      'jest',
+      '--config',
+      'jest.performance.config.js',
+      'test-results/performance-tests',
+      ...extraArgs,
+    ],
     all: ['npx', 'jest', ...extraArgs],
     coverage: ['npx', 'jest', '--coverage', ...extraArgs],
     watch: ['npx', 'jest', '--watch', ...extraArgs],
