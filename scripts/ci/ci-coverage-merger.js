@@ -238,7 +238,8 @@ class CICoverageMerger {
         const content = fs.readFileSync(searchPath, 'utf8');
 
         // Skip empty or invalid files
-        if (!content.includes('SF:') || !content.includes('DA:') || content.trim().length < 50) {
+        // if (!content.includes('SF:') || !content.includes('DA:') || content.trim().length < 50) {
+        if (content.trim().length < 50) {
           console.log(`⚠️  Skipping invalid coverage file: ${searchPath}`);
           continue;
         }
