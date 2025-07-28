@@ -744,47 +744,137 @@ export class YouTubeScraperService {
 
         const liveStream = await this.browserService.evaluate(() => {
           /* eslint-disable no-undef */
-          // Look for "Now playing" indicator to find active livestream
-          const nowPlayingElements = Array.from(document.querySelectorAll('*')).filter(
-            el => el.textContent && el.textContent.trim() === 'Now playing'
-          );
 
-          if (nowPlayingElements.length === 0) {
-            return null;
+          /**
+           * Check if a video element has indicators that it's currently live
+           * @param {Element} element - Video element or its container
+           * @returns {boolean} True if element shows live indicators
+           */
+          function hasLiveIndicators(element) {
+            if (!element) {
+              return false;
+            }
+
+            const container = element.closest(
+              'ytd-rich-grid-media, ytd-rich-item-renderer, ytd-video-renderer, div, article, section'
+            );
+            if (!container) {
+              return false;
+            }
+
+            const containerText = container.textContent?.toLowerCase() || '';
+
+            // Look for explicit live indicators
+            const liveIndicators = ['live now', 'streaming now', 'now playing', 'currently live', 'going live'];
+
+            // Check for live indicator text
+            for (const indicator of liveIndicators) {
+              if (containerText.includes(indicator)) {
+                return true;
+              }
+            }
+
+            // Look for live badges or visual indicators
+            const liveBadgeSelectors = [
+              '.ytp-live-badge',
+              '[aria-label*="live"]',
+              '.live-badge',
+              '.badge[data-style*="live"]',
+              '.ytd-badge-supported-renderer[aria-label*="live"]',
+            ];
+
+            for (const selector of liveBadgeSelectors) {
+              if (container.querySelector(selector)) {
+                return true;
+              }
+            }
+
+            // Check for red "LIVE" indicators in various formats
+            const allElements = container.querySelectorAll('*');
+            for (const el of allElements) {
+              const text = el.textContent?.trim().toLowerCase();
+              const style = window.getComputedStyle(el);
+
+              // Look for red "LIVE" text indicators
+              if (
+                text === 'live' &&
+                (style.color.includes('rgb(255, 0, 0)') || // Red
+                  style.color.includes('#ff0000') ||
+                  style.backgroundColor.includes('rgb(255, 0, 0)') ||
+                  style.backgroundColor.includes('#ff0000') ||
+                  el.classList.toString().toLowerCase().includes('live'))
+              ) {
+                return true;
+              }
+            }
+
+            return false;
           }
 
-          // Find the closest link element that contains a YouTube video
+          // Primary strategy: Look for explicit "Now playing" indicators
+          const nowPlayingElements = Array.from(document.querySelectorAll('*')).filter(
+            el => el.textContent && el.textContent.trim().toLowerCase() === 'now playing'
+          );
+
           let liveElement = null;
-          for (const nowPlaying of nowPlayingElements) {
-            // Look for video link in the same container
-            const container = nowPlaying.closest('div, article, section');
-            if (container) {
-              liveElement = container.querySelector('a[href*="/watch?v="]');
-              if (liveElement) {
-                break;
+          let detectionMethod = null;
+
+          // Strategy 1: Find video associated with "Now playing" text
+          if (nowPlayingElements.length > 0) {
+            for (const nowPlaying of nowPlayingElements) {
+              const container = nowPlaying.closest('div, article, section');
+              if (container) {
+                const videoLink = container.querySelector('a[href*="/watch?v="]');
+                if (videoLink && hasLiveIndicators(videoLink)) {
+                  liveElement = videoLink;
+                  detectionMethod = 'now-playing-indicator';
+                  break;
+                }
               }
             }
           }
 
-          // Fallback: Look for any featured livestream selectors
+          // Strategy 2: Look for videos with strong live indicators
           if (!liveElement) {
-            const selectors = [
+            const candidateSelectors = [
               'ytd-channel-featured-content-renderer a[href*="/watch?v="]',
               'a#video-title-link[href*="/watch?v="]',
-              '[aria-label*="live"] a[href*="/watch?v="]',
-              'a[href*="/watch?v="]:has-text("Live")',
-              // Generic fallback for first video link on live tab
-              'a[href*="/watch?v="]',
+              'ytd-rich-grid-media a[href*="/watch?v="]',
+              'ytd-rich-item-renderer a[href*="/watch?v="]',
             ];
 
-            for (const selector of selectors) {
+            for (const selector of candidateSelectors) {
               try {
-                liveElement = document.querySelector(selector);
+                const candidates = document.querySelectorAll(selector);
+                for (const candidate of candidates) {
+                  if (hasLiveIndicators(candidate)) {
+                    liveElement = candidate;
+                    detectionMethod = 'live-indicator-validation';
+                    break;
+                  }
+                }
                 if (liveElement) {
                   break;
                 }
               } catch (_e) {
                 // Ignore selector errors and continue
+              }
+            }
+          }
+
+          // Strategy 3: Check for YouTube's live stream player indicators
+          if (!liveElement) {
+            // Look for the main video player with live indicators
+            const playerContainer = document.querySelector('#movie_player, .html5-video-player');
+            if (playerContainer) {
+              const liveIndicator = playerContainer.querySelector('.ytp-live, .ytp-live-badge, [aria-label*="live"]');
+              if (liveIndicator) {
+                // Find associated video link
+                const videoLink = document.querySelector('a[href*="/watch?v="]');
+                if (videoLink) {
+                  liveElement = videoLink;
+                  detectionMethod = 'player-live-badge';
+                }
               }
             }
           }
@@ -822,8 +912,9 @@ export class YouTubeScraperService {
             url: liveElement.href,
             type: 'livestream',
             platform: 'youtube',
-            publishedAt: new Date().toISOString(), // Live streams are happening now
+            publishedAt: new Date().toISOString(),
             scrapedAt: new Date().toISOString(),
+            detectionMethod, // Include detection method for debugging
           };
           /* eslint-enable no-undef */
         });
@@ -838,9 +929,10 @@ export class YouTubeScraperService {
             platform: liveStream.platform,
             publishedAt: liveStream.publishedAt,
             scrapedAt: liveStream.scrapedAt,
+            detectionMethod: liveStream.detectionMethod,
           };
 
-          operation.success('Successfully scraped active live stream', logData);
+          operation.success(`Successfully scraped active live stream using ${liveStream.detectionMethod}`, logData);
         } else {
           operation.success('No active live stream found', {
             liveStreamUrl: this.liveStreamUrl,
@@ -867,17 +959,79 @@ export class YouTubeScraperService {
       throw new Error('YouTube scraper is not initialized');
     }
 
-    // Fetch both potential new content types concurrently
-    const [activeLiveStream, latestVideo] = await Promise.all([this.fetchActiveLiveStream(), this.fetchLatestVideo()]);
+    // Start tracked operation for content scanning
+    const operation = this.logger.startOperation('scanForContent', {
+      videosUrl: this.videosUrl,
+      liveStreamUrl: this.liveStreamUrl,
+      isAuthenticated: this.isAuthenticated,
+    });
 
-    if (activeLiveStream) {
-      this.metrics.livestreamsDetected++;
-      await this.contentCoordinator.processContent(activeLiveStream.id, 'scraper', activeLiveStream);
-    }
+    try {
+      operation.progress('Fetching both livestream and video content concurrently');
 
-    if (latestVideo && latestVideo.success) {
-      this.metrics.videosDetected++;
-      await this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
+      // Fetch both potential new content types concurrently
+      const [activeLiveStream, latestVideo] = await Promise.all([
+        this.fetchActiveLiveStream(),
+        this.fetchLatestVideo(),
+      ]);
+
+      let contentProcessed = 0;
+      const contentResults = [];
+
+      if (activeLiveStream) {
+        operation.progress(
+          `Processing detected livestream: ${activeLiveStream.id} (${activeLiveStream.detectionMethod})`
+        );
+        this.metrics.livestreamsDetected++;
+
+        try {
+          const result = await this.contentCoordinator.processContent(activeLiveStream.id, 'scraper', activeLiveStream);
+          contentResults.push({ type: 'livestream', id: activeLiveStream.id, result });
+          contentProcessed++;
+        } catch (error) {
+          operation.error(error, `Failed to process livestream ${activeLiveStream.id}`, {
+            livestreamId: activeLiveStream.id,
+            detectionMethod: activeLiveStream.detectionMethod,
+          });
+        }
+      }
+
+      if (latestVideo && latestVideo.success) {
+        operation.progress(`Processing detected video: ${latestVideo.id} (${latestVideo.strategy})`);
+        this.metrics.videosDetected++;
+
+        try {
+          const result = await this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
+          contentResults.push({ type: 'video', id: latestVideo.id, result });
+          contentProcessed++;
+        } catch (error) {
+          operation.error(error, `Failed to process video ${latestVideo.id}`, {
+            videoId: latestVideo.id,
+            strategy: latestVideo.strategy,
+          });
+        }
+      }
+
+      const summary = {
+        livestreamFound: !!activeLiveStream,
+        videoFound: !!(latestVideo && latestVideo.success),
+        contentProcessed,
+        results: contentResults.map(r => ({ type: r.type, id: r.id, action: r.result?.action })),
+      };
+
+      if (contentProcessed > 0) {
+        operation.success(`Content scan completed: processed ${contentProcessed} items`, summary);
+      } else {
+        operation.success('Content scan completed: no new content found', summary);
+      }
+
+      return summary;
+    } catch (error) {
+      operation.error(error, 'Content scanning failed', {
+        videosUrl: this.videosUrl,
+        liveStreamUrl: this.liveStreamUrl,
+      });
+      throw error;
     }
   }
 

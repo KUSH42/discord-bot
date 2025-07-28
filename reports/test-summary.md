@@ -1,48 +1,53 @@
 # 📊 Comprehensive Test Summary Report
 
-**Generated:** 7/28/2025, 6:05:38 PM
-**Commit:** `unknown`
-**Branch:** `unknown`
-**Trigger:** manual
+**Generated:** 7/28/2025, 5:43:15 PM
+**Commit:** `44fec79a2b4ed9e3b462fdde2ced0eeaf1e72eb2`
+**Branch:** `backup`
+**Trigger:** push
+**Run:** [#16576118870](https://github.com/KUSH42/discord-bot/actions/runs/16576118870)
 
 ## 🎯 Quality Gates Status
 
 | Gate | Status | Target | Actual | Result |
 |------|--------|--------|--------|---------|
-| Code Coverage | ✅ PASS | 25% | 73.90% | Lines covered |
-| Test Success Rate | ❌ FAIL | 95% | 40.0% | Suites passing |
-| Security | ❌ FAIL | 0 | 0 | Vulnerabilities |
+| Code Coverage | ✅ PASS | 25% | 74.10% | Lines covered |
+| Test Success Rate | ❌ FAIL | 95% | 60.0% | Suites passing |
+| Security | ✅ PASS | 0 | 0 | Vulnerabilities |
 
 ### 🔴 **QUALITY GATES FAILED**
 
 ## 📈 Coverage Analysis
 
-**Overall Score:** 62.2/100
+**Overall Score:** 73.8/100
 
 | Metric | Coverage | Total | Covered |
 |--------|----------|-------|---------|
-| **Lines** | **73.90%** | 20111 | 14863 |
-| Functions | 36.47% | 1670 | 609 |
-| Branches | 72.25% | 6428 | 4644 |
-| Statements | 73.90% | 20111 | 14863 |
+| **Lines** | **74.10%** | 20111 | 14903 |
+| Functions | 74.87% | 1703 | 1275 |
+| Branches | 72.38% | 6545 | 4737 |
+| Statements | 74.10% | 20111 | 14903 |
 
 🟡 **Good Coverage** - Meets recommended standards
 
 **Coverage Sources:**
-- E2E Tests: `coverage/e2e-tests/lcov.info`
 - Unknown: `coverage/lcov.info`
-- Performance Tests: `coverage/performance-tests/lcov.info`
 - Unit Tests: `coverage/unit-tests-node20/lcov.info`
+- E2E Tests: `coverage/e2e-tests/lcov.info`
+- Performance Tests: `coverage/performance-tests/lcov.info`
+- Unit Tests: `test-results/coverage/unit-tests-node18/lcov.info`
+- Unit Tests: `test-results/coverage/unit-tests-node20/lcov.info`
+- E2E Tests: `test-results/coverage/e2e-tests/lcov.info`
+- Unknown: `coverage/coverage/lcov.info`
 
 ## 🧪 Test Results Summary
 
 | Test Suite | Status | Details |
 |------------|--------|---------|
-| Unit | ❌ FAIL | 1623 tests, 115 failures, 92.9% success |
-| Integration | ❌ FAIL | 18 tests, 16 failures, 11.1% success |
-| E2e | ❌ FAIL | test-results/e2e-tests.xml |
-| Performance | ✅ PASS | test-results/performance-tests.xml |
-| Security | ✅ PASS | 98 tests, 0 failures, 100.0% success |
+| Unit | ❌ FAIL | test-results/test-results/unit-tests-node18.xml, test-results/test-results/unit-tests-node20.xml |
+| Integration | ✅ PASS | test-results/coverage/integration-tests |
+| E2e | ❌ FAIL | test-results/test-results/e2e-tests.xml |
+| Performance | ✅ PASS | test-results/test-results/performance-tests.xml |
+| Security | ✅ PASS | test-results/test-results/security-tests.xml |
 
 ## 📋 Detailed Test Results
 
@@ -52,7 +57,24 @@
 
 ### Integration Tests
 
-✅ Tests completed with status: failure
+```
+
+> discord-content-announcement-bot@0.2.0 test:integration
+> dotenvx run -f tests/test.env -- jest --config tests/configs/jest.integration.config.js --detectOpenHandles --forceExit --coverage --coverageDirectory=coverage/integration --coverageReporters=text --coverageReporters=lcov --coverage --coverageDirectory=coverage/integration-tests --coverageReporters=lcov --testTimeout=15000 --forceExit --detectOpenHandles --verbose=true --passWithNoTests --coverageThreshold={}
+
+[38;5;142m[dotenvx@1.48.0] injecting env (27) from tests/test.env[39m
+TypeError: filePath.startsWith is not a function
+    at replaceRootDirInPath (/home/runner/work/discord-bot/discord-bot/node_modules/jest-config/build/index.js:2732:17)
+    at /home/runner/work/discord-bot/discord-bot/node_modules/jest-config/build/index.js:1696:93
+    at Array.reduce (<anonymous>)
+    at normalize (/home/runner/work/discord-bot/discord-bot/node_modules/jest-config/build/index.js:1658:14)
+    at readConfig (/home/runner/work/discord-bot/discord-bot/node_modules/jest-config/build/index.js:928:36)
+    at async readConfigs (/home/runner/work/discord-bot/discord-bot/node_modules/jest-config/build/index.js:1168:26)
+    at async runCLI (/home/runner/work/discord-bot/discord-bot/node_modules/@jest/core/build/index.js:1393:7)
+    at async Object.run (/home/runner/work/discord-bot/discord-bot/node_modules/jest-cli/build/index.js:656:9)
+[1m[38;5;196mCommand failed with exit code 1: /home/runner/work/discord-bot/discord-bot/node_modules/.bin/jest --config tests/configs/jest.integration.config.js --detectOpenHandles --forceExit --coverage --coverageDirectory=coverage/integration --coverageReporters=text --coverageReporters=lcov --coverage --coverageDirectory=coverage/integration-tests --coverageReporters=lcov --testTimeout=15000 --forceExit --detectOpenHandles --verbose=true --passWithNoTests --coverageThreshold={}[39m[22m
+
+```
 
 ### E2e Tests
 
@@ -68,8 +90,19 @@
 
 ## 📦 Available Artifacts
 
-🏠 **Local Run** - No remote artifacts available
+All detailed reports and coverage data are available as workflow artifacts:
+[📊 Workflow Artifacts](https://github.com/KUSH42/discord-bot/actions/runs/16576118870)
+
+**Available Downloads:**
+- `comprehensive-test-report` - Complete test results and coverage
+- `lcov-html-report` - Interactive HTML coverage report
+- `unit-test-results-node18` - Node.js 18 unit test results
+- `unit-test-results-node20` - Node.js 20 unit test results
+- `integration-test-results` - Integration test results
+- `e2e-test-results` - End-to-end test results
+- `performance-test-results` - Performance test results
+- `security-test-results` - Security audit results
 
 ---
 
-*Report generated by Enhanced Test Summary Generator at 2025-07-28T16:05:38.774Z*
+*Report generated by Enhanced Test Summary Generator at 2025-07-28T17:43:15.482Z*
