@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-07-27T23:44:25.000Z",
+  "timestamp": "2025-07-28T05:45:39.975Z",
   "commit": "unknown",
   "branch": "unknown",
   "trigger": "manual",
@@ -33,10 +33,11 @@
       "coverage/unit/lcov.info",
       "coverage/integration/lcov.info",
       "coverage/performance/lcov.info",
-      "coverage/lcov.info"
+      "coverage/lcov.info",
+      "coverage/merged/lcov.info"
     ],
     "extended": {
-      "timestamp": "2025-07-27T23:44:24.461Z",
+      "timestamp": "2025-07-28T05:45:39.447Z",
       "totalFiles": 0,
       "coverageByType": {
         "unit": [
@@ -50,7 +51,7 @@
           {
             "path": "coverage/integration/lcov.info",
             "nodeVersion": "unknown",
-            "size": 155872
+            "size": 225396
           }
         ],
         "performance": [
@@ -64,7 +65,12 @@
           {
             "path": "coverage/lcov.info",
             "nodeVersion": "unknown",
-            "size": 259292
+            "size": 261749
+          },
+          {
+            "path": "coverage/merged/lcov.info",
+            "nodeVersion": "unknown",
+            "size": 262832
           }
         ]
       },
@@ -103,8 +109,8 @@
           "path": "coverage/integration/lcov.info",
           "type": "integration",
           "nodeVersion": "unknown",
-          "size": 155872,
-          "hash": "5e11d597"
+          "size": 225396,
+          "hash": "b9e28908"
         },
         {
           "path": "coverage/performance/lcov.info",
@@ -117,8 +123,15 @@
           "path": "coverage/lcov.info",
           "type": "unknown",
           "nodeVersion": "unknown",
-          "size": 259292,
-          "hash": "1a95be68"
+          "size": 261749,
+          "hash": "8f80ee57"
+        },
+        {
+          "path": "coverage/merged/lcov.info",
+          "type": "unknown",
+          "nodeVersion": "unknown",
+          "size": 262832,
+          "hash": "05f1d6a5"
         }
       ],
       "qualityScore": 81.03455668631861,
@@ -132,119 +145,24 @@
   },
   "tests": {
     "unit": {
-      "status": "failure",
-      "tests": 1552,
-      "failures": 1,
-      "errors": 0,
-      "skipped": 0,
-      "time": 31.208000000000002,
-      "successRate": 99.93556701030928,
-      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
-      "path": "undefined, test-results/unit-tests-node18.xml, test-results/unit-tests-node20.xml"
+      "status": "skipped",
+      "details": "No test results found"
     },
     "integration": {
-      "status": "success",
-      "tests": 2,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "time": 0.223,
-      "successRate": 100,
-      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
-      "path": "undefined, test-results/integration-tests.xml"
+      "status": "skipped",
+      "details": "No test results found"
     },
     "e2e": {
-      "status": "success",
-      "details": "49 tests, 0 failures, 0 errors, 0 skipped (28.53s)",
-      "path": "test-results/e2e-tests.xml",
-      "summary": {
-        "total": 49,
-        "passed": 49,
-        "failed": 0,
-        "skipped": 0,
-        "time": "28.53s"
-      },
-      "extended": {
-        "suites": [
-          {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
-          }
-        ],
-        "path": "test-results/e2e-tests.xml"
-      }
+      "status": "skipped",
+      "details": "No test results found"
     },
     "performance": {
-      "status": "success",
-      "details": "49 tests, 0 failures, 0 errors, 0 skipped (28.53s)",
-      "path": "test-results/performance-tests.xml",
-      "summary": {
-        "total": 49,
-        "passed": 49,
-        "failed": 0,
-        "skipped": 0,
-        "time": "28.53s"
-      },
-      "extended": {
-        "suites": [
-          {
-            "name": "Credential Handling Security Tests",
-            "tests": 20,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "28.369s"
-          },
-          {
-            "name": "Application Input Validation Security Tests",
-            "tests": 17,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.097s"
-          },
-          {
-            "name": "Security and Input Validation Tests",
-            "tests": 12,
-            "failures": 0,
-            "errors": 0,
-            "skipped": 0,
-            "time": "0.06s"
-          }
-        ],
-        "path": "test-results/performance-tests.xml"
-      }
+      "status": "skipped",
+      "details": "No test results found"
     },
     "security": {
-      "status": "success",
-      "tests": 98,
-      "failures": 0,
-      "errors": 0,
-      "skipped": 0,
-      "time": 9.035,
-      "successRate": 100,
-      "details": "0 tests, 0 failures, 0 errors, 0 skipped (0s)",
-      "path": "undefined, test-results/security-tests.xml"
+      "status": "skipped",
+      "details": "No test results found"
     }
   },
   "artifacts": [],
@@ -257,13 +175,13 @@
     "testsPassing": {
       "passed": false,
       "threshold": 95,
-      "actual": 80
+      "actual": 0
     },
     "security": {
       "passed": false,
       "vulnerabilities": 0
     }
   },
-  "generated": "2025-07-27T23:44:25.050Z",
+  "generated": "2025-07-28T05:45:39.984Z",
   "version": "2.0"
 }

@@ -177,13 +177,46 @@ class CICoverageMerger {
       './lcov.info',
       'lcov.info',
 
-      // GitHub Actions artifact patterns (primary - where CI actually places files)
-      'test-results/unit-test-results-node18/coverage/unit/lcov.info',
-      'test-results/unit-test-results-node20/coverage/unit/lcov.info',
-      'test-results/integration-test-results/coverage/integration/lcov.info',
-      'test-results/e2e-test-results/coverage/e2e/lcov.info',
-      'test-results/performance-test-results/coverage/performance/lcov.info',
-      'test-results/security-test-results/coverage/security/lcov.info',
+      // Local coverage directory paths (for local development)
+      'coverage/unit/lcov.info',
+      'coverage/integration/lcov.info',
+      'coverage/e2e/lcov.info',
+      'coverage/performance/lcov.info',
+      'coverage/security/lcov.info',
+      'coverage/lcov.info',
+
+      // GitHub Actions coverage directory patterns (from workflow coverageDirectory)
+      'coverage/unit-tests-node18/lcov.info',
+      'coverage/unit-tests-node20/lcov.info',
+      'coverage/integration-tests/lcov.info',
+      'coverage/e2e-tests/lcov.info',
+      'coverage/performance-tests/lcov.info',
+      'coverage/security-tests/lcov.info',
+
+      // GitHub Actions artifact patterns - CORRECTED PATHS
+      // Based on actual workflow: coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }}
+      'test-results/unit-tests-node18/lcov.info',
+      'test-results/unit-tests-node20/lcov.info',
+      'test-results/integration-tests/lcov.info',
+      'test-results/e2e-tests/lcov.info',
+      'test-results/performance-tests/lcov.info',
+      'test-results/security-tests/lcov.info',
+
+      // Alternative artifact patterns with coverage subdirectory
+      'test-results/unit-tests-node18/coverage/lcov.info',
+      'test-results/unit-tests-node20/coverage/lcov.info',
+      'test-results/integration-tests/coverage/lcov.info',
+      'test-results/e2e-tests/coverage/lcov.info',
+      'test-results/performance-tests/coverage/lcov.info',
+      'test-results/security-tests/coverage/lcov.info',
+
+      // Direct artifact directory access (when artifacts are merged into test-results/)
+      'test-results/unit-tests-node18/coverage/unit-tests-node18/lcov.info',
+      'test-results/unit-tests-node20/coverage/unit-tests-node20/lcov.info',
+      'test-results/integration-tests/coverage/integration-tests/lcov.info',
+      'test-results/e2e-tests/coverage/e2e-tests/lcov.info',
+      'test-results/performance-tests/coverage/performance-tests/lcov.info',
+      'test-results/security-tests/coverage/security-tests/lcov.info',
 
       // Legacy paths for backwards compatibility
       'test-results/unit/node18/coverage/unit/lcov.info',
@@ -191,20 +224,6 @@ class CICoverageMerger {
       'test-results/integration/coverage/integration/lcov.info',
       'test-results/e2e/coverage/e2e/lcov.info',
       'test-results/performance/coverage/performance/lcov.info',
-
-      // Direct coverage directory paths
-      'coverage/unit/lcov.info',
-      'coverage/integration/lcov.info',
-      'coverage/e2e/lcov.info',
-      'coverage/performance/lcov.info',
-      'coverage/lcov.info',
-
-      // GitHub Actions artifact patterns
-      'unit-test-results-node18/coverage/unit/lcov.info',
-      'unit-test-results-node20/coverage/unit/lcov.info',
-      'integration-test-results/coverage/integration/lcov.info',
-      'e2e-test-results/coverage/e2e/lcov.info',
-      'performance-test-results/coverage/performance/lcov.info',
     ];
 
     // Also dynamically search for any lcov.info files in test-results
@@ -269,10 +288,14 @@ class CICoverageMerger {
     const dynamicPaths = [];
 
     try {
-      // Scan test-results directory if it exists
+      // Scan coverage directory if it exists (local development)
+      if (fs.existsSync('coverage')) {
+        this.scanDirectoryForLcov('coverage', dynamicPaths);
+      }
+
+      // Scan test-results directory if it exists (GitHub Actions artifacts)
       if (fs.existsSync('test-results')) {
         this.scanDirectoryForLcov('test-results', dynamicPaths);
-        this.scanDirectoryForLcov('coverage', dynamicPaths);
       }
 
       // Scan current directory for artifact directories
@@ -282,7 +305,8 @@ class CICoverageMerger {
           entry.isDirectory() &&
           (entry.name.includes('test-results') ||
             entry.name.includes('coverage') ||
-            entry.name.endsWith('-test-results'))
+            entry.name.endsWith('-test-results') ||
+            entry.name.endsWith('-tests'))
         ) {
           this.scanDirectoryForLcov(entry.name, dynamicPaths);
         }
@@ -293,6 +317,7 @@ class CICoverageMerger {
 
     if (dynamicPaths.length > 0) {
       console.log(`🔍 Dynamically discovered ${dynamicPaths.length} additional coverage paths`);
+      dynamicPaths.forEach(path => console.log(`   Found: ${path}`));
     }
 
     return dynamicPaths;
@@ -399,7 +424,7 @@ class CICoverageMerger {
       const command = `npx lcov-result-merger ${quotedPaths} "${outputPath}"`;
 
       console.log(`Executing: ${command}`);
-      const result = execSync(command, { stdio: 'pipe', encoding: 'utf8' });
+      execSync(command, { stdio: 'pipe', encoding: 'utf8' });
       console.log('✅ Used lcov-result-merger');
 
       // Check if the merge actually worked
