@@ -580,7 +580,15 @@ export class ScraperApplication {
       // which provides both regular tweets and retweets in a single source
       await this.navigateToProfileTimeline(this.xUser);
 
-      operation.progress('Extracting tweets from profile timeline');
+      operation.progress('Waiting for search results to load');
+      // Wait for the primary column to load (same as profile timeline)
+      await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
+
+      operation.progress('Performing enhanced scrolling to load search results');
+      // Use the same enhanced scrolling as retweet detection
+      await this.performEnhancedScrolling();
+
+      operation.progress('Extracting tweets from page');
       const tweets = await this.extractTweets();
       this.stats.totalTweetsFound += tweets.length;
 
