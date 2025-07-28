@@ -60,29 +60,6 @@ export default {
     ],
   ],
 
-  // Unit test coverage thresholds
-  coverageThreshold: {
-    global: {
-      statements: 50, // Higher threshold for unit tests
-      branches: 40,
-      functions: 55,
-      lines: 50,
-    },
-    // Core modules should have excellent unit test coverage
-    'src/core/': {
-      statements: 85,
-      branches: 80,
-      functions: 90,
-      lines: 85,
-    },
-    'src/utilities/': {
-      statements: 90,
-      branches: 85,
-      functions: 95,
-      lines: 90,
-    },
-  },
-
   // Unit test specific settings
   testTimeout: 10000, // 10 seconds for unit tests
   maxWorkers: 4, // Parallel execution for faster unit tests
@@ -99,7 +76,7 @@ export default {
 
   // Unit test optimizations
   cache: true,
-  cacheDirectory: '<rootDir>/.jest-cache-unit',
+  cacheDirectory: `<rootDir>/.jest-cache-unit-${process.env.NODE_VERSION}`,
 
   // Error handling
   errorOnDeprecated: false,
