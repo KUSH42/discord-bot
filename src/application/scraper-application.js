@@ -12,6 +12,7 @@ export class ScraperApplication {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
     this.contentCoordinator = dependencies.contentCoordinator;
+    this.classifier = dependencies.contentClassifier;
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
     this.discord = dependencies.discordService;
