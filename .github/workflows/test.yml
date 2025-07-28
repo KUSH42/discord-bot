@@ -713,8 +713,9 @@ jobs:
             --verbose=true \
             2>&1 | tee coverage/performance-tests/test-output.log
           echo "Current working directory: $(pwd)"
+          $(echo ll -a)
           cd coverage
-          ll -a
+          $(echo ll -a)
           cd ..
 
 
@@ -923,9 +924,7 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Current working directory: $(pwd)"
-          cd coverage
-          ls -a
-          cd ..
+          ech
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
