@@ -803,20 +803,51 @@ export class ScraperApplication {
 
             const tweetID = tweetIdMatch[1];
 
-            // Extract author with multiple selectors
-            const authorSelectors = [
-              '[data-testid="User-Name"] a',
-              '[data-testid="User-Names"] a',
-              'a[role="link"][href^="/"]',
-              'div[dir="ltr"] span',
+            // Extract author username (not display name)
+            let author = 'Unknown';
+
+            // Method 1: Try to extract username from href attribute (most reliable)
+            const userLinkSelectors = [
+              '[data-testid="User-Name"] a[href^="/"]',
+              '[data-testid="User-Names"] a[href^="/"]',
+              'a[role="link"][href^="/"][href*="status"]',
+              'a[href^="/"][href*="status"]',
             ];
 
-            let author = 'Unknown';
-            for (const selector of authorSelectors) {
-              const authorElement = article.querySelector(selector);
-              if (authorElement && authorElement.textContent.trim()) {
-                author = authorElement.textContent.trim();
-                break;
+            for (const selector of userLinkSelectors) {
+              const linkElement = article.querySelector(selector);
+              if (linkElement && linkElement.href) {
+                const usernameMatch = linkElement.href.match(/\/([^/]+)\/status/);
+                if (usernameMatch && usernameMatch[1]) {
+                  author = usernameMatch[1];
+                  break;
+                }
+              }
+            }
+
+            // Method 2: Try to extract from tweet URL as fallback
+            if (author === 'Unknown' && url) {
+              const urlUsernameMatch = url.match(/\/([^/]+)\/status/);
+              if (urlUsernameMatch && urlUsernameMatch[1]) {
+                author = urlUsernameMatch[1];
+              }
+            }
+
+            // Method 3: Fallback to text content (display name) if username extraction fails
+            if (author === 'Unknown') {
+              const displayNameSelectors = [
+                '[data-testid="User-Name"] a',
+                '[data-testid="User-Names"] a',
+                'a[role="link"][href^="/"]',
+                'div[dir="ltr"] span',
+              ];
+
+              for (const selector of displayNameSelectors) {
+                const authorElement = article.querySelector(selector);
+                if (authorElement && authorElement.textContent.trim()) {
+                  author = authorElement.textContent.trim();
+                  break;
+                }
               }
             }
 
@@ -870,8 +901,8 @@ export class ScraperApplication {
               }
             }
 
-            // Method 2: Check for classic RT @ pattern (only if it's our monitored user doing the RT)
-            if (!isRetweet && text.startsWith('RT @') && (author === monitoredUser || author === `@${monitoredUser}`)) {
+            // Method 2: Check for classic RT @ pattern (when found on monitored user's timeline)
+            if (!isRetweet && text.startsWith('RT @') && window.location.href.includes(`/${monitoredUser}`)) {
               isRetweet = true;
             }
 
@@ -1110,9 +1141,12 @@ export class ScraperApplication {
         tweet.tweetCategory === 'Retweet' &&
         tweet.author !== this.xUser &&
         tweet.author !== `@${this.xUser}` &&
-        tweet.author !== 'Unknown'
+        tweet.author !== 'Unknown' &&
+        tweet.retweetedBy &&
+        (tweet.retweetedBy === this.xUser || tweet.retweetedBy === `@${this.xUser}`)
       ) {
         // True retweet: monitored user retweeted someone else's content
+        // Only treat as retweet if we have confirmed that our monitored user did the retweet
         classification = {
           type: 'retweet',
           confidence: 0.99,
