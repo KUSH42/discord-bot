@@ -764,38 +764,93 @@ export class ScraperApplication {
           'article[role="article"]',
           'div[data-testid="cellInnerDiv"] article',
           'article',
+          // Additional selectors for newer X.com layout
+          '[data-testid="tweet"]',
+          '[role="article"]',
+          'div[data-testid="cellInnerDiv"]',
+          'article[tabindex="-1"]',
+          'div[aria-labelledby]',
         ];
 
         let articles = [];
         for (const selector of articleSelectors) {
           articles = document.querySelectorAll(selector);
+          console.log(`Selector "${selector}" found ${articles.length} elements`);
           if (articles.length > 0) {
+            console.log(`Using selector: ${selector} (found ${articles.length} articles)`);
             break;
           }
         }
 
         if (articles.length === 0) {
+          console.log('No articles found with any selector');
+          // Debug: Check what content is actually on the page
+          const bodyText = document.body.innerText || '';
+          console.log(`Page body text length: ${bodyText.length}`);
+          console.log(`Page URL: ${window.location.href}`);
+
+          // Check for common X.com indicators
+          const indicators = ['Sign up', 'Log in', "What's happening", 'Home', 'Timeline'];
+
+          for (const indicator of indicators) {
+            if (bodyText.includes(indicator)) {
+              console.log(`Found page indicator: "${indicator}"`);
+            }
+          }
+
           return tweets;
         }
+
+        console.log(`Processing ${articles.length} articles for tweet extraction`);
 
         for (const article of articles) {
           try {
             // Extract tweet URL with multiple selectors
-            const linkSelectors = ['a[href*="/status/"]', 'time[datetime] + a', 'a[role="link"][href*="/status/"]'];
+            const linkSelectors = [
+              'a[href*="/status/"]',
+              'time[datetime] + a',
+              'a[role="link"][href*="/status/"]',
+              // Additional selectors for newer layouts
+              'time[datetime]',
+              'time + a',
+              'a[href*="status"]',
+              '[data-testid="User-Name"] ~ * a[href*="/status/"]',
+              'div a[href*="/status/"]',
+            ];
 
             let tweetLink = null;
+            let url = null;
+
             for (const selector of linkSelectors) {
-              tweetLink = article.querySelector(selector);
-              if (tweetLink) {
-                break;
+              const element = article.querySelector(selector);
+              if (element) {
+                if (element.href && element.href.includes('/status/')) {
+                  tweetLink = element;
+                  url = element.href;
+                  break;
+                } else if (element.tagName === 'TIME' && element.parentElement && element.parentElement.href) {
+                  // Handle time elements that are wrapped in links
+                  tweetLink = element.parentElement;
+                  url = element.parentElement.href;
+                  break;
+                }
               }
             }
 
+            // Fallback: search for any link with /status/ in the article
             if (!tweetLink) {
+              const allLinks = article.querySelectorAll('a[href*="/status/"]');
+              if (allLinks.length > 0) {
+                tweetLink = allLinks[0];
+                url = tweetLink.href;
+              }
+            }
+
+            if (!tweetLink || !url) {
+              console.log('No tweet link found in article');
               continue;
             }
 
-            const url = tweetLink.href;
             const tweetIdMatch = url.match(/status\/(\d+)/);
             if (!tweetIdMatch) {
               continue;
@@ -852,14 +907,46 @@ export class ScraperApplication {
             }
 
             // Extract text content with multiple selectors
-            const textSelectors = ['[data-testid="tweetText"]', '[lang] span', 'div[dir="ltr"]', 'span[dir="ltr"]'];
+            const textSelectors = [
+              '[data-testid="tweetText"]',
+              '[lang] span',
+              'div[dir="ltr"]',
+              'span[dir="ltr"]',
+              // Additional selectors for newer layouts
+              '[data-testid="tweetText"] span',
+              'div[lang] span',
+              'div[lang]',
+              'span[lang]',
+              'div[data-testid="tweetText"]',
+              // Fallback to any text in the article
+              'div:not([data-testid="User-Name"]):not([data-testid="User-Names"]) span',
+            ];
 
             let text = '';
             for (const selector of textSelectors) {
               const textElement = article.querySelector(selector);
-              if (textElement && textElement.innerText) {
-                text = textElement.innerText;
+              if (textElement && textElement.innerText && textElement.innerText.trim()) {
+                text = textElement.innerText.trim();
                 break;
+              }
+            }
+
+            // If no text found with specific selectors, try to extract from article text
+            if (!text) {
+              const articleText = article.innerText || '';
+              // Extract meaningful text (skip user names, timestamps, etc.)
+              const lines = articleText.split('\n').filter(line => {
+                const trimmed = line.trim();
+                return (
+                  trimmed &&
+                  !trimmed.match(/^\d+[hms]$/) && // timestamps like "2h", "5m"
+                  !trimmed.match(/^@\w+$/) && // usernames
+                  !trimmed.startsWith('·') && // separator dots
+                  trimmed.length > 3
+                ); // meaningful text
+              });
+              if (lines.length > 0) {
+                text = lines[0]; // Take first meaningful line
               }
             }
 
@@ -935,10 +1022,13 @@ export class ScraperApplication {
             }
 
             tweets.push(tweetData);
+            console.log(`Successfully extracted tweet ${tweetID} from ${author} (${tweetCategory})`);
           } catch (_err) {
-            // console.error('Error extracting tweet:', _err);
+            console.error('Error extracting tweet:', _err);
           }
         }
+
+        console.log(`Tweet extraction completed: found ${tweets.length} tweets`);
         return tweets;
         /* eslint-enable no-undef */
       }, monitoredUser);
