@@ -838,7 +838,7 @@ export class BotApplication {
           const youtubeChannel = await this.discord.fetchChannel(youtubeChannelId);
           if (youtubeChannel) {
             // Suppress Discord history scanning logs - only log summary
-            const videoResults = await duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 1000);
+            const videoResults = await duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 100);
 
             // Single summary log for Discord history scan (not actual YouTube scraping)
             this.logger.info(
@@ -869,7 +869,7 @@ export class BotApplication {
             try {
               const channel = await this.discord.fetchChannel(channelConfig.id);
               if (channel) {
-                const tweetResults = await scraperDuplicateDetector.scanDiscordChannelForTweets(channel, 1000);
+                const tweetResults = await scraperDuplicateDetector.scanDiscordChannelForTweets(channel, 100);
                 totalTwitterResults.messagesScanned += tweetResults.messagesScanned;
                 totalTwitterResults.tweetIdsAdded += tweetResults.tweetIdsAdded;
                 totalTwitterResults.channelsScanned++;

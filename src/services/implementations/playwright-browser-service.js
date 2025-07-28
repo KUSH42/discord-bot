@@ -18,8 +18,15 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async launch(options = {}) {
-    if (this.browser) {
+    // Check if browser is actually running and connected
+    if (this.browser && this.browser.isConnected()) {
       throw new Error('Browser is already running');
+    }
+
+    // Clean up any disconnected browser references
+    if (this.browser && !this.browser.isConnected()) {
+      this.browser = null;
+      this.page = null;
     }
 
     this.browser = await chromium.launch(options);
@@ -314,12 +321,39 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async close() {
+    // Close page first, with error handling for disconnected state
     if (this.page) {
-      await this.page.close();
+      try {
+        if (!this.page.isClosed()) {
+          await this.page.close();
+        }
+      } catch (error) {
+        // Ignore errors when page is already closed or disconnected
+        if (
+          !error.message.includes('Target page, context or browser has been closed') &&
+          !error.message.includes('Browser connection lost')
+        ) {
+          throw error;
+        }
+      }
       this.page = null;
     }
+
+    // Close browser with error handling for disconnected state
     if (this.browser) {
-      await this.browser.close();
+      try {
+        if (this.browser.isConnected()) {
+          await this.browser.close();
+        }
+      } catch (error) {
+        // Ignore errors when browser is already closed or disconnected
+        if (
+          !error.message.includes('Target page, context or browser has been closed') &&
+          !error.message.includes('Browser connection lost')
+        ) {
+          throw error;
+        }
+      }
       this.browser = null;
     }
   }

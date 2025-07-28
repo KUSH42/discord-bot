@@ -333,50 +333,8 @@ export class SystemdSafeConsoleTransport extends winston.transports.Console {
     }
 
     try {
-      // Override console methods temporarily to catch EPIPE errors
-      const originalConsoleError = console.error;
-      const originalConsoleLog = console.log;
-
-      console.error = (...args) => {
-        try {
-          originalConsoleError.apply(console, args);
-        } catch (error) {
-          if (this.isWriteError(error)) {
-            this.silent = true;
-            return;
-          }
-          throw error;
-        }
-      };
-
-      console.log = (...args) => {
-        try {
-          originalConsoleLog.apply(console, args);
-        } catch (error) {
-          if (this.isWriteError(error)) {
-            this.silent = true;
-            return;
-          }
-          throw error;
-        }
-      };
-
-      // Call the parent log method with wrapped callback
-      const result = super.log(info, error => {
-        // Restore original console methods
-        console.error = originalConsoleError;
-        console.log = originalConsoleLog;
-
-        // Handle callback errors
-        if (error && this.isWriteError(error)) {
-          this.silent = true;
-          callback(); // Don't pass the error to prevent cascade
-        } else {
-          callback(error);
-        }
-      });
-
-      return result;
+      // Call the parent log method
+      return super.log(info, callback);
     } catch (error) {
       // Handle EPIPE and other write errors silently
       if (this.isWriteError(error)) {
