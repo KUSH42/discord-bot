@@ -42,8 +42,8 @@ import { ScraperApplication } from '../application/scraper-application.js';
 import { MonitorApplication } from '../application/monitor-application.js';
 
 // Utils
-import { DiscordTransport, LoggerUtils } from '../logger-utils.js';
-const { createConsoleLogFormat, createFileLogFormat } = LoggerUtils;
+import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../logger-utils.js';
+const { createFileLogFormat, createSystemdSafeConsoleTransport } = LoggerUtils;
 
 /**
  * Set up all production services and dependencies
@@ -345,10 +345,9 @@ async function setupLogging(container, config) {
 
     // Create transports
     const transports = [
-      // Console transport
-      new winston.transports.Console({
+      // Systemd-safe console transport that handles EPIPE errors gracefully
+      LoggerUtils.createSystemdSafeConsoleTransport({
         level: logLevel,
-        format: createConsoleLogFormat(),
       }),
       // File transport with rotation
       new winston.transports.DailyRotateFile({

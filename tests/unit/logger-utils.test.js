@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { DiscordTransport, LoggerUtils } from '../../src/logger-utils.js';
+import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../../src/logger-utils.js';
 
 describe('Logger Utils Tests', () => {
   describe('DiscordTransport', () => {
@@ -258,6 +258,173 @@ describe('Logger Utils Tests', () => {
 
         // Clean up
         transport.close();
+      });
+    });
+
+    describe('createSystemdSafeConsoleTransport', () => {
+      it('should create SystemdSafeConsoleTransport instance', () => {
+        const transport = LoggerUtils.createSystemdSafeConsoleTransport();
+        expect(transport).toBeInstanceOf(SystemdSafeConsoleTransport);
+        expect(transport.level).toBe('info');
+      });
+
+      it('should create transport with custom options', () => {
+        const options = { level: 'debug' };
+        const transport = LoggerUtils.createSystemdSafeConsoleTransport(options);
+        expect(transport).toBeInstanceOf(SystemdSafeConsoleTransport);
+        expect(transport.level).toBe('debug');
+      });
+    });
+  });
+
+  describe('SystemdSafeConsoleTransport', () => {
+    let transport;
+    let mockCallback;
+
+    beforeEach(() => {
+      transport = new SystemdSafeConsoleTransport({ level: 'info' });
+      mockCallback = jest.fn();
+    });
+
+    describe('log method', () => {
+      it('should call parent log method normally', () => {
+        const logInfo = { level: 'info', message: 'Test message' };
+
+        // Mock the parent log method
+        const parentLogSpy = jest
+          .spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'log')
+          .mockImplementation((info, callback) => {
+            callback();
+            return true;
+          });
+
+        const result = transport.log(logInfo, mockCallback);
+
+        expect(parentLogSpy).toHaveBeenCalledWith(logInfo, mockCallback);
+        expect(result).toBe(true);
+
+        parentLogSpy.mockRestore();
+      });
+
+      it('should skip logging when silenced', async () => {
+        transport.silent = true;
+        const logInfo = { level: 'info', message: 'Test message' };
+
+        const parentLogSpy = jest.spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'log');
+
+        const result = await new Promise(resolve => {
+          const logResult = transport.log(logInfo, () => {
+            expect(parentLogSpy).not.toHaveBeenCalled();
+            resolve(logResult);
+          });
+        });
+
+        expect(result).toBe(true);
+        parentLogSpy.mockRestore();
+      });
+
+      it('should handle EPIPE errors gracefully', async () => {
+        const logInfo = { level: 'info', message: 'Test message' };
+
+        // Mock parent log to throw EPIPE error
+        const epipeError = new Error('write EPIPE');
+        epipeError.code = 'EPIPE';
+
+        const parentLogSpy = jest
+          .spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'log')
+          .mockImplementation(() => {
+            throw epipeError;
+          });
+
+        const result = await new Promise(resolve => {
+          const logResult = transport.log(logInfo, () => {
+            expect(transport.silent).toBe(true);
+            resolve(logResult);
+          });
+        });
+
+        expect(result).toBe(true);
+        parentLogSpy.mockRestore();
+      });
+
+      it('should re-throw non-write errors', () => {
+        const logInfo = { level: 'info', message: 'Test message' };
+        const otherError = new Error('Some other error');
+
+        const parentLogSpy = jest
+          .spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'log')
+          .mockImplementation(() => {
+            throw otherError;
+          });
+
+        expect(() => {
+          transport.log(logInfo, mockCallback);
+        }).toThrow('Some other error');
+
+        parentLogSpy.mockRestore();
+      });
+    });
+
+    describe('write method', () => {
+      it('should call parent write method normally', () => {
+        const parentWriteSpy = jest
+          .spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'write')
+          .mockReturnValue(true);
+
+        const result = transport.write('test chunk', 'utf8');
+
+        expect(parentWriteSpy).toHaveBeenCalledWith('test chunk', 'utf8');
+        expect(result).toBe(true);
+
+        parentWriteSpy.mockRestore();
+      });
+
+      it('should handle write errors gracefully', () => {
+        const writeError = new Error('write EPIPE');
+        writeError.code = 'EPIPE';
+
+        const parentWriteSpy = jest
+          .spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'write')
+          .mockImplementation(() => {
+            throw writeError;
+          });
+
+        const result = transport.write('test chunk', 'utf8');
+
+        expect(transport.silent).toBe(true);
+        expect(result).toBe(true);
+
+        parentWriteSpy.mockRestore();
+      });
+    });
+
+    describe('isWriteError method', () => {
+      it('should identify EPIPE errors', () => {
+        const epipeError = new Error('write EPIPE');
+        epipeError.code = 'EPIPE';
+        expect(transport.isWriteError(epipeError)).toBe(true);
+      });
+
+      it('should identify ECONNRESET errors', () => {
+        const connResetError = new Error('Connection reset');
+        connResetError.code = 'ECONNRESET';
+        expect(transport.isWriteError(connResetError)).toBe(true);
+      });
+
+      it('should identify EPIPE in error message', () => {
+        const epipeMessageError = new Error('write EPIPE broken pipe');
+        expect(transport.isWriteError(epipeMessageError)).toBe(true);
+      });
+
+      it('should not identify non-write errors', () => {
+        const otherError = new Error('Some other error');
+        otherError.code = 'EOTHER';
+        expect(transport.isWriteError(otherError)).toBe(false);
+      });
+
+      it('should handle null/undefined errors', () => {
+        expect(transport.isWriteError(null)).toBe(false);
+        expect(transport.isWriteError(undefined)).toBe(false);
       });
     });
   });

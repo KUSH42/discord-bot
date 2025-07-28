@@ -291,6 +291,89 @@ export class DiscordTransport extends Transport {
 }
 
 /**
+ * Systemd-safe console transport that handles EPIPE errors gracefully
+ */
+export class SystemdSafeConsoleTransport extends winston.transports.Console {
+  constructor(options) {
+    super(options);
+    this.silent = false;
+    this._setupErrorHandling();
+  }
+
+  _setupErrorHandling() {
+    // Handle errors on the stdout/stderr streams directly
+    if (process.stdout) {
+      process.stdout.on('error', error => {
+        if (this.isWriteError(error)) {
+          this.silent = true;
+          // Silently ignore EPIPE errors
+        }
+      });
+    }
+
+    if (process.stderr) {
+      process.stderr.on('error', error => {
+        if (this.isWriteError(error)) {
+          this.silent = true;
+          // Silently ignore EPIPE errors
+        }
+      });
+    }
+  }
+
+  log(info, callback) {
+    // If already silenced due to EPIPE, skip logging
+    if (this.silent) {
+      setImmediate(() => callback());
+      return true;
+    }
+
+    try {
+      // Call the parent log method
+      return super.log(info, callback);
+    } catch (error) {
+      // Handle EPIPE and other write errors silently
+      if (this.isWriteError(error)) {
+        // Mark transport as silent to prevent further EPIPE errors
+        this.silent = true;
+        // Call callback without error to prevent Winston from crashing
+        setImmediate(() => callback());
+        return true;
+      }
+      // Re-throw non-write errors
+      throw error;
+    }
+  }
+
+  write(chunk, encoding) {
+    // If already silenced due to EPIPE, skip writing
+    if (this.silent) {
+      return true;
+    }
+
+    try {
+      return super.write(chunk, encoding);
+    } catch (error) {
+      // Silently handle write errors to prevent crashing
+      if (this.isWriteError(error)) {
+        this.silent = true;
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  // Check if error is a write error (EPIPE, ECONNRESET, etc.)
+  isWriteError(error) {
+    if (!error) {
+      return false;
+    }
+    const writeErrorCodes = ['EPIPE', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'];
+    return writeErrorCodes.includes(error.code) || (error.message && error.message.includes('write EPIPE'));
+  }
+}
+
+/**
  * Logger utility functions
  */
 export const LoggerUtils = {
@@ -330,6 +413,19 @@ export const LoggerUtils = {
       client,
       channelId,
       level: options.level || 'info',
+      ...options,
+    });
+  },
+
+  /**
+   * Create systemd-safe console transport that handles EPIPE errors
+   * @param {Object} options - Transport options
+   * @returns {SystemdSafeConsoleTransport} Systemd-safe console transport instance
+   */
+  createSystemdSafeConsoleTransport(options = {}) {
+    return new SystemdSafeConsoleTransport({
+      level: options.level || 'info',
+      format: options.format || this.createConsoleLogFormat(),
       ...options,
     });
   },
