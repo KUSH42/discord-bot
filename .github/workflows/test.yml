@@ -180,7 +180,7 @@ jobs:
       - name: Validate package.json
         run: npm ls --depth=0
 
-  # Unit tests
+  # Unit Tests
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -245,24 +245,24 @@ jobs:
         env:
           NODE_VERSION: ${{ matrix.node-version }}
         run: |
-          mkdir -p coverage/unit test-results
+          mkdir -p coverage/unit-test-node${{ matrix.node-version }}
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=tests/configs/jest.unit.config.js \
             --coverage \
-            --coverageDirectory=coverage/unit \
+            --coverageDirectory=coverage/unit-test-node${{ matrix.node-version }} \
             --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee coverage/unit/test-output-node${{ matrix.node-version }}.log
+            2>&1 | tee coverage/unit-test-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage/unit/lcov.info
+          file: ccoverage/unit-test-node${{ matrix.node-version }}/lcov.info
           flags: unit-node${{ matrix.node-version }}
           name: unit-tests-node${{ matrix.node-version }}
           fail_ci_if_error: false
@@ -500,11 +500,11 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p coverage/integration test-results
+          mkdir -p coverage/integration-test
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --coverage \
-            --coverageDirectory=coverage/integration \
+            --coverageDirectory=coverage/integration-tests \
             --coverageReporters=lcov \
             --testTimeout=15000 \
             --forceExit \
@@ -512,12 +512,12 @@ jobs:
             --verbose=true \
             --passWithNoTests \
             --coverageThreshold='{}' \
-            2>&1 | tee coverage/integration/test-output.log
+            2>&1 | tee coverage/integration-tests/test-output.log
 
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage/integration/lcov.info
+          file: coverage/integration-tests/lcov.info
           flags: integration
           name: integration-tests
           fail_ci_if_error: false
@@ -529,7 +529,7 @@ jobs:
         with:
           name: integration-test-results
           path: |
-            coverage/integration/
+            coverage/integration-tests/
             test-results/integration-tests.xml
             logs/
           retention-days: 7
@@ -697,11 +697,11 @@ jobs:
 
       - name: Run performance tests
         run: |
-          mkdir -p coverage/performance test-results
+          mkdir -p coverage/performance-test-results
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
-            --coverageDirectory=coverage/performance \
+            --coverageDirectory=coverage/performance-test-result \
             --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=60000 \
@@ -709,7 +709,7 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            2>&1 | tee coverage/performance/test-output.log
+            2>&1 | tee coverage/performance-tests/test-output.log
 
       - name: Generate performance report
         run: |
@@ -725,13 +725,13 @@ jobs:
           echo "" >> reports/performance.md
 
           # Parse Jest output for timing information
-          if [ -f coverage/performance/test-output.log ]; then
+          if [ -f coverage/performance-tests/test-output.log ]; then
             echo "### Test Execution Times" >> reports/performance.md
-            grep -E "Test completed in [0-9]+\.[0-9]+ms" coverage/performance/test-output.log | head -10 >> reports/performance.md || echo "No timing data found" >> reports/performance.md
+            grep -E "Test completed in [0-9]+\.[0-9]+ms" coverage/performance-tests/test-output.log | head -10 >> reports/performance.md || echo "No timing data found" >> reports/performance.md
             echo "" >> reports/performance.md
             
             echo "### Throughput Metrics" >> reports/performance.md
-            grep -E "(messages per second|URLs per second|webhooks per second)" coverage/performance/test-output.log | head -10 >> reports/performance.md || echo "No throughput data found" >> reports/performance.md
+            grep -E "(messages per second|URLs per second|webhooks per second)" coverage/performance-tests/test-output.log | head -10 >> reports/performance.md || echo "No throughput data found" >> reports/performance.md
             echo "" >> reports/performance.md
           fi
 
@@ -757,7 +757,7 @@ jobs:
       - name: Upload performance test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage/performance/lcov.info
+          file: coverage/performance-tests/lcov.info
           flags: performance
           name: performance-tests
           fail_ci_if_error: false
@@ -769,7 +769,7 @@ jobs:
         with:
           name: performance-test-results
           path: |
-            coverage/performance/
+            coverage/performance-tests/
             test-results/performance-tests.xml
             reports/
             performance-metrics.json
