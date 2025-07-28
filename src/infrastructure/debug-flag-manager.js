@@ -153,7 +153,7 @@ export class DebugFlagManager {
 
     this.stateManager.set('debugFlags', newFlags);
 
-    this.logger?.info('Debug flag changed', {
+    this.logger?.info(`Debug flag changed: ${module} ${enabled}`, {
       module,
       enabled,
       previousState: currentFlags[module],

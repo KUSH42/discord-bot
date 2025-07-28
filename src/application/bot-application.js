@@ -226,7 +226,7 @@ export class BotApplication {
 
       // Delay restart to ensure the message is sent
       setTimeout(() => {
-        this.exec(`sudo systemctl restart ${serviceName}`, restartError => {
+        this.exec(`systemctl restart ${serviceName}`, restartError => {
           if (restartError) {
             this.logger.error(`systemctl restart failed: ${restartError}`);
             // We cannot reply here as the bot might be down
