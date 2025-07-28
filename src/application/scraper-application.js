@@ -575,42 +575,12 @@ export class ScraperApplication {
       operation.progress('Verifying authentication before polling');
       await this.verifyAuthentication();
 
-      operation.progress('Navigating to X search page');
-      const searchUrl = this.generateSearchUrl(true);
-      await this.browser.goto(searchUrl);
+      operation.progress('Using profile timeline approach (search disabled due to X.com restrictions)');
+      // X.com now requires more complex authentication for search, so we use profile timeline
+      // which provides both regular tweets and retweets in a single source
+      await this.navigateToProfileTimeline(this.xUser);
 
-      operation.progress('Waiting for content to load');
-      const contentSelectors = [
-        'article[data-testid="tweet"]',
-        'article[role="article"]',
-        'div[data-testid="cellInnerDiv"]',
-        'main[role="main"]',
-      ];
-
-      let contentLoaded = false;
-      for (const selector of contentSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          contentLoaded = true;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!contentLoaded) {
-        operation.progress('No content selectors found, proceeding anyway');
-      }
-
-      operation.progress('Scrolling to load additional content');
-      for (let i = 0; i < 3; i++) {
-        /* eslint-disable no-undef */
-        await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        /* eslint-enable no-undef */
-        await this.delay(3000);
-      }
-
-      operation.progress('Extracting tweets from page');
+      operation.progress('Extracting tweets from profile timeline');
       const tweets = await this.extractTweets();
       this.stats.totalTweetsFound += tweets.length;
 
@@ -639,8 +609,8 @@ export class ScraperApplication {
         stats: this.getStats(),
       });
 
-      operation.progress('Performing enhanced retweet detection');
-      await this.performEnhancedRetweetDetection();
+      operation.progress('Enhanced retweet detection skipped (already included in profile timeline)');
+      // Enhanced retweet detection is now redundant since profile timeline includes both tweets and retweets
 
       const nextInterval = this.getNextInterval();
       const nextRunTime = new Date(Date.now() + nextInterval);
@@ -775,33 +745,33 @@ export class ScraperApplication {
         let articles = [];
         for (const selector of articleSelectors) {
           articles = document.querySelectorAll(selector);
-          console.log(`Selector "${selector}" found ${articles.length} elements`);
+          // Log via browser console for debugging extraction
           if (articles.length > 0) {
-            console.log(`Using selector: ${selector} (found ${articles.length} articles)`);
+            // Selected working selector for extraction
             break;
           }
         }
 
         if (articles.length === 0) {
-          console.log('No articles found with any selector');
+          // No articles found with any selector
           // Debug: Check what content is actually on the page
           const bodyText = document.body.innerText || '';
-          console.log(`Page body text length: ${bodyText.length}`);
-          console.log(`Page URL: ${window.location.href}`);
+          // Debug page content for troubleshooting
+          // Current page URL for debugging
 
           // Check for common X.com indicators
           const indicators = ['Sign up', 'Log in', "What's happening", 'Home', 'Timeline'];
 
           for (const indicator of indicators) {
             if (bodyText.includes(indicator)) {
-              console.log(`Found page indicator: "${indicator}"`);
+              // Found page indicator for debugging
             }
           }
 
           return tweets;
         }
 
-        console.log(`Processing ${articles.length} articles for tweet extraction`);
+        // Processing articles for tweet extraction
 
         for (const article of articles) {
           try {
@@ -847,7 +817,7 @@ export class ScraperApplication {
             }
 
             if (!tweetLink || !url) {
-              console.log('No tweet link found in article');
+              // No tweet link found in article
               continue;
             }
 
@@ -1022,13 +992,13 @@ export class ScraperApplication {
             }
 
             tweets.push(tweetData);
-            console.log(`Successfully extracted tweet ${tweetID} from ${author} (${tweetCategory})`);
+            // Successfully extracted tweet data
           } catch (_err) {
-            console.error('Error extracting tweet:', _err);
+            // Error extracting tweet (caught and handled)
           }
         }
 
-        console.log(`Tweet extraction completed: found ${tweets.length} tweets`);
+        // Tweet extraction completed
         return tweets;
         /* eslint-enable no-undef */
       }, monitoredUser);

@@ -155,7 +155,7 @@ async function setupExternalServices(container, config) {
     return new FetchHttpService({
       timeout: 30000,
       headers: {
-        'User-Agent': 'Discord-YouTube-Bot/1.0',
+        'User-Agent': 'discord-youtube-bot/1.0',
       },
     });
   });

@@ -743,8 +743,52 @@ export class YouTubeScraperService {
         operation.progress('Extracting live stream information');
 
         const liveStream = await this.browserService.evaluate(() => {
-          // eslint-disable-next-line no-undef
-          const liveElement = document.querySelector('ytd-channel-featured-content-renderer a#video-title-link');
+          /* eslint-disable no-undef */
+          // Look for "Now playing" indicator to find active livestream
+          const nowPlayingElements = Array.from(document.querySelectorAll('*')).filter(
+            el => el.textContent && el.textContent.trim() === 'Now playing'
+          );
+
+          if (nowPlayingElements.length === 0) {
+            return null;
+          }
+
+          // Find the closest link element that contains a YouTube video
+          let liveElement = null;
+          for (const nowPlaying of nowPlayingElements) {
+            // Look for video link in the same container
+            const container = nowPlaying.closest('div, article, section');
+            if (container) {
+              liveElement = container.querySelector('a[href*="/watch?v="]');
+              if (liveElement) {
+                break;
+              }
+            }
+          }
+
+          // Fallback: Look for any featured livestream selectors
+          if (!liveElement) {
+            const selectors = [
+              'ytd-channel-featured-content-renderer a[href*="/watch?v="]',
+              'a#video-title-link[href*="/watch?v="]',
+              '[aria-label*="live"] a[href*="/watch?v="]',
+              'a[href*="/watch?v="]:has-text("Live")',
+              // Generic fallback for first video link on live tab
+              'a[href*="/watch?v="]',
+            ];
+
+            for (const selector of selectors) {
+              try {
+                liveElement = document.querySelector(selector);
+                if (liveElement) {
+                  break;
+                }
+              } catch (_e) {
+                // Ignore selector errors and continue
+              }
+            }
+          }
+
           if (!liveElement) {
             return null;
           }
@@ -755,15 +799,33 @@ export class YouTubeScraperService {
             return null;
           }
 
+          // Get title from various possible sources
+          let title = 'Live Stream';
+          if (liveElement.getAttribute('title')) {
+            title = liveElement.getAttribute('title');
+          } else if (liveElement.textContent && liveElement.textContent.trim()) {
+            title = liveElement.textContent.trim();
+          } else {
+            // Look for title in nearby heading elements
+            const container = liveElement.closest('div, article, section');
+            if (container) {
+              const heading = container.querySelector('h1, h2, h3, h4, [role="heading"]');
+              if (heading && heading.textContent) {
+                title = heading.textContent.trim();
+              }
+            }
+          }
+
           return {
             id: videoIdMatch[1],
-            title: liveElement.getAttribute('title') || 'Live Stream',
-            url,
+            title,
+            url: liveElement.href,
             type: 'livestream',
             platform: 'youtube',
             publishedAt: new Date().toISOString(), // Live streams are happening now
             scrapedAt: new Date().toISOString(),
           };
+          /* eslint-enable no-undef */
         });
 
         if (liveStream) {
