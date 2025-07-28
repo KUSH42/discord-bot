@@ -233,6 +233,7 @@ async function setupCoreServices(container, _config) {
       c.resolve('contentStateManager'),
       c.resolve('contentAnnouncer'),
       c.resolve('duplicateDetector'),
+      c.resolve('contentClassifier'),
       c.resolve('logger').child({ service: 'ContentCoordinator' }),
       c.resolve('config'),
       c.resolve('debugFlagManager'),
@@ -287,9 +288,8 @@ async function setupApplicationServices(container, _config) {
   container.registerSingleton('scraperApplication', c => {
     return new ScraperApplication({
       browserService: c.resolve('browserService'),
-      contentClassifier: c.resolve('contentClassifier'),
+      contentCoordinator: c.resolve('contentCoordinator'),
       discordService: c.resolve('discordService'),
-      contentAnnouncer: c.resolve('contentAnnouncer'),
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
       eventBus: c.resolve('eventBus'),

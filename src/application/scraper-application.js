@@ -11,8 +11,7 @@ import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 export class ScraperApplication {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
-    this.classifier = dependencies.contentClassifier;
-    this.announcer = dependencies.contentAnnouncer;
+    this.contentCoordinator = dependencies.contentCoordinator;
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
     this.discord = dependencies.discordService;
@@ -838,7 +837,7 @@ export class ScraperApplication {
 
             const tweetID = tweetIdMatch[1];
 
-            // Extract author username (not display name)
+            // Extract author username (not display name) - prioritize username extraction
             let author = 'Unknown';
 
             // Method 1: Try to extract username from href attribute (most reliable)
@@ -868,12 +867,32 @@ export class ScraperApplication {
               }
             }
 
-            // Method 3: Fallback to text content (display name) if username extraction fails
+            // Method 3: Try to extract username from profile links (without status)
+            if (author === 'Unknown') {
+              const profileLinkSelectors = [
+                '[data-testid="User-Name"] a[href^="/"]',
+                '[data-testid="User-Names"] a[href^="/"]',
+                'a[role="link"][href^="/"]',
+              ];
+
+              for (const selector of profileLinkSelectors) {
+                const linkElement = article.querySelector(selector);
+                if (linkElement && linkElement.href) {
+                  // Extract username from profile link like /username
+                  const profileMatch = linkElement.href.match(/\/([^/?]+)(?:\?|$)/);
+                  if (profileMatch && profileMatch[1] && !profileMatch[1].includes('status')) {
+                    author = profileMatch[1];
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Method 4: Only use display name as absolute last resort and log warning
             if (author === 'Unknown') {
               const displayNameSelectors = [
-                '[data-testid="User-Name"] a',
-                '[data-testid="User-Names"] a',
-                'a[role="link"][href^="/"]',
+                '[data-testid="User-Name"] span',
+                '[data-testid="User-Names"] span',
                 'div[dir="ltr"] span',
               ];
 
@@ -881,6 +900,12 @@ export class ScraperApplication {
                 const authorElement = article.querySelector(selector);
                 if (authorElement && authorElement.textContent.trim()) {
                   author = authorElement.textContent.trim();
+                  // Log warning since this might cause retweet detection issues
+                  this.logger.warn('⚠️ Using display name as fallback for author extraction', {
+                    url,
+                    displayName: author,
+                    tweetId: tweetID,
+                  });
                   break;
                 }
               }
@@ -1207,51 +1232,25 @@ export class ScraperApplication {
       }
 
       operation.progress('Classifying tweet content');
-      // Check if this is a retweet (where our monitored user retweeted someone else's content)
-      let classification;
-      if (
-        tweet.tweetCategory === 'Retweet' &&
-        tweet.author !== this.xUser &&
-        tweet.author !== `@${this.xUser}` &&
-        tweet.author !== 'Unknown' &&
-        tweet.retweetedBy &&
-        (tweet.retweetedBy === this.xUser || tweet.retweetedBy === `@${this.xUser}`)
-      ) {
-        // True retweet: monitored user retweeted someone else's content
-        // Only treat as retweet if we have confirmed that our monitored user did the retweet
-        classification = {
-          type: 'retweet',
-          confidence: 0.99,
-          platform: 'x',
-          details: {
-            statusId: tweet.tweetID,
-            originalAuthor: tweet.author, // The original tweet author
-            retweetedBy: this.xUser, // Our monitored user who did the retweet
-            detectionMethod: 'social-context-based',
-          },
-        };
-      } else {
-        // Use classifier for other tweets (including same-author tweets incorrectly marked as retweet)
-        classification = this.classifier.classifyXContent(tweet.url, tweet.text, metadata);
-      }
+      const classification = this.classifier.classifyXContent(tweet, metadata);
 
       operation.progress('Creating content object for announcement');
-      // Create content object for announcement
       const content = {
         platform: 'x',
-        type: classification.type,
+        type: 'post', // Default type, will be classified by ContentCoordinator
         id: tweet.tweetID,
         url: tweet.url,
-        author: tweet.retweetedBy || tweet.author, // Use retweetedBy for retweets, otherwise original author
-        originalAuthor: tweet.author, // Always store the original tweet author
+        author: tweet.author, // Always use the actual author (username)
         retweetedBy: tweet.retweetedBy, // Track who did the retweet (if applicable)
         text: tweet.text,
         timestamp: tweet.timestamp,
+        tweetCategory: tweet.tweetCategory, // Pass category for classification
+        xUser: this.xUser, // Pass monitored user for retweet detection
         isOld: !(await this.isNewContent(tweet)),
       };
 
-      operation.progress('Announcing content to Discord');
-      const result = await this.announcer.announceContent(content);
+      operation.progress('Processing content through ContentCoordinator');
+      const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
 
       operation.progress('Marking tweet as seen to prevent reprocessing');
       if (tweet.url) {
