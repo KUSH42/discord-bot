@@ -30,6 +30,7 @@ export class ScraperApplication {
 
     // Scraper configuration
     this.xUser = this.config.getRequired('X_USER_HANDLE');
+    this.xUsername = this.config.getRequired('X_USER_HANDLE');
     this.twitterUsername = this.config.getRequired('TWITTER_USERNAME');
     this.twitterPassword = this.config.getRequired('TWITTER_PASSWORD');
 
@@ -92,6 +93,7 @@ export class ScraperApplication {
 
     const operation = this.logger.startOperation('startScraperApplication', {
       xUser: this.xUser,
+      xUsername: this.xUsername,
       pollingInterval: { min: this.minInterval, max: this.maxInterval },
     });
 

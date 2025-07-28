@@ -621,6 +621,8 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee coverage/e2e-tests/test-output.log
+          echo "echo "Current working directory: $(pwd)""
+          ls -a
 
 
       - name: Upload E2E test coverage
@@ -710,6 +712,8 @@ jobs:
             --passWithNoTests \
             --verbose=true \
             2>&1 | tee coverage/performance-tests/test-output.log
+          echo "Current working directory: $(pwd)"
+          ls -a
 
       - name: Generate performance report
         run: |
@@ -831,6 +835,8 @@ jobs:
             --testTimeout=20000 \
             --forceExit \
             --detectOpenHandles
+          echo "Current working directory: $(pwd)"
+          ls -a
 
       - name: Run security audit
         run: |
@@ -911,6 +917,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          echo "Current working directory: $(pwd)"
+          ls -a
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5

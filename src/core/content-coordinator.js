@@ -7,10 +7,20 @@ import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
  * Manages unified content processing with source priority
  */
 export class ContentCoordinator {
-  constructor(contentStateManager, contentAnnouncer, duplicateDetector, logger, config, debugManager, metricsManager) {
+  constructor(
+    contentStateManager,
+    contentAnnouncer,
+    duplicateDetector,
+    classifier,
+    logger,
+    config,
+    debugManager,
+    metricsManager
+  ) {
     this.contentStateManager = contentStateManager;
     this.contentAnnouncer = contentAnnouncer;
     this.duplicateDetector = duplicateDetector;
+    this.classifier = classifier;
     this.logger = createEnhancedLogger('state', logger, debugManager, metricsManager);
     this.config = config;
 
@@ -211,6 +221,17 @@ export class ContentCoordinator {
         };
       }
       operation.progress(`✅ ${contentData.type} is new enough: ${contentData.publishedAt}`);
+
+      // Classify content for proper handling (especially for X retweets)
+      operation.progress('🔍 Classifying content for proper handling');
+      const classification = await this.classifyContent(contentData);
+      if (classification) {
+        contentData.classification = classification;
+        operation.progress('✅ Content classification completed', {
+          type: classification.type,
+          confidence: classification.confidence,
+        });
+      }
 
       // Add to content state management if not exists
       if (!existingState) {
@@ -434,6 +455,57 @@ export class ContentCoordinator {
     }
 
     return 'published';
+  }
+
+  /**
+   * Classify content for proper handling (especially X retweets)
+   * @param {Object} contentData - Content data to classify
+   * @returns {Promise<Object|null>} Classification result or null
+   */
+  async classifyContent(contentData) {
+    if (!this.classifier || !contentData) {
+      return null;
+    }
+
+    // Only classify X content currently, as YouTube content is already handled properly
+    if (contentData.platform === 'x') {
+      const metadata = {
+        tweetCategory: contentData.tweetCategory,
+        author: contentData.author,
+        retweetedBy: contentData.retweetedBy,
+        xUser: contentData.xUser || (this.config && this.config.get('X_USER_HANDLE')),
+      };
+
+      // Handle retweet classification logic specifically
+      if (contentData.tweetCategory === 'Retweet' && contentData.author && contentData.retweetedBy) {
+        const { xUser } = metadata;
+
+        // Check if this is a true retweet (monitored user retweeted someone else's content)
+        if (
+          contentData.author !== xUser &&
+          contentData.author !== `@${xUser}` &&
+          contentData.author !== 'Unknown' &&
+          (contentData.retweetedBy === xUser || contentData.retweetedBy === `@${xUser}`)
+        ) {
+          return {
+            type: 'retweet',
+            confidence: 0.99,
+            platform: 'x',
+            details: {
+              statusId: contentData.id || contentData.tweetID,
+              originalAuthor: contentData.author,
+              retweetedBy: xUser,
+              detectionMethod: 'social-context-based',
+            },
+          };
+        }
+      }
+
+      // Use classifier for other content
+      return this.classifier.classifyXContent(contentData.url, contentData.text || contentData.content, metadata);
+    }
+
+    return null;
   }
 
   /**
