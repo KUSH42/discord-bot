@@ -985,9 +985,11 @@ jobs:
             if genhtml coverage/merged/lcov.info \
               --output-directory "$LCOV_REPORT_DIR" \
               --branch_coverage=1 \ 
+              --css-file "$LCOV_REPORT_DIR/lcov_dark_theme.css" \
               --derive_function_end_line=0 \
               --title "Discord Bot - Enhanced Code Coverage Report" \
               --function-coverage \
+              --dark-mode \
               --prefix "$(pwd)" \
               --include "-/**/lcov.info" \
               --legend \
