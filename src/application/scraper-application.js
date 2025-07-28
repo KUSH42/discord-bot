@@ -946,13 +946,15 @@ export class ScraperApplication {
       // Ensure we always return an array, even if browser.evaluate returns undefined
       const tweets = Array.isArray(result) ? result : [];
 
-      operation.success('Tweet extraction completed', {
+      const stats = {
         tweetsFound: tweets.length,
         categories: tweets.reduce((acc, tweet) => {
           acc[tweet.tweetCategory] = (acc[tweet.tweetCategory] || 0) + 1;
           return acc;
         }, {}),
-      });
+      };
+
+      operation.success('Tweet extraction completed', stats);
 
       return tweets;
     } catch (error) {
