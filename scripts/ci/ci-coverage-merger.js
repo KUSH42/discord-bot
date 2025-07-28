@@ -298,6 +298,11 @@ class CICoverageMerger {
         this.scanDirectoryForLcov('test-results', dynamicPaths);
       }
 
+      // Scan test-results/coverage directory if it exists (GitHub Actions artifacts)
+      if (fs.existsSync('./test-results/coverage')) {
+        this.scanDirectoryForLcov('./test-results/coverage', dynamicPaths);
+      }
+
       // Scan current directory for artifact directories
       const entries = fs.readdirSync('.', { withFileTypes: true });
       for (const entry of entries) {
@@ -312,7 +317,7 @@ class CICoverageMerger {
         }
       }
     } catch (error) {
-      console.log(`⚠️  Dynamic discovery error: ${error.message}`);
+      console.log(`⚠️ Dynamic discovery error: ${error.message}`);
     }
 
     if (dynamicPaths.length > 0) {
