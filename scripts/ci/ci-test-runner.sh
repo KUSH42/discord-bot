@@ -56,7 +56,7 @@ case "$TEST_TYPE" in
     npm run test:unit -- \
       --shard=$SHARD/$TOTAL_SHARDS \
       --coverage \
-      --coverageDirectory=coverage/unit \
+      --coverageDirectory=coverage/$TEST_TYPE-tests-node$NODE_VERSION \
       --coverageReporters=lcov \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
@@ -67,6 +67,10 @@ case "$TEST_TYPE" in
   integration)
     npm run test:integration \
       --testTimeout=$TIMEOUT \
+      --coverage \
+      --coverageDirectory=coverage/$TEST_TYPE-tests \
+      --coverageReporters=lcov \
+      --maxWorkers=$MAX_WORKERS \
       --forceExit \
       --detectOpenHandles \
       --passWithNoTests
@@ -75,6 +79,8 @@ case "$TEST_TYPE" in
     npm run test:e2e -- \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
+      --coverageDirectory=coverage/$TEST_TYPE-tests \
+      --coverageReporters=lcov \
       --forceExit \
       --detectOpenHandles \
       --passWithNoTests
@@ -82,7 +88,7 @@ case "$TEST_TYPE" in
   performance)
     npm run test:performance -- \
       --coverage \
-      --coverageDirectory=coverage/performance \
+      --coverageDirectory=coverage/$TEST_TYPE-tests \
       --coverageReporters=lcov \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
@@ -92,6 +98,8 @@ case "$TEST_TYPE" in
     ;;
   security)
     npm run test:security -- \
+      --coverage \
+      --coverageDirectory=coverage/$TEST_TYPE-tests \
       --maxWorkers=$MAX_WORKERS \
       --testTimeout=$TIMEOUT \
       --forceExit \

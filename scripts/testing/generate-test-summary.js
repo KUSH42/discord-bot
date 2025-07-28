@@ -502,11 +502,12 @@ class TestSummaryGenerator {
    */
   loadTestTypeResults(basePath, testType) {
     const possiblePaths = [
-      path.join(basePath, testType),
-      path.join(basePath, `${testType}-test-results`),
+      path.join(basePath, 'test-reports', `${testType}-tests`),
+      path.join(basePath, 'coverage', `${testType}-tests`),
+      path.join(basePath, 'test-reports/coverage', `${testType}-tests`),
       path.join(basePath, testType, 'coverage', testType),
-      path.join(basePath, testType, 'node18', 'coverage', testType),
-      path.join(basePath, testType, 'node20', 'coverage', testType),
+      path.join(basePath, 'coverage', 'unit-tests-node18'),
+      path.join(basePath, 'coverage', 'unit-tests-node20'),
     ];
 
     for (const testPath of possiblePaths) {
