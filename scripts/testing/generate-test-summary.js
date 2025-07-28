@@ -34,6 +34,7 @@ class TestSummaryGenerator {
         testsPassing: { passed: false, threshold: 95, actual: 0 },
         security: { passed: false, vulnerabilities: 0 },
       },
+      processedCoverageFiles: [],
     };
   }
 
