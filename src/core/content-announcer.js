@@ -118,12 +118,13 @@ export class ContentAnnouncer {
         result.skipped = true;
         result.reason = skipReason;
 
-        operation.success('Content announcement skipped', {
+        const skipInfo = {
           reason: skipReason,
           postingEnabled: this.state.get('postingEnabled', true),
           announcementEnabled: this.state.get('announcementEnabled', true),
           botStartTime: this.state.get('botStartTime'),
-        });
+        };
+        operation.success(`Content announcement skipped: ${JSON.stringify(skipInfo)}`);
 
         return result;
       }
@@ -319,7 +320,7 @@ export class ContentAnnouncer {
       const botStartTime = this.state.get('botStartTime');
 
       if (publishedTime < botStartTime) {
-        return 'Content was published before bot started';
+        return `Content was published before bot started (published: ${publishedTime.toISOString()}, bot started: ${botStartTime.toISOString()})`;
       }
     }
 

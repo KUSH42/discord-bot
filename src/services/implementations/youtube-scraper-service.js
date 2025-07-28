@@ -678,7 +678,7 @@ export class YouTubeScraperService {
             scrapedAt: latestVideo.scrapedAt,
           };
 
-          operation.success('Successfully scraped latest video', logData);
+          operation.success(`Successfully scraped latest video: ${JSON.stringify(logData)}`);
         } else {
           const failureInfo = {
             videosUrl: this.videosUrl,
@@ -932,12 +932,15 @@ export class YouTubeScraperService {
             detectionMethod: liveStream.detectionMethod,
           };
 
-          operation.success(`Successfully scraped active live stream using ${liveStream.detectionMethod}`, logData);
+          operation.success(
+            `Successfully scraped active live stream using ${liveStream.detectionMethod}: ${JSON.stringify(logData)}`
+          );
         } else {
-          operation.success('No active live stream found', {
+          const noStreamInfo = {
             liveStreamUrl: this.liveStreamUrl,
             note: 'This is normal when no live stream is currently active',
-          });
+          };
+          operation.success(`No active live stream found: ${JSON.stringify(noStreamInfo)}`);
         }
 
         return liveStream;
@@ -1020,9 +1023,9 @@ export class YouTubeScraperService {
       };
 
       if (contentProcessed > 0) {
-        operation.success(`Content scan completed: processed ${contentProcessed} items`, summary);
+        operation.success(`Content scan completed: processed ${contentProcessed} items - ${JSON.stringify(summary)}`);
       } else {
-        operation.success('Content scan completed: no new content found', summary);
+        operation.success(`Content scan completed: no new content found - ${JSON.stringify(summary)}`);
       }
 
       return summary;

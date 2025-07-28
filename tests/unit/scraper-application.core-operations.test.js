@@ -17,6 +17,7 @@ describe('ScraperApplication Core Operations', () => {
   let mockDiscordService;
   let mockDuplicateDetector;
   let mockPersistentStorage;
+  let mockContentCoordinator;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,7 +48,7 @@ describe('ScraperApplication Core Operations', () => {
       classifyXContent: jest.fn(),
     };
 
-    mockAnnouncer = {
+    mockContentCoordinator = {
       announceContent: jest.fn(),
     };
 
@@ -121,7 +122,7 @@ describe('ScraperApplication Core Operations', () => {
     mockDependencies = {
       browserService: mockBrowserService,
       contentClassifier: mockClassifier,
-      contentAnnouncer: mockAnnouncer,
+      contentCoordinator: mockContentCoordinator,
       config: mockConfig,
       stateManager: mockStateManager,
       discordService: mockDiscordService,
@@ -147,7 +148,7 @@ describe('ScraperApplication Core Operations', () => {
     it('should create with proper dependency injection', () => {
       expect(scraperApp.browser).toBe(mockBrowserService);
       expect(scraperApp.classifier).toBe(mockClassifier);
-      expect(scraperApp.announcer).toBe(mockAnnouncer);
+      expect(scraperApp.contentCoordinator).toBe(mockContentCoordinator);
       expect(scraperApp.config).toBe(mockConfig);
       expect(scraperApp.state).toBe(mockStateManager);
       expect(scraperApp.discord).toBe(mockDiscordService);

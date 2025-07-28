@@ -227,10 +227,11 @@ export class ContentCoordinator {
       const classification = await this.classifyContent(contentData);
       if (classification) {
         contentData.classification = classification;
-        operation.progress('✅ Content classification completed', {
+        const classificationInfo = {
           type: classification.type,
           confidence: classification.confidence,
-        });
+        };
+        operation.progress(`✅ Content classification completed: ${JSON.stringify(classificationInfo)}`);
       }
 
       // Add to content state management if not exists
@@ -264,10 +265,14 @@ export class ContentCoordinator {
       }
 
       // Process and announce content
-      operation.progress('📢 Proceeding with content announcement', {
+      const announcementAttemptInfo = {
         platform: contentData.platform,
         type: contentData.type,
-      });
+        title: contentData.title,
+        publishedAt: contentData.publishedAt,
+        url: contentData.url,
+      };
+      operation.progress(`📢 Proceeding with content announcement: ${JSON.stringify(announcementAttemptInfo)}`);
       const announcementResult = await this.announceContent(contentId, contentData, source);
 
       if (announcementResult && announcementResult.success) {
@@ -286,12 +291,13 @@ export class ContentCoordinator {
 
         this.metrics.totalProcessed++;
 
-        operation.success('🎉 Content processing completed successfully', {
+        const successInfo = {
           action: 'announced',
           title: contentData.title,
           channelId: announcementResult.channelId,
           messageId: announcementResult.messageId,
-        });
+        };
+        operation.success(`🎉 Content processing completed successfully: ${JSON.stringify(successInfo)}`);
 
         return {
           action: 'announced',
@@ -310,10 +316,11 @@ export class ContentCoordinator {
           await this.contentStateManager.markAsAnnounced(contentId);
         }
 
-        operation.success('Content processing completed with warning', {
+        const warningInfo = {
           action: announcementResult?.skipped ? 'skip' : 'failed',
           reason: announcementResult?.reason || 'Content announcement failed',
-        });
+        };
+        operation.success(`Content processing completed with warning: ${JSON.stringify(warningInfo)}`);
 
         return {
           action: announcementResult?.skipped ? 'skip' : 'failed',

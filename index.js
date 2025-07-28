@@ -33,11 +33,11 @@ function isWriteError(error) {
 function safeConsoleLog(message, ...args) {
   try {
     console.log(message, ...args);
-  } catch (error) {
+  } catch (_error) {
     // If console.log fails, try stderr, then give up silently
     try {
       process.stderr.write(`${message}\n`);
-    } catch (fallbackError) {
+    } catch (_fallbackError) {
       // Can't log - just give up silently
     }
   }
@@ -278,7 +278,7 @@ function setupGracefulShutdown(container) {
             fileTransport.log({ level: 'info', message: 'Received uncaughtException, starting graceful shutdown...' });
           }
         }
-      } catch (logError) {
+      } catch (_logError) {
         // Ignore logging errors during EPIPE cascade
       }
       return; // Don't shutdown for EPIPE errors - they're recoverable
@@ -288,7 +288,7 @@ function setupGracefulShutdown(container) {
     try {
       const logger = container.resolve('logger');
       logger.error('Uncaught Exception:', error);
-    } catch (logError) {
+    } catch (_logError) {
       safeConsoleLog('ERROR: Failed to log uncaught exception:', error);
     }
     await shutdownHandler('uncaughtException');
@@ -305,7 +305,7 @@ function setupGracefulShutdown(container) {
     try {
       const logger = container.resolve('logger');
       logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    } catch (logError) {
+    } catch (_logError) {
       safeConsoleLog('ERROR: Failed to log unhandled rejection:', reason);
     }
     await shutdownHandler('unhandledRejection');
