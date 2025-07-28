@@ -190,14 +190,18 @@ export class DiscordTransport extends Transport {
         const fetchedChannel = await this.client.channels.fetch(this.channelId);
         if (fetchedChannel && fetchedChannel.isTextBased()) {
           this.channel = fetchedChannel;
-          // Send initialization message using message sender
-          this.messageSender
-            .sendImmediate(this.channel, '✅ **Winston logging transport initialized for this channel.**')
-            .catch(error => {
-              if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error)) {
-                this.safeConsoleError('[DiscordTransport] Failed to send initialization message:', error);
-              }
-            });
+          // Send initialization message asynchronously (non-blocking) with lower priority
+          setTimeout(() => {
+            this.messageSender
+              .queueMessage(this.channel, '✅ **Winston logging transport initialized for this channel.**', {
+                priority: -1, // Low priority, won't block startup
+              })
+              .catch(error => {
+                if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error)) {
+                  this.safeConsoleError('[DiscordTransport] Failed to send initialization message:', error);
+                }
+              });
+          }, 2000); // 2 second delay to avoid blocking startup
         } else {
           this.channel = 'errored';
           if (process.env.NODE_ENV !== 'test') {

@@ -1,18 +1,46 @@
 [Unit]
 Description=Discord Content Announcement Bot Service
 After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
 User=xush
+Group=xush
 Environment="DISPLAY=:99"
 Environment="PATH=/home/xush/.nvm/versions/node/v22.17.0/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="NODE_ENV=production"
+Environment="HOME=/home/xush"
 WorkingDirectory=/home/xush/discord-bot
-ExecStart=/home/xush/.nvm/versions/node/v22.17.0/bin/node index.js
-Restart=on-failure
+ExecStart=/bin/bash -c 'source /home/xush/.nvm/nvm.sh && node index.js'
+
+# Enhanced restart configuration
+Restart=always
 RestartSec=10s
-StandardOutput=syslog
-StandardError=syslog
+RestartPreventExitStatus=0
+
+# Resource limits to prevent runaway processes
+MemoryMax=2G
+CPUQuota=200%
+
+# Logging configuration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=discord-bot
+
+# Security and isolation
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/xush/discord-bot
+ReadWritePaths=/tmp
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
 
 [Install]
 WantedBy=multi-user.target

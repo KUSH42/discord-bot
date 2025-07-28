@@ -17,6 +17,33 @@ import { setupProductionServices, setupWebhookEndpoints, createShutdownHandler }
 config();
 
 /**
+ * Check if error is a write error (EPIPE, ECONNRESET, etc.)
+ */
+function isWriteError(error) {
+  if (!error) {
+    return false;
+  }
+  const writeErrorCodes = ['EPIPE', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'];
+  return writeErrorCodes.includes(error.code) || (error.message && error.message.includes('write EPIPE'));
+}
+
+/**
+ * Safe console logging that won't throw EPIPE errors
+ */
+function safeConsoleLog(message, ...args) {
+  try {
+    console.log(message, ...args);
+  } catch (error) {
+    // If console.log fails, try stderr, then give up silently
+    try {
+      process.stderr.write(`${message}\n`);
+    } catch (fallbackError) {
+      // Can't log - just give up silently
+    }
+  }
+}
+
+/**
  * Main application entry point
  * WARNING: This starts real production applications with infinite background processes
  * DO NOT call this function in tests - it will cause hanging and memory leaks
@@ -235,17 +262,52 @@ function setupGracefulShutdown(container) {
   process.on('SIGUSR1', () => shutdownHandler('SIGUSR1'));
   process.on('SIGUSR2', () => shutdownHandler('SIGUSR2'));
 
-  // Handle uncaught exceptions
+  // Handle uncaught exceptions with EPIPE protection
   process.on('uncaughtException', async error => {
-    const logger = container.resolve('logger');
-    logger.error('Uncaught Exception:', error);
+    // Check if this is an EPIPE error from logging system - don't cascade shutdown
+    if (isWriteError(error)) {
+      // Safe console log without triggering winston
+      safeConsoleLog('INFO: Received uncaughtException, starting graceful shutdown...');
+      try {
+        const logger = container.resolve('logger');
+        // Try to use file logging only for EPIPE errors
+        if (logger._readableState) {
+          // Winston logger - get file transport only
+          const fileTransport = logger.transports.find(t => t.filename);
+          if (fileTransport) {
+            fileTransport.log({ level: 'info', message: 'Received uncaughtException, starting graceful shutdown...' });
+          }
+        }
+      } catch (logError) {
+        // Ignore logging errors during EPIPE cascade
+      }
+      return; // Don't shutdown for EPIPE errors - they're recoverable
+    }
+
+    // For non-EPIPE errors, proceed with normal error handling
+    try {
+      const logger = container.resolve('logger');
+      logger.error('Uncaught Exception:', error);
+    } catch (logError) {
+      safeConsoleLog('ERROR: Failed to log uncaught exception:', error);
+    }
     await shutdownHandler('uncaughtException');
   });
 
-  // Handle unhandled promise rejections
+  // Handle unhandled promise rejections with EPIPE protection
   process.on('unhandledRejection', async (reason, promise) => {
-    const logger = container.resolve('logger');
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Check if this is an EPIPE-related rejection
+    if (reason && isWriteError(reason)) {
+      safeConsoleLog('INFO: Ignoring EPIPE-related unhandled rejection');
+      return; // Don't shutdown for EPIPE-related rejections
+    }
+
+    try {
+      const logger = container.resolve('logger');
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    } catch (logError) {
+      safeConsoleLog('ERROR: Failed to log unhandled rejection:', reason);
+    }
     await shutdownHandler('unhandledRejection');
   });
 }

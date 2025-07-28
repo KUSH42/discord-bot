@@ -517,59 +517,120 @@ export function setupWebhookEndpoints(app, container) {
  */
 export function createShutdownHandler(container) {
   return async signal => {
-    const logger = container.resolve('logger');
-    logger.info(`Received ${signal}, starting graceful shutdown...`);
-
+    let logger;
     let hasError = false;
 
+    // Safe logging function that won't cause EPIPE cascades
+    const safeLog = (level, message, ...args) => {
+      try {
+        if (logger) {
+          logger[level](message, ...args);
+        } else {
+          console.log(`[${level.toUpperCase()}]: ${message}`, ...args);
+        }
+      } catch (error) {
+        // If logging fails (EPIPE), use stderr directly
+        try {
+          process.stderr.write(`[${level.toUpperCase()}]: ${message}\n`);
+        } catch (fallbackError) {
+          // Can't log - just continue with shutdown
+        }
+      }
+    };
+
     try {
-      // Stop applications
+      logger = container.resolve('logger');
+    } catch (error) {
+      // Logger might not be available during certain error conditions
+    }
+
+    safeLog('info', `Received ${signal}, starting graceful shutdown...`);
+
+    try {
+      // Stop applications with timeout to prevent hanging
+      const shutdownTimeout = 30000; // 30 seconds total timeout
+      const appTimeout = 8000; // 8 seconds per application
+
       const botApp = container.resolve('botApplication');
       const scraperApp = container.resolve('scraperApplication');
       const monitorApp = container.resolve('monitorApplication');
 
-      // Stop applications individually to handle failures gracefully
+      // Stop applications individually with timeouts
       try {
-        await botApp.stop();
+        await Promise.race([
+          botApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Bot stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Bot application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping bot application:', error);
+        safeLog('warn', 'Error stopping bot application:', error.message);
         hasError = true;
       }
 
       try {
-        await scraperApp.stop();
+        await Promise.race([
+          scraperApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Scraper application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping scraper application:', error);
+        safeLog('warn', 'Error stopping scraper application:', error.message);
         hasError = true;
       }
 
       try {
-        await monitorApp.stop();
+        await Promise.race([
+          monitorApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Monitor stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Monitor application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping monitor application:', error);
+        safeLog('warn', 'Error stopping monitor application:', error.message);
         hasError = true;
       }
 
-      // Dispose of container resources
+      // Dispose of container resources with timeout
       try {
-        await container.dispose();
+        await Promise.race([
+          container.dispose(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Container dispose timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Container disposed successfully');
       } catch (error) {
-        logger.error('Error disposing container:', error);
+        safeLog('warn', 'Error disposing container:', error.message);
         hasError = true;
       }
 
-      if (hasError) {
-        logger.error('Graceful shutdown completed with errors');
-        process.exit(1);
-        return; // For test compatibility when process.exit is mocked
+      // Choose exit code based on signal type and errors
+      let exitCode = 0;
+
+      if (signal === 'uncaughtException' || signal === 'unhandledRejection') {
+        // For error-triggered shutdowns, use exit code 1 only if it's not EPIPE-related
+        exitCode = hasError ? 1 : 0;
+        safeLog('info', `Shutdown triggered by ${signal}, exit code: ${exitCode}`);
+      } else if (hasError) {
+        // For signal-triggered shutdowns with errors, still use exit code 0 for systemd restart
+        safeLog('warn', 'Graceful shutdown completed with non-critical errors, allowing restart');
+        exitCode = 0;
       } else {
-        logger.info('Graceful shutdown completed');
-        process.exit(0);
-        return; // For test compatibility when process.exit is mocked
+        safeLog('info', 'Graceful shutdown completed successfully');
+        exitCode = 0;
       }
+
+      // Small delay to allow final log writes
+      setTimeout(() => {
+        process.exit(exitCode);
+      }, 100);
+
+      return; // For test compatibility when process.exit is mocked
     } catch (error) {
-      logger.error('Error during shutdown:', error);
-      process.exit(1);
+      safeLog('error', 'Critical error during shutdown:', error.message);
+
+      // For critical shutdown errors, still try to exit gracefully for systemd
+      setTimeout(() => {
+        process.exit(0); // Use exit code 0 to allow systemd restart
+      }, 100);
+
       return; // For test compatibility when process.exit is mocked
     }
   };
