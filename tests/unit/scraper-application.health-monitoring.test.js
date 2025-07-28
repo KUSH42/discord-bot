@@ -171,7 +171,9 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Fast forward time to trigger health check
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+
+      // Allow async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(performHealthCheckSpy).toHaveBeenCalled();
     });
@@ -191,7 +193,9 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger health check
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+
+      // Allow async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Health check passed',
@@ -218,7 +222,9 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger health check
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+
+      // Allow async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Health check detected problems',
@@ -240,7 +246,9 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger health check
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+
+      // Allow async operations to complete
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Health check failed',
@@ -465,11 +473,11 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger first health check (should fail)
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+      await new Promise(resolve => setImmediate(resolve));
 
       // Trigger second health check (should succeed)
       jest.advanceTimersByTime(10000);
-      await jest.runAllTimersAsync();
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(healthCheckCallCount).toBe(2);
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalledTimes(1);
@@ -488,7 +496,7 @@ describe('ScraperApplication Health Monitoring', () => {
 
       // Trigger health check
       jest.advanceTimersByTime(15000);
-      await jest.runAllTimersAsync();
+      await new Promise(resolve => setImmediate(resolve));
 
       expect(scraperApp.performHealthCheck).toHaveBeenCalled();
     });

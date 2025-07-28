@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">32.81% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>42/128</span>
+                <span class='fraction'>0/128</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">32.81% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>42/128</span>
+                <span class='fraction'>0/128</span>
             </div>
         
             
@@ -191,25 +191,7 @@
 <a name='L126'></a><a href='#L126'>126</a>
 <a name='L127'></a><a href='#L127'>127</a>
 <a name='L128'></a><a href='#L128'>128</a>
-<a name='L129'></a><a href='#L129'>129</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<a name='L129'></a><a href='#L129'>129</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -246,14 +228,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -285,14 +259,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -310,34 +276,68 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * Utility functions for parsing relative time strings into Date objects
- * All operations are performed in UTC to avoid timezone issues
- */
-&nbsp;
-import { nowUTC } from './utc-time.js';
-&nbsp;
-/**
- * Parse relative time strings (e.g., "1 hour ago", "2 days ago") into Date objects
- * All calculations are performed in UTC to ensure timezone safety
- * @param {string} relativeTimeString - The relative time string to parse
- * @param {Date} [referenceDate] - The reference date to calculate from (defaults to current UTC time)
- * @returns {Date|null} The calculated Date object, or null if parsing fails
- * @example
- * parseRelativeTime("1 hour ago") // Returns Date 1 hour before now (UTC)
- * parseRelativeTime("2 days ago") // Returns Date 2 days before now (UTC)
- * parseRelativeTime("just now") // Returns current Date (UTC)
- */
-export <span class="fstat-no" title="function not covered" >function parseRelativeTime(relativeTimeString, referenceDate = nowUTC()) {</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >/**</span></span></span>
+<span class="cstat-no" title="statement not covered" > * Utility functions for parsing relative time strings into Date objects</span>
+<span class="cstat-no" title="statement not covered" > * All operations are performed in UTC to avoid timezone issues</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >import { nowUTC } from './utc-time.js';</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Parse relative time strings (e.g., "1 hour ago", "2 days ago") into Date objects</span>
+<span class="cstat-no" title="statement not covered" > * All calculations are performed in UTC to ensure timezone safety</span>
+<span class="cstat-no" title="statement not covered" > * @param {string} relativeTimeString - The relative time string to parse</span>
+<span class="cstat-no" title="statement not covered" > * @param {Date} [referenceDate] - The reference date to calculate from (defaults to current UTC time)</span>
+<span class="cstat-no" title="statement not covered" > * @returns {Date|null} The calculated Date object, or null if parsing fails</span>
+<span class="cstat-no" title="statement not covered" > * @example</span>
+<span class="cstat-no" title="statement not covered" > * parseRelativeTime("1 hour ago") // Returns Date 1 hour before now (UTC)</span>
+<span class="cstat-no" title="statement not covered" > * parseRelativeTime("2 days ago") // Returns Date 2 days before now (UTC)</span>
+<span class="cstat-no" title="statement not covered" > * parseRelativeTime("just now") // Returns current Date (UTC)</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >export function parseRelativeTime(relativeTimeString, referenceDate = nowUTC()) {</span>
 <span class="cstat-no" title="statement not covered" >  if (!relativeTimeString || typeof relativeTimeString !== 'string') {</span>
 <span class="cstat-no" title="statement not covered" >    return null;</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
@@ -374,15 +374,15 @@ export <span class="fstat-no" title="function not covered" >function parseRelati
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  return calculateDateFromUnit(amount, unit, referenceDate);</span>
 <span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-/**
- * Calculate date by subtracting time units from reference date
- * @param {number} amount - Amount of time units
- * @param {string} unit - Time unit (second, minute, hour, day, week, month, year)
- * @param {Date} referenceDate - Reference date to calculate from
- * @returns {Date} Calculated date
- */
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >function calculateDateFromUnit(amount, unit, referenceDate) {</span></span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Calculate date by subtracting time units from reference date</span>
+<span class="cstat-no" title="statement not covered" > * @param {number} amount - Amount of time units</span>
+<span class="cstat-no" title="statement not covered" > * @param {string} unit - Time unit (second, minute, hour, day, week, month, year)</span>
+<span class="cstat-no" title="statement not covered" > * @param {Date} referenceDate - Reference date to calculate from</span>
+<span class="cstat-no" title="statement not covered" > * @returns {Date} Calculated date</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >function calculateDateFromUnit(amount, unit, referenceDate) {</span>
 <span class="cstat-no" title="statement not covered" >  const date = new Date(referenceDate);</span>
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  switch (unit) {</span>
@@ -413,15 +413,15 @@ export <span class="fstat-no" title="function not covered" >function parseRelati
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  return date;</span>
 <span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-/**
- * Calculate date from short unit notation (s, m, h, d, w, y)
- * @param {number} amount - Amount of time units
- * @param {string} shortUnit - Short time unit (s, m, h, d, w, y)
- * @param {Date} referenceDate - Reference date to calculate from
- * @returns {Date} Calculated date
- */
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >function calculateDateFromShortUnit(amount, shortUnit, referenceDate) {</span></span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Calculate date from short unit notation (s, m, h, d, w, y)</span>
+<span class="cstat-no" title="statement not covered" > * @param {number} amount - Amount of time units</span>
+<span class="cstat-no" title="statement not covered" > * @param {string} shortUnit - Short time unit (s, m, h, d, w, y)</span>
+<span class="cstat-no" title="statement not covered" > * @param {Date} referenceDate - Reference date to calculate from</span>
+<span class="cstat-no" title="statement not covered" > * @returns {Date} Calculated date</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >function calculateDateFromShortUnit(amount, shortUnit, referenceDate) {</span>
 <span class="cstat-no" title="statement not covered" >  const unitMap = {</span>
 <span class="cstat-no" title="statement not covered" >    s: 'second',</span>
 <span class="cstat-no" title="statement not covered" >    m: 'minute',</span>
@@ -438,13 +438,13 @@ export <span class="fstat-no" title="function not covered" >function parseRelati
 <span class="cstat-no" title="statement not covered" ></span>
 <span class="cstat-no" title="statement not covered" >  return calculateDateFromUnit(amount, fullUnit, referenceDate);</span>
 <span class="cstat-no" title="statement not covered" >}</span>
-&nbsp;
-/**
- * Check if a relative time string is valid and parseable
- * @param {string} relativeTimeString - The relative time string to validate
- * @returns {boolean} True if the string can be parsed
- */
-export <span class="fstat-no" title="function not covered" >function isValidRelativeTime(relativeTimeString) {</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * Check if a relative time string is valid and parseable</span>
+<span class="cstat-no" title="statement not covered" > * @param {string} relativeTimeString - The relative time string to validate</span>
+<span class="cstat-no" title="statement not covered" > * @returns {boolean} True if the string can be parsed</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >export function isValidRelativeTime(relativeTimeString) {</span>
 <span class="cstat-no" title="statement not covered" >  return parseRelativeTime(relativeTimeString) !== null;</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;</pre></td></tr></table></pre>
@@ -454,7 +454,7 @@ export <span class="fstat-no" title="function not covered" >function isValidRela
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-28T20:05:53.512Z
+                at 2025-07-28T20:19:17.104Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

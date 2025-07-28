@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.01% </span>
+                <span class="strong">58.2% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>63/134</span>
+                <span class='fraction'>78/134</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">40% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>2/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">25% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>1/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">47.01% </span>
+                <span class="strong">58.2% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>63/134</span>
+                <span class='fraction'>78/134</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -232,23 +232,23 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62638x</span>
+<span class="cline-any cline-yes">62638x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
+<span class="cline-any cline-yes">62639x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -365,24 +365,24 @@ const DANGEROUS_BROWSER_ARGS = ['--disable-web-security', '--disable-extensions'
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
-export <span class="fstat-no" title="function not covered" >function getXScrapingBrowserConfig(options = {}) {</span>
-<span class="cstat-no" title="statement not covered" >  const config = {</span>
-<span class="cstat-no" title="statement not covered" >    headless: options.headless ?? false,</span>
-<span class="cstat-no" title="statement not covered" >    args: [...SAFE_BROWSER_ARGS],</span>
-<span class="cstat-no" title="statement not covered" >  };</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >  // Add display if running in headless environment</span>
-<span class="cstat-no" title="statement not covered" >  if (process.env.DISPLAY) {</span>
-<span class="cstat-no" title="statement not covered" >    config.args.push(`--display=${process.env.DISPLAY}`);</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >  // Add any additional args that were specifically requested</span>
-<span class="cstat-no" title="statement not covered" >  if (options.additionalArgs?.length &gt; 0) {</span>
+export function getXScrapingBrowserConfig(options = {}) {
+  const config = {
+    headless: options.headless<span class="branch-0 cbranch-no" title="branch not covered" > ?? false,</span>
+    args: [...SAFE_BROWSER_ARGS],
+  };
+&nbsp;
+  // Add display if running in headless environment
+  if (process.env.DISPLAY) {
+    config.args.push(`--display=${process.env.DISPLAY}`);
+  }
+&nbsp;
+  // Add any additional args that were specifically requested
+  if (options.additionalArgs<span class="branch-0 cbranch-no" title="branch not covered" >?.length </span>&gt; 0) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
 <span class="cstat-no" title="statement not covered" >    config.args.push(...options.additionalArgs);</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >  return config;</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;
+  return config;
+}
 &nbsp;
 /**
  * Get standard browser configuration for YouTube scraping
@@ -472,7 +472,7 @@ export { SAFE_BROWSER_ARGS, DANGEROUS_BROWSER_ARGS };
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-28T20:05:53.621Z
+                at 2025-07-28T20:19:17.206Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
