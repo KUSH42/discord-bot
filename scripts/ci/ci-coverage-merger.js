@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
-import { toISOStringUTC } from '../../utilities/utc-time-test.js';
+import { toISOStringUTC } from '../../src/utilities/utc-time.js';
 
 class CICoverageMerger {
   constructor() {
