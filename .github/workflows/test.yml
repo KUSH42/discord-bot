@@ -245,19 +245,19 @@ jobs:
         env:
           NODE_VERSION: ${{ matrix.node-version }}
         run: |
-          mkdir -p coverage/unit-test-node${{ matrix.node-version }}
+          mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=tests/configs/jest.unit.config.js \
             --coverage \
-            --coverageDirectory=coverage/unit-test-node${{ matrix.node-version }} \
+            --coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }} \
             --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=10000 \
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee coverage/unit-test-node${{ matrix.node-version }}.log
+            2>&1 | tee coverage/unit-tests-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v4
@@ -272,9 +272,9 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: unit-test-results-node${{ matrix.node-version }}
+          name: unit-tests-node${{ matrix.node-version }}
           path: |
-            coverage/unit/
+            coverage/unit-tests-node${{ matrix.node-version }}/
             test-results/unit-tests-node${{ matrix.node-version }}.xml
           retention-days: 7
 
@@ -500,7 +500,7 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p coverage/integration-test
+          mkdir -p coverage/integration-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --coverage \
@@ -527,7 +527,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-results
+          name: integration-tests
           path: |
             coverage/integration-tests/
             test-results/integration-tests.xml
@@ -610,23 +610,23 @@ jobs:
         env:
           NODE_ENV: test
         run: |
-          mkdir -p coverage/e2e test-results
+          mkdir -p coverage/e2e-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
             --coverage \
-            --coverageDirectory=coverage/e2e \
+            --coverageDirectory=coverage/e2e-tests \
             --coverageReporters=lcov \
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee coverage/e2e/test-output.log
+            2>&1 | tee coverage/e2e-tests/test-output.log
 
 
       - name: Upload E2E test coverage
         uses: codecov/codecov-action@v4
         with:
-          file: coverage/e2e/lcov.info
+          file: coverage/e2e-tests/lcov.info
           flags: e2e
           name: e2e-tests
           fail_ci_if_error: false
@@ -636,9 +636,9 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: e2e-test-results
+          name: e2e-tests
           path: |
-            coverage/e2e/
+            coverage/e2e-tests/
             test-results/e2e-tests.xml
             logs/
             screenshots/
@@ -697,11 +697,11 @@ jobs:
 
       - name: Run performance tests
         run: |
-          mkdir -p coverage/performance-test-results
+          mkdir -p coverage/performance-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
-            --coverageDirectory=coverage/performance-test-result \
+            --coverageDirectory=coverage/performance-tests \
             --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=60000 \
@@ -824,7 +824,7 @@ jobs:
 
       - name: Run security tests
         run: |
-          mkdir -p test-results/security test-results
+          mkdir -p test-results/security-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
@@ -880,7 +880,7 @@ jobs:
             security-audit.json
             security-report.json
             test-results/security-tests.xml
-            test-results/security/
+            test-results/security-tests/
           retention-days: 30
 
   # Aggregate results and report
