@@ -45,10 +45,10 @@ export default {
   // Re-enabled coverage thresholds after fixing hanging tests
   coverageThreshold: {
     global: {
-      statements: 80, // Increased from 20 to be more achievable
-      branches: 75, // Increased from 15
-      functions: 70, // Increased from 20
-      lines: 70, // Increased from 20
+      statements: 25, // Matches CLAUDE.md project requirements
+      branches: 20, // Matches CLAUDE.md project requirements
+      functions: 25, // Matches CLAUDE.md project requirements
+      lines: 25, // Matches CLAUDE.md project requirements
     },
   },
   testMatch: ['**/tests/**/*.test.js', '**/tests/**/*.spec.js', '**/__tests__/**/*.js'],

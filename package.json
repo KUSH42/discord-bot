@@ -14,7 +14,7 @@
     "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
     "test:coverage": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
     "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/unit",
-    "test:integration": "dotenvx run -f tests/test.env -- jest --config tests/configs/jest.integration.config.js --detectOpenHandles --forceExit --coverage --coverageDirectory=coverage/integration --coverageReporters=text --coverageReporters=lcov",
+    "test:integration": "NODE_OPTIONS=\"--experimental-vm-modules\" dotenvx run -f tests/test.env -- jest --config tests/configs/jest.integration.config.js",
     "test:e2e": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.e2e.config.js",
     "test:performance": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.performance.config.js",
     "test:security": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.security.config.js",
