@@ -187,7 +187,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: [pre-flight, lint]
     if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'unit')
@@ -261,15 +260,6 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee test-results/unit-tests-node${{ matrix.node-version }}.log
-
-      - name: Upload unit test coverage
-        uses: codecov/test-results-action@v1
-        with:
-          file: test-results/unit-tests-node${{ matrix.node-version }}/unit-tests-node${{ matrix.node-version }}
-          flags: unit-node${{ matrix.node-version }}
-          name: unit-tests-node${{ matrix.node-version }}
-          fail_ci_if_error: false
-          plugins: ''
 
       - name: Store unit test results
         uses: actions/upload-artifact@v4
@@ -422,7 +412,6 @@ jobs:
     #container:
     #  image: ${{ needs.build-and-push-docker.outputs.image_tag }}
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     #needs: [pre-flight, lint, build-and-push-docker]
     needs: [pre-flight, lint]
@@ -518,15 +507,6 @@ jobs:
             --coverageThreshold='{}' \
             2>&1 | tee test-results/integration-tests-output.log
 
-      - name: Upload integration test coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/integration-tests/lcov.info
-          flags: integration
-          name: integration-tests
-          fail_ci_if_error: false
-          plugins: ''
-
       - name: Store integration test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -543,7 +523,6 @@ jobs:
     name: End-to-End Tests
     runs-on: ubuntu-latest
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 20
     needs: [pre-flight, lint]
@@ -631,16 +610,6 @@ jobs:
           echo "echo "Current working directory: $(pwd)""
           $(echo ls -a -F)
 
-
-      - name: Upload E2E test coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/e2e-tests/lcov.info
-          flags: e2e
-          name: e2e-tests
-          fail_ci_if_error: false
-          plugins: ''
-
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -661,7 +630,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: [pre-flight, lint]
     if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'performance')
@@ -763,15 +731,6 @@ jobs:
             "test_duration_seconds": $SECONDS
           }
           EOF
-
-      - name: Upload performance test coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/performance-tests/lcov.info
-          flags: performance
-          name: performance-tests
-          fail_ci_if_error: false
-          plugins: ''
 
       - name: Store performance test results
         uses: actions/upload-artifact@v4
@@ -899,8 +858,6 @@ jobs:
     name: Test Summary
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     needs:
       [
         unit-tests,
@@ -923,6 +880,10 @@ jobs:
       - name: Install dependencies
         run: |
           echo "Current working directory: $(pwd)"
+
+          sudo apt-get update && sudo apt-get install -y lcov || \
+          echo "lcov install failed"
+
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
@@ -958,10 +919,6 @@ jobs:
           pattern: '*-test*'
           merge-multiple: true
           path: .
-
-      - name: Install enhanced coverage tools
-        run: |
-          sudo apt-get update && sudo apt-get install -y lcov || echo "lcov install failed"
 
       - name: Enhanced coverage merging and analysis
         id: coverage
@@ -1002,14 +959,13 @@ jobs:
           fi
 
       - name: Upload merged coverage to Codecov
+        uses: codecov/codecov-action@v5
         if: steps.coverage.outputs.status == 'available'
-        uses: codecov/codecov-action@v4
         with:
-          file: coverage/merged/lcov.info
-          flags: merged
-          name: merged-coverage
-          fail_ci_if_error: false
-          plugins: ''
+          fail_ci_if_error: false # optional (default = false)
+          verbose: true # optional (default = false)
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Store final test report
         uses: actions/upload-artifact@v4
