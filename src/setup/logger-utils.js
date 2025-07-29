@@ -3,9 +3,9 @@
 
 import Transport from 'winston-transport';
 import * as winston from 'winston';
-import { splitMessage } from './discord-utils.js';
-import { DiscordMessageSender } from './services/implementations/message-sender/discord-message-sender.js';
-import { createEnhancedLogger } from './utilities/enhanced-logger.js';
+import { splitMessage } from '../setup/discord-utils.js';
+import { DiscordMessageSender } from '../services/implementations/message-sender/discord-message-sender.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
  * Discord Transport for Winston logger
@@ -18,6 +18,10 @@ export class DiscordTransport extends Transport {
     this.channelId = opts.channelId;
     this.channel = null;
     this.buffer = [];
+
+    // Store debug manager and metrics manager for enhanced logging
+    this.debugManager = opts.debugManager;
+    this.metricsManager = opts.metricsManager;
 
     // Buffering options
     this.flushInterval = opts.flushInterval || 1000; // 1 seconds to match send delay
@@ -39,12 +43,24 @@ export class DiscordTransport extends Transport {
             verbose: console.debug?.bind(console) || console.log.bind(console),
           };
 
-    // Create enhanced logger for the discord-transport module
-    const logger =
-      opts.debugManager && opts.metricsManager
-        ? createEnhancedLogger('discord-transport', baseLogger, opts.debugManager, opts.metricsManager)
+    // Create enhanced logger for the discord-transport module itself
+    this.logger =
+      this.debugManager && this.metricsManager
+        ? createEnhancedLogger('discord-transport', baseLogger, this.debugManager, this.metricsManager)
+        : {
+            debug: baseLogger.debug,
+            info: baseLogger.info,
+            warn: baseLogger.warn,
+            error: baseLogger.error,
+            verbose: baseLogger.verbose,
+          };
+
+    // Create enhanced logger for DiscordMessageSender
+    const messageSenderLogger =
+      this.debugManager && this.metricsManager
+        ? createEnhancedLogger('discord-message-sender', baseLogger, this.debugManager, this.metricsManager)
         : baseLogger;
-    this.messageSender = new DiscordMessageSender(logger, {
+    this.messageSender = new DiscordMessageSender(messageSenderLogger, {
       baseSendDelay: opts.baseSendDelay || 1000, // 1 second between sends to respect Discord limits
       burstAllowance: opts.burstAllowance || 30, // Allow 30 quick messages per 2 minutes
       burstResetTime: opts.burstResetTime || 60000, // 1 minute burst reset for better recovery
@@ -86,7 +102,7 @@ export class DiscordTransport extends Transport {
     } catch (error) {
       // Ignore flush errors during shutdown
       if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-        this.safeConsoleError('[DiscordTransport] Error during final flush:', error);
+        this.logError('Error during final flush:', error);
       }
     }
 
@@ -97,7 +113,7 @@ export class DiscordTransport extends Transport {
       } catch (error) {
         // Ignore shutdown errors - they're expected during disconnect
         if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-          this.safeConsoleError('[DiscordTransport] Error during message sender shutdown:', error);
+          this.logError('Error during message sender shutdown:', error);
         }
       }
     }
@@ -161,7 +177,16 @@ export class DiscordTransport extends Transport {
     return shutdownMessages.some(msg => error.message.includes(msg));
   }
 
-  // Safe logging to prevent EPIPE errors on console.error
+  // Enhanced error logging using enhanced logger when available
+  logError(message, error = null) {
+    if (this.logger && typeof this.logger.error === 'function') {
+      this.logger.error(message, error ? { error: error.message, stack: error.stack } : {});
+    } else {
+      this.safeConsoleError(`[DiscordTransport] ${message}`, error);
+    }
+  }
+
+  // Safe logging to prevent EPIPE errors on console.error (fallback)
   safeConsoleError(message, ...args) {
     try {
       console.error(message, ...args);
@@ -198,20 +223,20 @@ export class DiscordTransport extends Transport {
               })
               .catch(error => {
                 if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error)) {
-                  this.safeConsoleError('[DiscordTransport] Failed to send initialization message:', error);
+                  this.logError('Failed to send initialization message:', error);
                 }
               });
           }, 2000); // 2 second delay to avoid blocking startup
         } else {
           this.channel = 'errored';
           if (process.env.NODE_ENV !== 'test') {
-            this.safeConsoleError(`[DiscordTransport] Channel ${this.channelId} is not a valid text channel.`);
+            this.logError(`Channel ${this.channelId} is not a valid text channel.`);
           }
         }
       } catch (error) {
         this.channel = 'errored';
         if (process.env.NODE_ENV !== 'test') {
-          this.safeConsoleError(`[DiscordTransport] Failed to fetch channel ${this.channelId}:`, error);
+          this.logError(`Failed to fetch channel ${this.channelId}:`, error);
         }
       }
     }
@@ -258,17 +283,28 @@ export class DiscordTransport extends Transport {
       // Only log the error if it's not related to Discord being unavailable during shutdown
       // and we're not in test environment, and not a write error
       if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-        this.safeConsoleError('[DiscordTransport] Failed to flush log buffer to Discord:', error);
+        this.logError('Failed to flush log buffer to Discord:', error);
 
         // Log rate limiting metrics for debugging only if client is still available
         if (!this.isClientUnavailable()) {
           const metrics = this.messageSender.getMetrics();
-          this.safeConsoleError('[DiscordTransport] Message sender metrics:', {
-            successRate: metrics.successRate,
-            rateLimitHits: metrics.rateLimitHits,
-            currentQueueSize: metrics.currentQueueSize,
-            isPaused: metrics.isPaused,
-          });
+          if (this.logger && typeof this.logger.debug === 'function') {
+            this.logger.debug(
+              `Message sender metrics: ${JSON.stringify({
+                successRate: metrics.successRate,
+                rateLimitHits: metrics.rateLimitHits,
+                currentQueueSize: metrics.currentQueueSize,
+                isPaused: metrics.isPaused,
+              })}`
+            );
+          } else {
+            this.safeConsoleError('[DiscordTransport] Message sender metrics:', {
+              successRate: metrics.successRate,
+              rateLimitHits: metrics.rateLimitHits,
+              currentQueueSize: metrics.currentQueueSize,
+              isPaused: metrics.isPaused,
+            });
+          }
         }
       }
 
@@ -417,6 +453,8 @@ export const LoggerUtils = {
       client,
       channelId,
       level: options.level || 'info',
+      debugManager: options.debugManager,
+      metricsManager: options.metricsManager,
       ...options,
     });
   },

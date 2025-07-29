@@ -127,7 +127,7 @@ describe('DebugFlagManager', () => {
 
     it('should log the change', () => {
       debugManager.toggle('content-announcer', true);
-      expect(mockLogger.info).toHaveBeenLastCalledWith('Debug flag changed', {
+      expect(mockLogger.info).toHaveBeenLastCalledWith('Debug flag changed: content-announcer true', {
         module: 'content-announcer',
         enabled: true,
         previousState: false,
