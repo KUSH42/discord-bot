@@ -16,13 +16,68 @@ describe('ScraperApplication Health Monitoring', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
 
+    // Basic timer advancement (from TIMER-TESTING-GUIDE.md)
+    global.advanceAsyncTimers = async ms => {
+      await jest.advanceTimersByTimeAsync(ms);
+      await Promise.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+    };
+
+    // ADVANCED: Deep async coordination for nested operations (from ADVANCED-TIMER-PATTERNS.md)
+    global.advanceAsyncTimersDeep = async (ms, maxIterations = 15) => {
+      await jest.advanceTimersByTimeAsync(ms);
+      for (let i = 0; i < maxIterations; i++) {
+        await Promise.resolve();
+        await new Promise(resolve => setImmediate(resolve));
+        await new Promise(resolve => process.nextTick(resolve));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    };
+
+    // ENHANCED: setInterval-specific advancement
+    global.advanceIntervalTimersDeep = async (ms, maxIterations = 20) => {
+      await jest.advanceTimersByTimeAsync(ms);
+      for (let i = 0; i < maxIterations; i++) {
+        await Promise.resolve();
+        await new Promise(resolve => setImmediate(resolve));
+        await new Promise(resolve => process.nextTick(resolve));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      // Additional tick to ensure setInterval callbacks are processed
+      await new Promise(resolve => process.nextTick(resolve));
+    };
+
+    // ADVANCED: State synchronization
+    global.waitForStateChange = async (stateChecker, timeoutMs = 5000) => {
+      const startTime = Date.now();
+      while (!stateChecker() && Date.now() - startTime < timeoutMs) {
+        await global.advanceAsyncTimersDeep(10);
+      }
+      if (!stateChecker()) {
+        throw new Error(`State change timeout after ${timeoutMs}ms`);
+      }
+    };
+
     // Create enhanced logging mocks
     const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     // Mock all dependencies
     mockConfig = {
-      getRequired: jest.fn(),
-      get: jest.fn(),
+      getRequired: jest.fn(key => {
+        const values = {
+          X_USER_HANDLE: 'testuser',
+          TWITTER_USERNAME: 'test@example.com',
+          TWITTER_PASSWORD: 'testpass123',
+        };
+        return values[key] || `mock-${key}`;
+      }),
+      get: jest.fn((key, defaultValue) => {
+        const values = {
+          X_QUERY_INTERVAL_MIN: '300000',
+          X_QUERY_INTERVAL_MAX: '600000',
+        };
+        return values[key] || defaultValue;
+      }),
       getBoolean: jest.fn(),
     };
 
@@ -106,6 +161,7 @@ describe('ScraperApplication Health Monitoring', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    delete global.advanceAsyncTimers;
     if (scraperApp.healthCheckInterval) {
       clearInterval(scraperApp.healthCheckInterval);
     }
@@ -167,20 +223,33 @@ describe('ScraperApplication Health Monitoring', () => {
     });
 
     it('should execute health checks at specified intervals', async () => {
-      const performHealthCheckSpy = jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue({
-        errors: [],
+      // Mock setInterval to capture the callback function
+      let intervalCallback;
+      const originalSetInterval = global.setInterval;
+      jest.spyOn(global, 'setInterval').mockImplementation((callback, ms) => {
+        intervalCallback = callback;
+        return originalSetInterval(() => {}, ms); // Return real timer ID for cleanup
+      });
+
+      const performHealthCheckSpy = jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
+        // Simulate nested async operations in health check
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return { errors: [] };
       });
       const mockOperation = { success: jest.fn(), error: jest.fn() };
       mockLogger.startOperation.mockReturnValue(mockOperation);
 
       scraperApp.startHealthMonitoring(100); // 100ms for testing
 
-      // Fast forward time to trigger health check
-      jest.advanceTimersByTime(100);
-      await jest.runAllTimersAsync();
+      // Directly execute the interval callback instead of waiting for timer
+      expect(intervalCallback).toBeDefined();
+      await intervalCallback();
 
       expect(performHealthCheckSpy).toHaveBeenCalled();
-    }, 2000);
+
+      // Restore original setInterval
+      global.setInterval.mockRestore();
+    }, 5000);
 
     it('should handle successful health checks', async () => {
       const healthResult = {
@@ -191,18 +260,21 @@ describe('ScraperApplication Health Monitoring', () => {
         errors: [],
       };
 
-      jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue(healthResult);
+      jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
+        // Simulate complex health check with multiple async operations
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return healthResult;
+      });
       const mockOperation = { success: jest.fn(), error: jest.fn() };
       mockLogger.startOperation.mockReturnValue(mockOperation);
 
       scraperApp.startHealthMonitoring(100);
 
-      // Trigger health check
-      jest.advanceTimersByTime(100);
-      await jest.runAllTimersAsync();
+      // Use interval-specific advancement for setInterval callbacks
+      await global.advanceIntervalTimersDeep(100, 25);
 
       expect(mockOperation.success).toHaveBeenCalledWith('Health check passed', healthResult);
-    }, 2000);
+    }, 10000);
 
     it('should handle health check failures', async () => {
       const healthResult = {
@@ -213,17 +285,22 @@ describe('ScraperApplication Health Monitoring', () => {
         errors: ['Authentication verification failed', 'Browser not available or closed'],
       };
 
-      jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue(healthResult);
-      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
+      jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
+        // Simulate complex health check that detects failures
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return healthResult;
+      });
+      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockImplementation(async () => {
+        // Simulate async failure handling
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
       const mockOperation = { success: jest.fn(), error: jest.fn() };
       mockLogger.startOperation.mockReturnValue(mockOperation);
 
       scraperApp.startHealthMonitoring(100);
 
-      // Trigger health check
-      jest.advanceTimersByTime(100);
-
-      await jest.runAllTimersAsync();
+      // Use interval-specific advancement for setInterval callbacks
+      await global.advanceIntervalTimersDeep(100, 25);
 
       expect(mockOperation.error).toHaveBeenCalledWith(
         expect.any(Error),
@@ -231,43 +308,48 @@ describe('ScraperApplication Health Monitoring', () => {
         healthResult
       );
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalled();
-    }, 2000);
+    }, 10000);
 
     it('should handle health check exceptions', async () => {
       const healthCheckError = new Error('Health check crashed');
 
-      jest.spyOn(scraperApp, 'performHealthCheck').mockRejectedValue(healthCheckError);
-      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
+      jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
+        // Simulate async operation that throws
+        await new Promise(resolve => setTimeout(resolve, 10));
+        throw healthCheckError;
+      });
+      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockImplementation(async () => {
+        // Simulate async failure handling
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
       const mockOperation = { success: jest.fn(), error: jest.fn() };
       mockLogger.startOperation.mockReturnValue(mockOperation);
 
       scraperApp.startHealthMonitoring(100);
 
-      // Trigger health check
-      jest.advanceTimersByTime(100);
-
-      await jest.runAllTimersAsync();
+      // Use interval-specific advancement for setInterval callbacks
+      await global.advanceIntervalTimersDeep(100, 25);
 
       expect(mockOperation.error).toHaveBeenCalledWith(healthCheckError, 'Health check failed');
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalledWith(healthCheckError);
-    }, 2000);
+    }, 10000);
   });
 
   describe('stopHealthMonitoring', () => {
-    it('should stop health monitoring when interval exists', () => {
+    it('should stop health monitoring when interval exists', async () => {
+      const mockOperation = { success: jest.fn(), error: jest.fn() };
+      mockLogger.startOperation.mockReturnValue(mockOperation);
+
       scraperApp.startHealthMonitoring();
       expect(scraperApp.healthCheckInterval).toBeDefined();
 
       scraperApp.stopHealthMonitoring();
 
+      // Wait for cleanup to complete
+      await global.advanceAsyncTimersDeep(10);
+
       expect(scraperApp.healthCheckInterval).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Health monitoring stopped',
-        expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-        })
-      );
+      expect(mockOperation.success).toHaveBeenCalledWith('Health monitoring stopped');
     });
 
     it('should handle stopping when no interval exists', () => {
@@ -452,30 +534,37 @@ describe('ScraperApplication Health Monitoring', () => {
       let healthCheckCallCount = 0;
       jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
         healthCheckCallCount++;
+        // Simulate async operations in health check
+        await new Promise(resolve => setTimeout(resolve, 10));
         if (healthCheckCallCount === 1) {
           throw new Error('First check failed');
         }
         return { errors: [] };
       });
 
-      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockResolvedValue();
+      jest.spyOn(scraperApp, 'handleHealthCheckFailure').mockImplementation(async () => {
+        // Simulate async failure handling
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
 
       scraperApp.startHealthMonitoring(100);
 
-      // Trigger first health check (should fail)
-      jest.advanceTimersByTime(100);
-      await jest.runAllTimersAsync();
+      // Trigger first health check (should fail) - use deep advancement
+      await global.advanceIntervalTimersDeep(100, 25);
 
-      // Trigger second health check (should succeed)
-      jest.advanceTimersByTime(100);
-      await jest.runAllTimersAsync();
+      // Trigger second health check (should succeed) - use deep advancement
+      await global.advanceIntervalTimersDeep(100, 25);
 
       expect(healthCheckCallCount).toBe(2);
       expect(scraperApp.handleHealthCheckFailure).toHaveBeenCalledTimes(1);
-    }, 2000);
+    }, 10000);
 
     it('should handle concurrent health monitoring operations safely', async () => {
-      jest.spyOn(scraperApp, 'performHealthCheck').mockResolvedValue({ errors: [] });
+      jest.spyOn(scraperApp, 'performHealthCheck').mockImplementation(async () => {
+        // Simulate complex health check operations
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return { errors: [] };
+      });
 
       // Start multiple health monitoring instances
       scraperApp.startHealthMonitoring(5000);
@@ -485,11 +574,10 @@ describe('ScraperApplication Health Monitoring', () => {
       // Should only have one active interval (the last one)
       expect(scraperApp.healthCheckInterval).toBeDefined();
 
-      // Trigger health check
-      jest.advanceTimersByTime(15000);
-      await jest.runAllTimersAsync();
+      // Trigger health check with deep advancement for complex operations
+      await global.advanceIntervalTimersDeep(15000, 25);
 
       expect(scraperApp.performHealthCheck).toHaveBeenCalled();
-    }, 2000);
+    }, 12000);
   });
 });

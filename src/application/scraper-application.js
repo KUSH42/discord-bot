@@ -1233,12 +1233,12 @@ export class ScraperApplication {
       }
 
       operation.progress('Classifying tweet content');
-      const classification = this.classifier.classifyXContent(tweet, metadata);
+      const classification = this.classifier.classifyXContent(tweet.url, tweet.text, metadata);
 
       operation.progress('Creating content object for announcement');
       const content = {
         platform: 'x',
-        type: 'post', // Default type, will be classified by ContentCoordinator
+        type: classification.type || 'post', // Use classification result
         id: tweet.tweetID,
         url: tweet.url,
         author: tweet.author, // Always use the actual author (username)

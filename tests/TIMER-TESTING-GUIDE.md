@@ -216,3 +216,45 @@ To update existing timer-dependent tests:
 3. **Don't use excessive timeouts** - Proper time control should make tests fast
 4. **Don't advance time without Promise resolution** - Use the helper function
 5. **Don't assume immediate processing** - Allow time for async operations
+
+## For Complex Timer Operations
+
+This guide covers **basic timer patterns**. For complex scenarios involving:
+- Nested async operations within timer callbacks
+- Multiple interacting timers
+- State-dependent timer sequences
+- Resource cleanup race conditions
+- Event-driven timer interactions
+
+See **`ADVANCED-TIMER-PATTERNS.md`** for deep timer synchronization patterns and solutions to timeout issues in health monitoring, restart functionality, and other complex async timer operations.
+
+## Quick Diagnostic for Timer Issues
+
+**If your timer-based test is timing out:**
+
+1. **Identify the pattern**:
+   ```bash
+   # Basic setTimeout/Promise chains
+   → Use patterns from this guide (TIMER-TESTING-GUIDE.md)
+   
+   # setInterval with async callbacks  
+   → Use ADVANCED-TIMER-PATTERNS.md patterns
+   
+   # Health monitoring, restart functionality
+   → Use interval-specific advancement: advanceIntervalTimersDeep()
+   ```
+
+2. **Quick fixes**:
+   ```javascript
+   // Increase timeout for complex operations
+   it('complex test', async () => { /* ... */ }, 15000);
+   
+   // Use appropriate advancement method
+   await global.advanceIntervalTimersDeep(100, 25); // For setInterval
+   await global.advanceAsyncTimers(100);            // For setTimeout
+   ```
+
+3. **Debug with logging**:
+   ```bash
+   DEBUG_TIMERS=true npm test -- --testNamePattern="your failing test"
+   ```

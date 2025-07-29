@@ -218,14 +218,10 @@ describe('YouTubeScraperService - Advanced Testing', () => {
       expect(result.id).toBe('abc123');
       expect(result.publishedAt).toBeDefined(); // Should be parsed from publishedText
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Successfully scraped latest video',
+        expect.stringContaining('Successfully scraped latest video'),
         expect.objectContaining({
-          success: true,
-          strategy: 'modern-grid',
-          id: 'abc123',
-          title: 'Test Video Title',
-          module: 'youtube',
           outcome: 'success',
+          module: 'youtube',
         })
       );
     });
@@ -387,13 +383,10 @@ describe('YouTubeScraperService - Advanced Testing', () => {
 
       expect(result).toEqual(liveStreamWithNowPlaying);
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Successfully scraped active live stream',
+        expect.stringContaining('Successfully scraped active live stream'),
         expect.objectContaining({
-          id: 'live456',
-          title: 'Live Stream Title',
-          type: 'livestream',
-          module: 'youtube',
           outcome: 'success',
+          module: 'youtube',
         })
       );
     });

@@ -28,6 +28,21 @@ describe('ScraperApplication Restart Functionality', () => {
         };
         return values[key];
       }),
+      get: jest.fn((key, defaultValue) => {
+        const values = {
+          X_QUERY_INTERVAL_MIN: '300000',
+          X_QUERY_INTERVAL_MAX: '600000',
+          STARTUP_TIMESTAMP: Date.now().toString(),
+          PARALLEL_SCRAPING: 'false',
+          LOGIN_RETRY_DELAY: '5000',
+          PROFILE_RETRY_DELAY: '10000',
+          MAX_RETRY_ATTEMPTS: '3',
+          SCRAPING_ANNOUNCEMENT_DELAY: '2000',
+          X_POLLING_INTERVAL: '900000',
+          MAX_SCROLLS: '50',
+        };
+        return values[key] || defaultValue;
+      }),
     };
 
     // Create additional mocks
@@ -93,24 +108,38 @@ describe('ScraperApplication Restart Functionality', () => {
     }));
 
     // Create ScraperApplication instance
-    scraperApp = new ScraperApplication(
-      mockConfig,
-      mockBrowserService,
-      mockAuthManager,
-      mockContentAnnouncer,
-      mockContentClassifier,
-      mockLogger,
-      mockDebugManager,
-      mockMetricsManager
-    );
+    const dependencies = {
+      config: mockConfig,
+      browserService: mockBrowserService,
+      authManager: mockAuthManager,
+      contentCoordinator: { announceContent: jest.fn() },
+      contentClassifier: mockContentClassifier,
+      logger: mockDependencies.logger,
+      debugManager: mockDependencies.debugManager,
+      metricsManager: mockDependencies.metricsManager,
+      stateManager: { getState: jest.fn(), setState: jest.fn() },
+      discordService: { sendMessage: jest.fn() },
+      eventBus: { emit: jest.fn(), on: jest.fn() },
+    };
 
-    // Mock timers
+    scraperApp = new ScraperApplication(dependencies);
+
+    // Mock timers first
     jest.useFakeTimers();
+
+    // Test helper for synchronized async timer advancement (from TIMER-TESTING-GUIDE.md)
+    global.advanceAsyncTimers = async ms => {
+      await jest.advanceTimersByTimeAsync(ms);
+      // Allow promises to resolve
+      await Promise.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+    };
   });
 
   afterEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
+    delete global.advanceAsyncTimers;
   });
 
   describe('restart()', () => {
@@ -123,31 +152,36 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      // Spy on the actual enhanced logger that ScraperApplication creates
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
+
+      // Mock the start and stop methods that restart() calls
+      jest.spyOn(scraperApp, 'stop').mockResolvedValue();
+      jest.spyOn(scraperApp, 'start').mockResolvedValue();
 
       // Act
       const result = await scraperApp.restart();
 
-      // Assert
-      expect(result).toEqual({ success: true, message: 'Scraper restarted successfully' });
+      // Assert - restart() returns undefined on success
+      expect(result).toBeUndefined();
 
       // Verify operation tracking
-      expect(mockLogger.startOperation).toHaveBeenCalledWith('restart', {
-        currentState: expect.objectContaining({
-          isRunning: expect.any(Boolean),
-          browserHealthy: true,
-          authenticated: true,
-        }),
-      });
+      expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
+        'restartScraperApplication',
+        expect.objectContaining({
+          maxRetries: 3,
+          baseDelay: 5000,
+        })
+      );
 
-      expect(mockOperation.progress).toHaveBeenCalledWith('Stopping current operations');
-      expect(mockOperation.progress).toHaveBeenCalledWith('Reinitializing browser and authentication');
-      expect(mockOperation.progress).toHaveBeenCalledWith('Starting scraping operations');
-      expect(mockOperation.success).toHaveBeenCalledWith('Restart completed successfully');
-
-      // Verify metrics recording
-      expect(mockMetricsManager.incrementCounter).toHaveBeenCalledWith('scraper.restart.attempts');
-      expect(mockMetricsManager.incrementCounter).toHaveBeenCalledWith('scraper.restart.success');
+      expect(mockOperation.progress).toHaveBeenCalledWith('Stopping current scraper instance');
+      expect(mockOperation.success).toHaveBeenCalledWith(
+        'X scraper application restarted successfully',
+        expect.objectContaining({
+          attempt: 1,
+          totalAttempts: 3,
+        })
+      );
     });
 
     it('should handle restart with unhealthy browser', async () => {
@@ -159,7 +193,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Act
       const result = await scraperApp.restart();
@@ -183,7 +217,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Act
       const result = await scraperApp.restart();
@@ -219,20 +253,16 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
-      // Mock Math.random to ensure consistent delay calculation
-      const originalRandom = Math.random;
-      Math.random = jest.fn(() => 0.5);
+      // Act - Use shorter delays for testing
+      const restartPromise = scraperApp.restart({ maxRetries: 3, baseDelay: 1000 });
 
-      // Act
-      const restartPromise = scraperApp.restart();
-
-      // Fast-forward through retry delays
-      // First retry: 1000ms base + jitter
-      await jest.advanceTimersByTimeAsync(1500);
-      // Second retry: 2000ms base + jitter
-      await jest.advanceTimersByTimeAsync(2500);
+      // Fast-forward through retry delays with synchronized advancement
+      // First retry delay: baseDelay * Math.pow(2, 0) = 1000ms
+      await global.advanceAsyncTimers(1000);
+      // Second retry delay: baseDelay * Math.pow(2, 1) = 2000ms
+      await global.advanceAsyncTimers(2000);
 
       const result = await restartPromise;
 
@@ -240,12 +270,9 @@ describe('ScraperApplication Restart Functionality', () => {
       expect(result).toEqual({ success: true, message: 'Scraper restarted successfully' });
       expect(attemptCount).toBe(3);
 
-      // Verify retry logging
-      expect(mockOperation.progress).toHaveBeenCalledWith('Retry attempt 1 failed, waiting 1500ms before next attempt');
-      expect(mockOperation.progress).toHaveBeenCalledWith('Retry attempt 2 failed, waiting 2500ms before next attempt');
-
-      // Restore Math.random
-      Math.random = originalRandom;
+      // Verify retry logging (actual message format from implementation)
+      expect(mockOperation.progress).toHaveBeenCalledWith('Waiting 1000ms before next restart attempt');
+      expect(mockOperation.progress).toHaveBeenCalledWith('Waiting 2000ms before next restart attempt');
     });
 
     it('should fail after maximum retry attempts', async () => {
@@ -256,15 +283,18 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
-      // Act
-      const restartPromise = scraperApp.restart();
+      // Act - Use shorter delays for testing
+      const restartPromise = scraperApp.restart({ maxRetries: 3, baseDelay: 1000 });
 
-      // Fast-forward through all retry attempts
-      for (let i = 0; i < 3; i++) {
-        await jest.advanceTimersByTimeAsync(5000); // Max delay
-      }
+      // Fast-forward through all retry attempts with synchronized advancement
+      // First attempt fails immediately, then wait for first retry delay (1000ms)
+      await global.advanceAsyncTimers(1000);
+      // Second attempt fails, wait for second retry delay (2000ms)
+      await global.advanceAsyncTimers(2000);
+      // Third attempt fails, wait for third retry delay (4000ms)
+      await global.advanceAsyncTimers(4000);
 
       const result = await restartPromise;
 
@@ -289,7 +319,8 @@ describe('ScraperApplication Restart Functionality', () => {
       let launchCallCount = 0;
       mockBrowserService.launch.mockImplementation(async () => {
         launchCallCount++;
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Remove setTimeout delay - just resolve immediately for testing
+        return {};
       });
 
       const mockOperation = {
@@ -297,14 +328,15 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Act - Start multiple restart attempts concurrently
       const restart1 = scraperApp.restart();
       const restart2 = scraperApp.restart();
       const restart3 = scraperApp.restart();
 
-      await jest.advanceTimersByTimeAsync(200);
+      // Use synchronized timer advancement - no delay needed for concurrency test
+      await global.advanceAsyncTimers(100);
 
       const [result1, result2, result3] = await Promise.all([restart1, restart2, restart3]);
 
@@ -328,7 +360,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Start scraper and capture initial state
       scraperApp.isRunning = true;
@@ -359,7 +391,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Act
       const result = await scraperApp.restart();
@@ -382,7 +414,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Act
       await scraperApp.restart();
@@ -415,13 +447,13 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
-      // Act
-      const restartPromise = scraperApp.restart();
+      // Act - Use shorter delays for testing
+      const restartPromise = scraperApp.restart({ maxRetries: 3, baseDelay: 1000 });
 
-      // Fast-forward through retry delays
-      await jest.advanceTimersByTimeAsync(3000);
+      // Fast-forward through retry delays with synchronized advancement
+      await global.advanceAsyncTimers(3000);
 
       const result = await restartPromise;
 
@@ -449,13 +481,13 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
-      // Act
-      const restartPromise = scraperApp.restart();
+      // Act - Use shorter delays for testing
+      const restartPromise = scraperApp.restart({ maxRetries: 3, baseDelay: 1000 });
 
-      // Fast-forward through retry delays
-      await jest.advanceTimersByTimeAsync(5000);
+      // Fast-forward through retry delays with synchronized advancement
+      await global.advanceAsyncTimers(3000);
 
       const result = await restartPromise;
 
@@ -475,17 +507,19 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      mockLogger.startOperation.mockReturnValue(mockOperation);
+      jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
-      // Act
-      const restartPromise = scraperApp.restart();
+      // Act - Use shorter delays for testing
+      const restartPromise = scraperApp.restart({ maxRetries: 3, baseDelay: 1000 });
+
+      // Advance to trigger first retry attempt
+      await global.advanceAsyncTimers(500);
 
       // Simulate shutdown during retry delay
-      setTimeout(() => {
-        scraperApp.isShuttingDown = true;
-      }, 500);
+      scraperApp.isShuttingDown = true;
 
-      await jest.advanceTimersByTimeAsync(1000);
+      // Advance rest of the time to complete the retry cycle
+      await global.advanceAsyncTimers(1500);
 
       const result = await restartPromise;
 

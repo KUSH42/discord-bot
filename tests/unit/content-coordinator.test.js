@@ -13,6 +13,7 @@ describe('ContentCoordinator', () => {
   let mockContentStateManager;
   let mockContentAnnouncer;
   let mockDuplicateDetector;
+  let mockContentClassifier;
   let mockLogger;
   let mockConfig;
   let mockDependencies;
@@ -39,6 +40,10 @@ describe('ContentCoordinator', () => {
       markAsSeen: jest.fn(),
       isDuplicateWithFingerprint: jest.fn(),
       markAsSeenWithFingerprint: jest.fn(),
+    };
+
+    mockContentClassifier = {
+      classify: jest.fn(),
     };
 
     mockConfig = {
@@ -88,6 +93,7 @@ describe('ContentCoordinator', () => {
         mockContentStateManager,
         mockContentAnnouncer,
         mockDuplicateDetector,
+        mockContentClassifier, // missing classifier parameter
         mockLogger,
         null, // no config
         mockDependencies.debugManager,
@@ -676,10 +682,11 @@ describe('ContentCoordinator', () => {
         mockContentStateManager,
         mockContentAnnouncer,
         mockDuplicateDetector,
-        mockDependencies.baseLogger,
+        mockContentClassifier,
+        mockDependencies.logger,
+        mockConfig,
         mockDependencies.debugManager,
-        mockDependencies.metricsManager,
-        mockConfig
+        mockDependencies.metricsManager
       );
     });
 
@@ -780,10 +787,11 @@ describe('ContentCoordinator', () => {
           mockContentStateManager,
           mockContentAnnouncer,
           mockDuplicateDetector,
-          mockDependencies.baseLogger,
+          mockContentClassifier,
+          mockDependencies.logger,
+          mockConfig,
           mockDependencies.debugManager,
-          mockDependencies.metricsManager,
-          mockConfig
+          mockDependencies.metricsManager
         );
 
         mockDuplicateDetector.hasVideoId = jest.fn().mockReturnValue(false);
@@ -898,10 +906,11 @@ describe('ContentCoordinator', () => {
           mockContentStateManager,
           mockContentAnnouncer,
           mockDuplicateDetector,
-          mockDependencies.baseLogger,
+          mockContentClassifier,
+          mockDependencies.logger,
+          mockConfig,
           mockDependencies.debugManager,
-          mockDependencies.metricsManager,
-          mockConfig
+          mockDependencies.metricsManager
         );
 
         // Set up base mocks for processing

@@ -158,6 +158,73 @@ expect(errorSpy).toHaveBeenCalledWith(...);
 
 **Why**: Enhanced logger creates isolated child loggers with correlation tracking and performance metrics, so the actual logging calls don't reach the base mock.
 
+### Complex Timer Operations
+
+For tests involving complex async operations with multiple timers (health monitoring, restart functionality):
+
+```javascript
+// ❌ Basic timer advancement - insufficient for nested async operations
+await jest.advanceTimersByTimeAsync(1000);
+
+// ✅ Advanced pattern for complex timer scenarios  
+await global.advanceAsyncTimersDeep(1000, 15);
+```
+
+**When to use advanced patterns**:
+- Timer callbacks with nested async operations
+- State-dependent timer sequences  
+- Resource cleanup race conditions
+- Event-driven timer interactions
+
+See **`tests/ADVANCED-TIMER-PATTERNS.md`** for comprehensive solutions to timeout issues.
+
+## 🛠️ Troubleshooting Complex Test Issues
+
+### Timer-Based Test Timeouts
+**Symptoms**: Tests with `setInterval`, health monitoring, or restart functionality timing out
+
+**Solutions**:
+1. **Identify complexity level**:
+   - Basic: Single timer → Use `advanceAsyncTimers()`  
+   - Complex: Nested async operations → Use `advanceIntervalTimersDeep()`
+   - Problematic: Jest coordination issues → Use direct timer control
+
+2. **Apply appropriate timeout**:
+   ```javascript
+   it('complex operation', async () => { /* test */ }, 15000); // 15s timeout
+   ```
+
+3. **Debug with timer logging**:
+   ```bash
+   DEBUG_TIMERS=true npm test -- --testNamePattern="your test"
+   ```
+
+### Enhanced Logger Test Failures
+**Symptoms**: Mock expectations failing with enhanced logger components
+
+**Solution**: Spy on the enhanced logger instance, not the base mock:
+```javascript
+const enhancedLogger = component.logger;
+const errorSpy = jest.spyOn(enhancedLogger, 'error');
+expect(errorSpy).toHaveBeenCalledWith(...);
+```
+
+### Resource Cleanup Issues  
+**Symptoms**: Tests hanging or failing intermittently due to cleanup races
+
+**Solution**: Add cleanup coordination:
+```javascript
+await global.ensureCleanupComplete(() => component.healthCheckInterval === null);
+```
+
+### State-Dependent Test Failures
+**Symptoms**: Tests failing because they depend on state changes from previous operations
+
+**Solution**: Add state synchronization:
+```javascript
+await global.waitForStateChange(() => component.isRunning === false);
+```
+
 ---
 
 💡 **Pro Tip**: Start with `npm run test:dev -- --watch` for the fastest
