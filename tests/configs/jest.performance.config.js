@@ -42,6 +42,7 @@ export default {
 
   coverageDirectory: 'coverage/performance-tests',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
   // Performance test reporters
   reporters: [

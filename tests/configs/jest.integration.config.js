@@ -43,6 +43,7 @@ export default {
 
   coverageDirectory: 'coverage/integration',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
   // Integration test reporters
   reporters: [
