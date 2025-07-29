@@ -147,23 +147,44 @@ describe('Search and Retweet Logic', () => {
     jest.clearAllMocks();
   });
 
-  it('should navigate to profile timeline regardless of retweet processing setting', async () => {
+  it('should perform enhanced retweet detection regardless of step 1 results', async () => {
+    // Mock generateSearchUrl and performEnhancedRetweetDetection
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
 
     await scraperApp.pollXProfile();
 
-    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
+    // Should always perform step 2 (enhanced retweet detection) after step 1 (search)
+    expect(scraperApp.performEnhancedRetweetDetection).toHaveBeenCalled();
   });
 
-  it('should use profile timeline approach instead of search', async () => {
+  it('should use two-step approach: advanced search + enhanced retweet detection', async () => {
+    // Mock generateSearchUrl method for the first step
+    jest
+      .spyOn(scraperApp, 'generateSearchUrl')
+      .mockReturnValue('https://x.com/search?q=(from%3Atestuser)%20since%3A2025-07-28&f=live&pf=on&src=typed_query');
+
+    // Mock performEnhancedRetweetDetection for the second step
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
+
     await scraperApp.pollXProfile();
 
-    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
-    // Should not use browser.goto directly since navigateToProfileTimeline handles navigation
-    expect(mockBrowserService.goto).not.toHaveBeenCalled();
+    // Step 1: Should use advanced search with browser.goto
+    expect(scraperApp.generateSearchUrl).toHaveBeenCalledWith(true);
+    expect(mockBrowserService.goto).toHaveBeenCalledWith(
+      'https://x.com/search?q=(from%3Atestuser)%20since%3A2025-07-28&f=live&pf=on&src=typed_query'
+    );
+
+    // Step 2: Should perform enhanced retweet detection (which navigates to profile timeline internally)
+    expect(scraperApp.performEnhancedRetweetDetection).toHaveBeenCalled();
   });
 
   it('should log polling completion message', async () => {
+    // Mock the required methods for the two-step approach
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
+
     await scraperApp.pollXProfile();
 
     expect(mockLogger.info).toHaveBeenCalledWith(
@@ -175,6 +196,9 @@ describe('Search and Retweet Logic', () => {
   });
 
   it('should not log enhanced retweet message when disabled', async () => {
+    // Mock the required methods for the two-step approach
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(false);
 
     await scraperApp.pollXProfile();
@@ -182,22 +206,29 @@ describe('Search and Retweet Logic', () => {
     expect(mockLogger.info).not.toHaveBeenCalledWith(expect.stringContaining('Enhanced retweet detection'));
   });
 
-  it('should use profile timeline navigation before processing content', async () => {
+  it('should use both search and enhanced retweet detection for complete coverage', async () => {
+    // Mock the two-step approach methods
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
+
     await scraperApp.pollXProfile();
 
-    // Should navigate to profile timeline first
-    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
+    // Step 1: Should perform advanced search for user-authored posts
+    expect(mockBrowserService.goto).toHaveBeenCalledWith('https://x.com/search?q=(from%3Atestuser)');
 
-    // Profile timeline approach includes both tweets and retweets automatically,
-    // so enhanced retweet detection is no longer needed
-    expect(scraperApp.performEnhancedScrolling).toHaveBeenCalled();
+    // Step 2: Should perform enhanced retweet detection to get retweets missed by search
+    expect(scraperApp.performEnhancedRetweetDetection).toHaveBeenCalled();
   });
 
-  it('should perform scrolling to load more content', async () => {
+  it('should extract tweets after navigating to search results', async () => {
+    // Mock the methods needed for the test
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
+
     await scraperApp.pollXProfile();
 
-    // Should call performEnhancedScrolling as part of the content loading process
-    expect(scraperApp.performEnhancedScrolling).toHaveBeenCalled();
+    // Should extract tweets from search results after navigation
+    expect(scraperApp.extractTweets).toHaveBeenCalled();
   });
 
   it('should extract and process tweets after navigation', async () => {
@@ -211,6 +242,9 @@ describe('Search and Retweet Logic', () => {
       },
     ];
 
+    // Mock the required methods for the two-step approach
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     scraperApp.extractTweets.mockResolvedValue(mockTweets);
     scraperApp.filterNewTweets.mockReturnValue(mockTweets);
 
@@ -225,6 +259,9 @@ describe('Search and Retweet Logic', () => {
     const mockTweets = [{ tweetID: '123' }];
     const newTweets = [{ tweetID: '123' }];
 
+    // Mock the required methods for the two-step approach
+    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
+    jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     scraperApp.extractTweets.mockResolvedValue(mockTweets);
     scraperApp.filterNewTweets.mockReturnValue(newTweets);
 

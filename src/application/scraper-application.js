@@ -577,29 +577,38 @@ export class ScraperApplication {
       operation.progress('Verifying authentication before polling');
       await this.verifyAuthentication();
 
-      operation.progress('Using profile timeline approach (search disabled due to X.com restrictions)');
-      // X.com now requires more complex authentication for search, so we use profile timeline
-      // which provides both regular tweets and retweets in a single source
-      await this.navigateToProfileTimeline(this.xUser);
+      // ========================================================================
+      // CRITICAL IMPLEMENTATION NOTE: TWO-STEP APPROACH IS MANDATORY
+      // ========================================================================
+      // 1. ADVANCED SEARCH: Get posts AUTHORED by the user (excludes retweets)
+      //    - Uses "from:username" search to find only original posts
+      //    - This is the primary method for detecting new content
+      //
+      // 2. PROFILE TIMELINE: Get ONLY retweets (everything else already covered)
+      //    - Retweets don't appear in "from:username" search results
+      //    - Profile timeline includes both posts AND retweets
+      //    - We filter to process only retweets to avoid duplicates
+      //
+      // DO NOT CHANGE THIS TO USE ONLY ONE METHOD - IT WILL MISS CONTENT
+      // ========================================================================
+
+      operation.progress('STEP 1: Using advanced search for user-authored posts');
+      const searchUrl = this.generateSearchUrl(true);
+      await this.browser.goto(searchUrl);
 
       operation.progress('Waiting for search results to load');
-      // Wait for the primary column to load (same as profile timeline)
       await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
 
-      operation.progress('Performing enhanced scrolling to load search results');
-      // Use the same enhanced scrolling as retweet detection
-      await this.performEnhancedScrolling();
+      operation.progress('Extracting tweets from search results');
+      const searchTweets = await this.extractTweets();
+      this.stats.totalTweetsFound += searchTweets.length;
 
-      operation.progress('Extracting tweets from page');
-      const tweets = await this.extractTweets();
-      this.stats.totalTweetsFound += tweets.length;
+      operation.progress('Filtering search results for new tweets only');
+      const newSearchTweets = await this.filterNewTweets(searchTweets);
 
-      operation.progress('Filtering for new tweets only');
-      const newTweets = await this.filterNewTweets(tweets);
-
-      operation.progress(`Processing ${newTweets.length} new tweets`);
-      if (newTweets.length > 0) {
-        for (const tweet of newTweets) {
+      operation.progress(`Processing ${newSearchTweets.length} new tweets from search`);
+      if (newSearchTweets.length > 0) {
+        for (const tweet of newSearchTweets) {
           try {
             await this.processNewTweet(tweet);
             this.stats.totalTweetsAnnounced++;
@@ -609,18 +618,19 @@ export class ScraperApplication {
         }
       }
 
+      // STEP 2: Enhanced retweet detection (MANDATORY - DO NOT SKIP)
+      operation.progress('STEP 2: Performing enhanced retweet detection from profile timeline');
+      await this.performEnhancedRetweetDetection();
+
       this.stats.successfulRuns++;
 
       // Emit poll completion event
       this.eventBus.emit('scraper.poll.completed', {
         timestamp: nowUTC(),
-        tweetsFound: tweets.length,
-        newTweets: newTweets.length,
+        tweetsFound: searchTweets.length,
+        newTweets: newSearchTweets.length,
         stats: this.getStats(),
       });
-
-      operation.progress('Enhanced retweet detection skipped (already included in profile timeline)');
-      // Enhanced retweet detection is now redundant since profile timeline includes both tweets and retweets
 
       const nextInterval = this.getNextInterval();
       const nextRunTime = new Date(Date.now() + nextInterval);
@@ -632,8 +642,8 @@ export class ScraperApplication {
       });
 
       operation.success('X profile polling completed successfully', {
-        tweetsFound: tweets.length,
-        newTweets: newTweets.length,
+        tweetsFound: searchTweets.length,
+        newTweets: newSearchTweets.length,
         nextRunInMs: nextInterval,
         nextRunTime: nextRunTimeFormatted,
       });
@@ -658,8 +668,24 @@ export class ScraperApplication {
   }
 
   /**
-   * Performs a separate check for retweets by navigating to the user's profile.
-   * This is designed to catch retweets that might be missed by the standard search.
+   * CRITICAL: Enhanced retweet detection from profile timeline
+   *
+   * ========================================================================
+   * PURPOSE: ONLY detect and process RETWEETS that are missed by search
+   * ========================================================================
+   *
+   * WHY THIS EXISTS:
+   * - Advanced search (from:username) only returns original posts, NOT retweets
+   * - User retweets are important content that must be announced
+   * - Profile timeline contains both original posts AND retweets
+   *
+   * FILTERING STRATEGY:
+   * - Process ALL content from profile timeline (posts + retweets)
+   * - Duplicate detection will automatically skip posts already processed from search
+   * - Only truly new content (primarily retweets) will be announced
+   *
+   * DO NOT MODIFY THIS TO SKIP RETWEETS OR CHANGE THE APPROACH
+   *
    * @returns {Promise<void>}
    */
   async performEnhancedRetweetDetection() {
@@ -677,13 +703,16 @@ export class ScraperApplication {
       operation.progress('Navigating to user profile timeline for retweet detection');
       await this.navigateToProfileTimeline(this.xUser);
 
+      operation.progress('Performing enhanced scrolling to load more timeline content');
+      await this.performEnhancedScrolling();
+
       operation.progress('Extracting tweets from profile page');
       const tweets = await this.extractTweets();
 
-      operation.progress(`Filtering ${tweets.length} potential retweets`);
+      operation.progress(`Filtering ${tweets.length} potential retweets from timeline`);
       const newTweets = await this.filterNewTweets(tweets);
 
-      operation.progress(`Processing ${newTweets.length} new tweets from enhanced detection`);
+      operation.progress(`Processing ${newTweets.length} new tweets from enhanced detection (primarily retweets)`);
       let processedCount = 0;
       let skippedCount = 0;
 

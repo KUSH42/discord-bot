@@ -659,23 +659,21 @@ describe('Scraper Announcement Flow E2E', () => {
     });
 
     it('should perform enhanced retweet detection', async () => {
-      // Mock the sequence of browser.evaluate() calls:
-      // 1. 3 scrolling calls in main pollXProfile
-      // 2. First extractTweets() call on search page
-      // 3. 5 scrolling calls in performEnhancedScrolling()
-      // 4. Second extractTweets() call on profile timeline
+      // Mock the sequence of browser.evaluate() calls for the CORRECT two-step approach:
+      // STEP 1: Advanced search for user posts (from:username)
+      //   - One extractTweets() call on search page (no scrolling on search)
+      // STEP 2: Enhanced retweet detection from profile timeline
+      //   - 5 scrolling calls in performEnhancedScrolling()
+      //   - One extractTweets() call on profile timeline
       mockBrowserService.evaluate
-        .mockResolvedValueOnce(undefined) // Scroll 1 (main pollXProfile)
-        .mockResolvedValueOnce(undefined) // Scroll 2 (main pollXProfile)
-        .mockResolvedValueOnce(undefined) // Scroll 3 (main pollXProfile)
-        .mockResolvedValueOnce([]) // First extractTweets() call on search page
-        .mockResolvedValueOnce(undefined) // Scroll 1 (performEnhancedScrolling)
-        .mockResolvedValueOnce(undefined) // Scroll 2 (performEnhancedScrolling)
-        .mockResolvedValueOnce(undefined) // Scroll 3 (performEnhancedScrolling)
-        .mockResolvedValueOnce(undefined) // Scroll 4 (performEnhancedScrolling)
-        .mockResolvedValueOnce(undefined) // Scroll 5 (performEnhancedScrolling)
+        .mockResolvedValueOnce([]) // Step 1: extractTweets() call on search page (no user posts)
+        .mockResolvedValueOnce(undefined) // Step 2: Scroll 1 (performEnhancedScrolling)
+        .mockResolvedValueOnce(undefined) // Step 2: Scroll 2 (performEnhancedScrolling)
+        .mockResolvedValueOnce(undefined) // Step 2: Scroll 3 (performEnhancedScrolling)
+        .mockResolvedValueOnce(undefined) // Step 2: Scroll 4 (performEnhancedScrolling)
+        .mockResolvedValueOnce(undefined) // Step 2: Scroll 5 (performEnhancedScrolling)
         .mockResolvedValueOnce([
-          // Second extractTweets() call on profile timeline
+          // Step 2: extractTweets() call on profile timeline - finds retweet
           {
             tweetID: '1234567892', // Use ID that matches the URL
             url: 'https://x.com/testuser/status/1234567892',
