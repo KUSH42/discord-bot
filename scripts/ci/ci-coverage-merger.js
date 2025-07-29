@@ -11,13 +11,13 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
-import { toISOStringUTC } from '../../src/utc-time.js';
+import { toISOStringUTC } from '../../src/utilities/utc-time.js';
 
 class CICoverageMerger {
   constructor() {
     this.workingDir = process.cwd();
     this.testResults = 'test-results';
-    this.coverageArtifacts = 'coverage-artifacts';
+    this.coverageArtifacts = 'coverage';
     this.outputDir = 'coverage';
     this.mergedDir = path.join(this.outputDir, 'merged');
     this.summary = {
