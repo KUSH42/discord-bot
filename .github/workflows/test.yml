@@ -514,7 +514,7 @@ jobs:
             --verbose=true \
             --passWithNoTests \
             --coverageThreshold='{}' \
-            2>&1 | tee test-results/integration-tests/test-output.log
+            2>&1 | tee test-results/integration-tests-output.log
 
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v4
@@ -624,7 +624,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee test-results/e2e-tests/test-output.log
+            2>&1 | tee test-results/e2e-tests/tests-output.log
           echo "echo "Current working directory: $(pwd)""
           $(echo ls -a -F)
 
@@ -715,7 +715,7 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            2>&1 | tee test-results/performance-tests/test-output.log
+            2>&1 | tee test-results/performance-tests-output.log
 
       - name: Generate performance report
         run: |
@@ -731,13 +731,13 @@ jobs:
           echo "" >> reports/performance.md
 
           # Parse Jest output for timing information
-          if [ -f coverage/performance-tests/test-output.log ]; then
+          if [ -f coverage/performance-tests-output.log ]; then
             echo "### Test Execution Times" >> reports/performance.md
-            grep -E "Test completed in [0-9]+\.[0-9]+ms" coverage/performance-tests/test-output.log | head -10 >> reports/performance.md || echo "No timing data found" >> reports/performance.md
+            grep -E "Test completed in [0-9]+\.[0-9]+ms" coverage/performance-tests-output.log | head -10 >> reports/performance.md || echo "No timing data found" >> reports/performance.md
             echo "" >> reports/performance.md
             
             echo "### Throughput Metrics" >> reports/performance.md
-            grep -E "(messages per second|URLs per second|webhooks per second)" coverage/performance-tests/test-output.log | head -10 >> reports/performance.md || echo "No throughput data found" >> reports/performance.md
+            grep -E "(messages per second|URLs per second|webhooks per second)" coverage/performance-tests-output.log | head -10 >> reports/performance.md || echo "No throughput data found" >> reports/performance.md
             echo "" >> reports/performance.md
           fi
 
