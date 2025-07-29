@@ -215,6 +215,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          mkdir -p test-results
+
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
