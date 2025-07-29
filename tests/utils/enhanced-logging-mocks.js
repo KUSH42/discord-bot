@@ -67,6 +67,10 @@ export function createMockMetricsManager() {
     // Essential: methods required by EnhancedLogger
     recordTiming: jest.fn(),
     incrementCounter: jest.fn(),
+    // Additional methods used in tests
+    startTimer: jest.fn().mockReturnValue({ end: jest.fn() }),
+    recordMetric: jest.fn(),
+    setGauge: jest.fn(),
   };
 }
 

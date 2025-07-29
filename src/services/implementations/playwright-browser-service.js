@@ -125,7 +125,21 @@ export class PlaywrightBrowserService extends BrowserService {
     if (!this.page) {
       throw new Error('No page available');
     }
-    return await this.page.evaluate(script, ...args);
+
+    // Check if page is closed before attempting evaluation
+    if (this.page.isClosed()) {
+      throw new Error('Page is closed');
+    }
+
+    try {
+      return await this.page.evaluate(script, ...args);
+    } catch (error) {
+      // Provide more context for common navigation-related errors
+      if (error.message.includes('Execution context was destroyed')) {
+        throw new Error(`Execution context was destroyed (likely due to navigation): ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**

@@ -3,7 +3,7 @@
  * No side effects - only processes input and returns command results
  */
 
-import { nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
+import { nowUTC as _nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 export class CommandProcessor {

@@ -28,6 +28,7 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       page: {
         url: jest.fn(() => 'https://x.com/home'),
         screenshot: jest.fn(),
+        isClosed: jest.fn(() => false),
       },
     };
 

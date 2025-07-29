@@ -1,4 +1,4 @@
-// index.js - Modern Discord YouTube Bot Entry Point
+// index.js - Modern Discord Bot Entry Point
 // © 2025 Marco Keller. All rights reserved. This software and its content are proprietary and confidential. Unauthorized reproduction or distribution is strictly prohibited.
 
 import { config } from '@dotenvx/dotenvx';

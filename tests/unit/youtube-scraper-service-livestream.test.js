@@ -52,7 +52,7 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       metricsManager: mockDependencies.metricsManager,
     });
 
-    // Spy on the service's enhanced logger methods
+    // Spy on the service's enhanced logger methods after construction
     jest.spyOn(scraperService.logger, 'startOperation');
 
     // Mock the browser service
@@ -197,7 +197,7 @@ describe('YouTubeScraperService - Livestream Detection', () => {
 
       expect(result).toBeNull();
       // Verify operation was started
-      expect(mockLogger.startOperation).toHaveBeenCalledWith(
+      expect(scraperService.logger.startOperation).toHaveBeenCalledWith(
         'fetchActiveLiveStream',
         expect.objectContaining({
           liveStreamUrl: 'https://www.youtube.com/@testchannel/live',

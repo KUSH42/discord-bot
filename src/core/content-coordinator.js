@@ -649,18 +649,26 @@ export class ContentCoordinator {
     try {
       if (!this.duplicateDetector) {
         operation.progress('No duplicate detector available, skipping Discord scanning');
-        return operation.success('Discord scanning skipped - no duplicate detector', {
+        operation.success('Discord scanning skipped - no duplicate detector', {
           scanned: false,
           reason: 'no_duplicate_detector',
         });
+        return {
+          scanned: false,
+          reason: 'no_duplicate_detector',
+        };
       }
 
       if (!discordService || !discordService.isReady()) {
         operation.progress('Discord service not ready, skipping Discord scanning');
-        return operation.success('Discord scanning skipped - service not ready', {
+        operation.success('Discord scanning skipped - service not ready', {
           scanned: false,
           reason: 'discord_not_ready',
         });
+        return {
+          scanned: false,
+          reason: 'discord_not_ready',
+        };
       }
 
       operation.progress('Starting Discord channel scanning for duplicate detection');
@@ -733,13 +741,17 @@ export class ContentCoordinator {
         }
       }
 
-      return operation.success(
+      const result = {
+        scanned: true,
+        results: scanResults,
+      };
+
+      operation.success(
         `Discord channel scanning completed: ${scanResults.totalScanned} messages scanned, ${scanResults.totalAdded} items cached`,
-        {
-          scanned: true,
-          results: scanResults,
-        }
+        result
       );
+
+      return result;
     } catch (error) {
       operation.error(error, 'Discord channel scanning failed');
       throw error;
@@ -761,10 +773,12 @@ export class ContentCoordinator {
     try {
       if (!this.duplicateDetector) {
         operation.progress('No duplicate detector available, skipping Discord check');
-        return operation.success('Discord check skipped - no duplicate detector', {
+        const result = {
           found: false,
           reason: 'no_duplicate_detector',
-        });
+        };
+        operation.success('Discord check skipped - no duplicate detector', result);
+        return result;
       }
 
       // For YouTube content, check video IDs
@@ -773,11 +787,13 @@ export class ContentCoordinator {
         const videoExists = this.duplicateDetector.hasVideoId(contentData.videoId);
 
         if (videoExists) {
-          return operation.success('YouTube video found in duplicate detector', {
+          const result = {
             found: true,
             foundIn: 'youtube_duplicate_detector',
             contentId: contentData.videoId,
-          });
+          };
+          operation.success('YouTube video found in duplicate detector', result);
+          return result;
         }
       }
 
@@ -787,11 +803,13 @@ export class ContentCoordinator {
         const tweetExists = this.duplicateDetector.hasTweetId(contentData.tweetId);
 
         if (tweetExists) {
-          return operation.success('X/Twitter tweet found in duplicate detector', {
+          const result = {
             found: true,
             foundIn: 'x_duplicate_detector',
             contentId: contentData.tweetId,
-          });
+          };
+          operation.success('X/Twitter tweet found in duplicate detector', result);
+          return result;
         }
       }
 
@@ -801,17 +819,21 @@ export class ContentCoordinator {
         const urlExists = this.duplicateDetector.hasUrl(contentData.url);
 
         if (urlExists) {
-          return operation.success('URL found in duplicate detector', {
+          const result = {
             found: true,
             foundIn: 'url_duplicate_detector',
             url: contentData.url,
-          });
+          };
+          operation.success('URL found in duplicate detector', result);
+          return result;
         }
       }
 
-      return operation.success('No recent announcements found in Discord channels', {
+      const result = {
         found: false,
-      });
+      };
+      operation.success('No recent announcements found in Discord channels', result);
+      return result;
     } catch (error) {
       operation.error(error, 'Failed to check Discord for recent announcements');
       // Return false on error to allow announcement to proceed

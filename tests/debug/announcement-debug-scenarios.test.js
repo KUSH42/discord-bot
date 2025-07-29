@@ -135,12 +135,17 @@ describe('Announcement Debug Scenarios', () => {
     const mockDebugManager = {
       shouldLog: jest.fn().mockReturnValue(true),
       getLevel: jest.fn().mockReturnValue(3),
+      isEnabled: jest.fn(() => false),
+      toggleFlag: jest.fn(),
+      setLevel: jest.fn(),
     };
 
     // Mock metrics manager for enhanced logging
     const mockMetricsManager = {
       recordMetric: jest.fn(),
       startTimer: jest.fn().mockReturnValue({ end: jest.fn() }),
+      incrementCounter: jest.fn(),
+      setGauge: jest.fn(),
     };
 
     // Set up dependencies
@@ -224,8 +229,11 @@ describe('Announcement Debug Scenarios', () => {
       contentStateManager,
       contentAnnouncer,
       mockDependencies.duplicateDetector,
+      mockDependencies.classifier,
       mockLogger,
-      mockConfig
+      mockConfig,
+      mockDebugManager,
+      mockMetricsManager
     );
 
     // Add ContentCoordinator to dependencies

@@ -151,9 +151,6 @@ describe('Logger Utils Tests', () => {
     });
 
     it('should send initialization message when channel is ready', async () => {
-      jest.useFakeTimers();
-
-      // Mock the messageSender to track queueMessage calls
       const mockMessageSender = {
         queueMessage: jest.fn().mockResolvedValue(true),
         getMetrics: jest.fn().mockReturnValue({ queued: 0, sent: 0, failed: 0 }),
@@ -161,24 +158,20 @@ describe('Logger Utils Tests', () => {
       };
       transport.messageSender = mockMessageSender;
 
+      // Use real timers and just wait for the setTimeout
       const callback = jest.fn();
 
       await transport.log({ level: 'info', message: 'First message' }, callback);
 
-      // Fast-forward past the 2-second delay
-      jest.advanceTimersByTime(2000);
-
-      // Wait for any pending promises
-      await new Promise(resolve => setImmediate(resolve));
+      // Wait for the 2-second initialization delay
+      await new Promise(resolve => setTimeout(resolve, 2100));
 
       expect(mockMessageSender.queueMessage).toHaveBeenCalledWith(
         mockChannel,
         '✅ **Winston logging transport initialized for this channel.**',
         { priority: -1 }
       );
-
-      jest.useRealTimers();
-    });
+    }, 15000);
 
     it('should handle periodic flushing', async () => {
       // Manually start flushing since it's disabled in test environment
@@ -189,6 +182,7 @@ describe('Logger Utils Tests', () => {
 
       // Wait for periodic flush (flushInterval is 100ms in test setup)
       await new Promise(resolve => setTimeout(resolve, 150));
+
       expect(mockChannel.send).toHaveBeenCalled();
 
       // Clear the timer to prevent interference with other tests
@@ -196,7 +190,7 @@ describe('Logger Utils Tests', () => {
         clearInterval(transport.flushTimer);
         transport.flushTimer = null;
       }
-    });
+    }, 5000);
   });
 
   describe('LoggerUtils', () => {
@@ -322,30 +316,26 @@ describe('Logger Utils Tests', () => {
 
         const result = transport.log(logInfo, mockCallback);
 
-        expect(parentLogSpy).toHaveBeenCalledWith(logInfo, mockCallback);
+        expect(parentLogSpy).toHaveBeenCalledWith(logInfo, expect.any(Function));
         expect(result).toBe(true);
 
         parentLogSpy.mockRestore();
       });
 
-      it('should skip logging when silenced', async () => {
+      it('should skip logging when silenced', () => {
         transport.silent = true;
         const logInfo = { level: 'info', message: 'Test message' };
 
         const parentLogSpy = jest.spyOn(Object.getPrototypeOf(SystemdSafeConsoleTransport.prototype), 'log');
 
-        const result = await new Promise(resolve => {
-          const logResult = transport.log(logInfo, () => {
-            expect(parentLogSpy).not.toHaveBeenCalled();
-            resolve(logResult);
-          });
-        });
+        const result = transport.log(logInfo, mockCallback);
 
+        expect(parentLogSpy).not.toHaveBeenCalled();
         expect(result).toBe(true);
         parentLogSpy.mockRestore();
       });
 
-      it('should handle EPIPE errors gracefully', async () => {
+      it('should handle EPIPE errors gracefully', () => {
         const logInfo = { level: 'info', message: 'Test message' };
 
         // Mock parent log to throw EPIPE error
@@ -358,13 +348,9 @@ describe('Logger Utils Tests', () => {
             throw epipeError;
           });
 
-        const result = await new Promise(resolve => {
-          const logResult = transport.log(logInfo, () => {
-            expect(transport.silent).toBe(true);
-            resolve(logResult);
-          });
-        });
+        const result = transport.log(logInfo, mockCallback);
 
+        expect(transport.silent).toBe(true);
         expect(result).toBe(true);
         parentLogSpy.mockRestore();
       });

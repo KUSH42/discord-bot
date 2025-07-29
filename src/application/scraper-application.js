@@ -1517,10 +1517,28 @@ export class ScraperApplication {
   async performEnhancedScrolling() {
     // Scroll down multiple times to load more content for retweet detection
     for (let i = 0; i < 5; i++) {
-      /* eslint-disable no-undef */
-      await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      /* eslint-enable no-undef */
-      await this.delay(1500); // Wait for content to load
+      try {
+        // Check if page context is still valid before evaluating
+        if (!this.browser.page || this.browser.page.isClosed()) {
+          this.logger.warn('Page context lost during scrolling, aborting');
+          return;
+        }
+
+        /* eslint-disable no-undef */
+        await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        /* eslint-enable no-undef */
+        await this.delay(1500); // Wait for content to load
+      } catch (error) {
+        if (
+          error.message.includes('Execution context was destroyed') ||
+          error.message.includes('Target closed') ||
+          error.message.includes('Page closed')
+        ) {
+          this.logger.warn(`Page navigation interrupted scrolling at step ${i + 1}`, { error: error.message });
+          return; // Gracefully exit instead of failing
+        }
+        throw error; // Re-throw other errors
+      }
     }
   }
 
@@ -1536,8 +1554,19 @@ export class ScraperApplication {
     // Wait for timeline to load
     await this.browser.waitForSelector('[data-testid="primaryColumn"]');
 
-    // Perform deeper scrolling for retweets
-    await this.performEnhancedScrolling();
+    // Brief delay to ensure page is fully stabilized before scrolling
+    await this.delay(500);
+
+    // Perform deeper scrolling for retweets with error handling
+    try {
+      await this.performEnhancedScrolling();
+    } catch (error) {
+      this.logger.warn('Enhanced scrolling failed, continuing without it', {
+        username,
+        error: error.message,
+      });
+      // Don't throw - this is not critical to the scraping process
+    }
   }
 
   /**

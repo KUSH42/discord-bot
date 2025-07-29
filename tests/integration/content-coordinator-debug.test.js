@@ -54,11 +54,16 @@ describe('ContentCoordinator Debug Integration', () => {
       getNumber: jest.fn().mockReturnValue(30000),
     };
 
+    const mockClassifier = {
+      classifyContent: jest.fn().mockReturnValue('post'),
+    };
+
     // Create ContentCoordinator with enhanced logging
     coordinator = new ContentCoordinator(
       mockContentStateManager,
       mockContentAnnouncer,
       mockDuplicateDetector,
+      mockClassifier,
       mockLogger,
       mockConfig,
       debugFlagManager,

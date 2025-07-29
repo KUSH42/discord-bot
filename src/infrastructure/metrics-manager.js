@@ -295,7 +295,7 @@ export class MetricsManager {
    * Update aggregated data for time windows
    * @private
    */
-  updateAggregations(type, name, value, timestamp, tags) {
+  updateAggregations(type, name, value, timestamp, _tags) {
     const now = Math.floor(timestamp / 1000); // Convert to seconds
 
     for (const windowSeconds of this.aggregationWindows) {

@@ -4,6 +4,7 @@ import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { ContentClassifier } from '../../src/core/content-classifier.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
+import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 
 /**
  * Integration tests for the complete content announcement flow
@@ -20,8 +21,11 @@ describe('Content Announcement Flow Integration', () => {
   let mockStateManager;
   let mockPersistentStorage;
   let mockLogger;
+  let loggerMocks;
 
   beforeEach(() => {
+    // Create enhanced logger mocks
+    loggerMocks = createEnhancedLoggerMocks();
     // Mock Discord service
     mockDiscordService = {
       sendMessage: jest.fn(() => Promise.resolve({ id: 'message123' })),
@@ -95,14 +99,8 @@ describe('Content Announcement Flow Integration', () => {
       getStorageStats: jest.fn(() => Promise.resolve({ seenCount: 0 })),
     };
 
-    // Mock logger
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn(() => mockLogger),
-    };
+    // Use enhanced logger mocks
+    mockLogger = loggerMocks.logger;
 
     // Create components
     contentAnnouncer = new ContentAnnouncer(mockDiscordService, mockConfig, mockStateManager, mockLogger);
@@ -114,8 +112,11 @@ describe('Content Announcement Flow Integration', () => {
       contentStateManager,
       contentAnnouncer,
       duplicateDetector,
+      _contentClassifier,
       mockLogger,
-      mockConfig
+      mockConfig,
+      loggerMocks.debugManager,
+      loggerMocks.metricsManager
     );
   });
 
