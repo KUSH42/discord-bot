@@ -986,10 +986,12 @@ jobs:
             coverage/
             test-results/
             reports/
+            logs/
             coverage-summary.json
             coverage-metrics.json
             security-audit.json
             security-report.json
+            performance-metrics.json
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
