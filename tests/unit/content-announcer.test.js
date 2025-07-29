@@ -704,7 +704,7 @@ describe('ContentAnnouncer', () => {
       const result = await contentAnnouncer.announceContent(content);
 
       expect(result.skipped).toBe(true);
-      expect(result.reason).toBe('Content was published before bot started');
+      expect(result.reason).toContain('Content was published before bot started');
     });
 
     it('should provide correct skip reason for old X content', async () => {

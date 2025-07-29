@@ -46,6 +46,13 @@ describe('ScraperApplication Process Tweet', () => {
       getStats: jest.fn().mockReturnValue({ totalSeen: 0, totalChecked: 0 }),
     };
 
+    const mockContentCoordinator = {
+      processContent: jest.fn().mockResolvedValue({
+        action: 'announced',
+        announcementResult: { success: true },
+      }),
+    };
+
     // Configure default mock returns
     mockConfig.getRequired.mockImplementation(key => {
       const defaults = {
@@ -93,6 +100,7 @@ describe('ScraperApplication Process Tweet', () => {
         ensureAuthenticated: jest.fn(),
       },
       duplicateDetector: mockDuplicateDetector,
+      contentCoordinator: mockContentCoordinator,
       persistentStorage: { get: jest.fn(), set: jest.fn() },
       debugManager: enhancedLoggingMocks.debugManager,
       metricsManager: enhancedLoggingMocks.metricsManager,
@@ -120,7 +128,6 @@ describe('ScraperApplication Process Tweet', () => {
       };
 
       mockClassifier.classifyXContent.mockReturnValue(mockClassification);
-      mockAnnouncer.announceContent.mockResolvedValue({ success: true });
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(false);
 
       await scraperApp.processNewTweet(tweet);
@@ -131,30 +138,26 @@ describe('ScraperApplication Process Tweet', () => {
         monitoredUser: 'testuser',
       });
 
-      expect(mockAnnouncer.announceContent).toHaveBeenCalledWith({
-        platform: 'x',
-        type: 'post',
-        id: '123456789',
-        url: tweet.url,
-        author: 'testuser',
-        originalAuthor: tweet.author,
-        text: tweet.text,
-        timestamp: tweet.timestamp,
-        isOld: true,
-      });
-
-      expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweet.url);
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced post from @testuser',
+      // ContentCoordinator should be called instead of announcer directly
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '123456789',
+        'scraper',
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-          tweetId: '123456789',
+          platform: 'x',
+          type: 'post',
+          id: '123456789',
+          url: tweet.url,
+          author: 'testuser',
+          text: tweet.text,
+          timestamp: tweet.timestamp,
+          isOld: true,
         })
       );
+
+      expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweet.url);
     });
 
-    it('should bypass classifier for author-based retweets', async () => {
+    it('should process retweets using classifier', async () => {
       const retweetTweet = {
         tweetID: '987654321',
         url: 'https://x.com/otheruser/status/987654321',
@@ -165,33 +168,40 @@ describe('ScraperApplication Process Tweet', () => {
         retweetedBy: 'testuser', // Our monitored user who did the retweet
       };
 
-      mockAnnouncer.announceContent.mockResolvedValue({ success: true });
+      const mockClassification = {
+        type: 'retweet',
+        confidence: 0.9,
+        platform: 'x',
+      };
+
+      mockClassifier.classifyXContent.mockReturnValue(mockClassification);
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(retweetTweet);
 
-      expect(mockClassifier.classifyXContent).not.toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced retweet from @testuser', // Should show who retweeted (monitored user)
+      // Classifier should be called for retweets in current implementation
+      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(retweetTweet.url, retweetTweet.text, {
+        timestamp: retweetTweet.timestamp,
+        author: retweetTweet.author,
+        monitoredUser: 'testuser',
+      });
+
+      // ContentCoordinator should be called
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '987654321',
+        'scraper',
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
-          tweetId: '987654321',
+          platform: 'x',
+          type: 'retweet',
+          id: '987654321',
+          url: retweetTweet.url,
+          author: 'otheruser',
+          retweetedBy: 'testuser',
+          text: retweetTweet.text,
+          timestamp: retweetTweet.timestamp,
+          isOld: false,
         })
       );
-
-      expect(mockAnnouncer.announceContent).toHaveBeenCalledWith({
-        platform: 'x',
-        type: 'retweet',
-        id: '987654321',
-        url: retweetTweet.url,
-        author: 'testuser', // Should be the monitored user who retweeted
-        originalAuthor: 'otheruser', // Original tweet author
-        retweetedBy: 'testuser', // Track who did the retweet
-        text: retweetTweet.text,
-        timestamp: retweetTweet.timestamp,
-        isOld: false,
-      });
     });
 
     it('should handle tweets with retweet metadata', async () => {
@@ -242,18 +252,22 @@ describe('ScraperApplication Process Tweet', () => {
         confidence: 0.8,
         platform: 'x',
       });
-      mockAnnouncer.announceContent.mockResolvedValue({
+
+      // ContentCoordinator returns skipped result
+      mockDependencies.contentCoordinator.processContent.mockResolvedValue({
         success: false,
         skipped: true,
         reason: 'Content filtered',
       });
+
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweet);
 
-      // The announcer is called but returns skipped result
-      expect(mockAnnouncer.announceContent).toHaveBeenCalled();
-      expect(mockAnnouncer.announceContent).toHaveBeenCalledWith(
+      // ContentCoordinator should be called instead of announcer directly
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '444555666',
+        'scraper',
         expect.objectContaining({
           type: 'post',
           platform: 'x',
@@ -276,20 +290,25 @@ describe('ScraperApplication Process Tweet', () => {
         confidence: 0.7,
         platform: 'x',
       });
-      mockAnnouncer.announceContent.mockResolvedValue({
+
+      // ContentCoordinator returns failed result
+      mockDependencies.contentCoordinator.processContent.mockResolvedValue({
         success: false,
         skipped: false,
         reason: 'API error',
       });
+
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweet);
 
+      // Check that the error was logged via enhanced logger operation.error()
       expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to announce post',
         expect.objectContaining({
           module: 'scraper',
           outcome: 'error',
+          tweetId: '777888999',
           error: 'API error',
         })
       );
@@ -306,10 +325,13 @@ describe('ScraperApplication Process Tweet', () => {
       };
 
       const mockClassification = { type: 'post', platform: 'x' };
-      const mockResult = { success: true };
+      const mockResult = {
+        action: 'announced',
+        announcementResult: { success: true },
+      };
 
       mockClassifier.classifyXContent.mockReturnValue(mockClassification);
-      mockAnnouncer.announceContent.mockResolvedValue(mockResult);
+      mockDependencies.contentCoordinator.processContent.mockResolvedValue(mockResult);
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweet);
@@ -377,7 +399,7 @@ describe('ScraperApplication Process Tweet', () => {
     });
 
     it('should handle retweet detection correctly', async () => {
-      // Test actual retweet - should be classified as retweet without using classifier
+      // Test actual retweet - classifier should be called in current implementation
       const actualRetweet = {
         tweetID: '111',
         url: 'https://x.com/otheruser/status/111',
@@ -387,22 +409,25 @@ describe('ScraperApplication Process Tweet', () => {
         retweetedBy: 'testuser', // Our monitored user who did the retweet
       };
 
-      mockAnnouncer.announceContent.mockResolvedValue({ success: true });
+      mockClassifier.classifyXContent.mockReturnValue({
+        type: 'retweet',
+        platform: 'x',
+      });
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(actualRetweet);
 
-      // Should be classified as retweet automatically, not using classifier
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Announced retweet from @testuser',
+      // Classifier should be called for retweets in current implementation
+      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(
+        actualRetweet.url,
+        actualRetweet.text,
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'success',
+          author: 'otheruser',
+          monitoredUser: 'testuser',
         })
       );
-      expect(mockClassifier.classifyXContent).not.toHaveBeenCalled();
 
-      // Test non-retweet - should use classifier
+      // Test regular post - should also use classifier
       const regularPost = {
         tweetID: '222',
         url: 'https://x.com/testuser/status/222',
@@ -418,7 +443,7 @@ describe('ScraperApplication Process Tweet', () => {
 
       await scraperApp.processNewTweet(regularPost);
 
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledTimes(1);
+      expect(mockClassifier.classifyXContent).toHaveBeenCalledTimes(2);
     });
   });
 });

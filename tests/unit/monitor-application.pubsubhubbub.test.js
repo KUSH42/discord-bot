@@ -456,6 +456,9 @@ describe('MonitorApplication - PubSubHubbub Operations', () => {
     it('should not log when debugging is disabled', () => {
       monitorApp.webhookDebugEnabled = false;
 
+      // Clear any previous logging calls from initialization
+      mockLogger.info.mockClear();
+
       monitorApp.logWebhookDebug('TEST MESSAGE', { data: 'test' });
 
       expect(mockLogger.info).not.toHaveBeenCalled();

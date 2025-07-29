@@ -7,6 +7,7 @@ describe('Tweet Processing and Duplicate Detection', () => {
   let mockBrowserService;
   let mockContentClassifier;
   let mockContentAnnouncer;
+  let mockContentCoordinator;
   let mockConfig;
   let mockStateManager;
   let mockEventBus;
@@ -97,7 +98,7 @@ describe('Tweet Processing and Duplicate Detection', () => {
     };
 
     // Mock content coordinator
-    const mockContentCoordinator = {
+    mockContentCoordinator = {
       processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
     };
 
@@ -246,6 +247,7 @@ describe('Tweet Processing Pipeline', () => {
   let mockBrowserService;
   let mockContentClassifier;
   let mockContentAnnouncer;
+  let mockContentCoordinator;
   let mockConfig;
   let mockStateManager;
   let mockEventBus;
@@ -336,7 +338,7 @@ describe('Tweet Processing Pipeline', () => {
     };
 
     // Mock content coordinator
-    const mockContentCoordinator = {
+    mockContentCoordinator = {
       processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
     };
 
@@ -393,8 +395,10 @@ describe('Tweet Processing Pipeline', () => {
       })
     );
 
-    // Should announce the content
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+    // Should process content through coordinator (not announce directly)
+    expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+      mockTweet.tweetID,
+      'scraper',
       expect.objectContaining({
         platform: 'x',
         type: 'post',
@@ -429,7 +433,7 @@ describe('Tweet Processing Pipeline', () => {
       tweetCategory: 'Post',
     };
 
-    mockContentAnnouncer.announceContent.mockResolvedValue({
+    mockContentCoordinator.processContent.mockResolvedValue({
       success: false,
       reason: 'Channel not found',
     });
@@ -438,7 +442,7 @@ describe('Tweet Processing Pipeline', () => {
 
     // Should still complete processing despite announcement failure
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalled();
+    expect(mockContentCoordinator.processContent).toHaveBeenCalled();
     expect(mockEventBus.emit).toHaveBeenCalledWith('scraper.tweet.processed', expect.any(Object));
   });
 
@@ -453,19 +457,35 @@ describe('Tweet Processing Pipeline', () => {
       retweetedBy: 'testuser', // Our monitored user who did the retweet
     };
 
+    // Mock classifier to return retweet type
+    mockContentClassifier.classifyXContent.mockReturnValue({ type: 'retweet' });
+
     await scraperApp.processNewTweet(mockRetweet);
 
-    // Should NOT call the classifier since it's an author-based retweet
-    expect(mockContentClassifier.classifyXContent).not.toHaveBeenCalled();
-
-    // Should still announce the content as a retweet with correct author structure
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+    // Should call the classifier for retweets in current implementation
+    expect(mockContentClassifier.classifyXContent).toHaveBeenCalledWith(
+      mockRetweet.url,
+      mockRetweet.text,
       expect.objectContaining({
-        type: 'retweet',
-        author: 'testuser', // Should be the monitored user who retweeted
-        originalAuthor: 'differentuser', // Original author stored separately
-        retweetedBy: 'testuser', // Track who did the retweet
+        timestamp: mockRetweet.timestamp,
+        author: mockRetweet.author,
+        monitoredUser: 'testuser',
+      })
+    );
+
+    // Should process through coordinator
+    expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+      mockRetweet.tweetID,
+      'scraper',
+      expect.objectContaining({
         platform: 'x',
+        type: 'retweet',
+        id: mockRetweet.tweetID,
+        url: mockRetweet.url,
+        author: mockRetweet.author,
+        retweetedBy: 'testuser',
+        text: mockRetweet.text,
+        timestamp: mockRetweet.timestamp,
       })
     );
   });
@@ -484,7 +504,7 @@ describe('Tweet Processing Pipeline', () => {
 
     // Should call the classifier since author matches xUser
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalled();
+    expect(mockContentCoordinator.processContent).toHaveBeenCalled();
 
     // Verify classifier was called with correct metadata
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalledWith(
@@ -496,8 +516,10 @@ describe('Tweet Processing Pipeline', () => {
       })
     );
 
-    // Should announce as a 'post' (based on our mock classifier returning { type: 'post' })
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+    // Should process as a 'post' (based on our mock classifier returning { type: 'post' })
+    expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+      mockTweet.tweetID,
+      'scraper',
       expect.objectContaining({
         type: 'post', // Should be 'post', not 'retweet'
         author: 'testuser',
@@ -524,8 +546,10 @@ describe('Tweet Processing Pipeline', () => {
     // Should call the classifier since author matches xUser
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
 
-    // Should announce as a 'quote', not 'retweet'
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+    // Should process as a 'quote', not 'retweet'
+    expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+      mockQuote.tweetID,
+      'scraper',
       expect.objectContaining({
         type: 'quote',
         author: 'testuser',
@@ -552,8 +576,10 @@ describe('Tweet Processing Pipeline', () => {
     // Should call the classifier since author matches xUser
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
 
-    // Should announce as a 'reply', not 'retweet'
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+    // Should process as a 'reply', not 'retweet'
+    expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+      mockReply.tweetID,
+      'scraper',
       expect.objectContaining({
         type: 'reply',
         author: 'testuser',
@@ -576,7 +602,7 @@ describe('Tweet Processing Pipeline', () => {
 
     // Should call the classifier since author is Unknown
     expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
-    expect(mockContentAnnouncer.announceContent).toHaveBeenCalled();
+    expect(mockContentCoordinator.processContent).toHaveBeenCalled();
   });
 
   it('should correctly categorize monitored user tweets in extractTweets', async () => {

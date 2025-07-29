@@ -352,6 +352,8 @@ describe('ScraperApplication Content Detection', () => {
     beforeEach(() => {
       jest.spyOn(scraperApp, 'extractTweets').mockResolvedValue([]);
       jest.spyOn(scraperApp, 'navigateToProfileTimeline').mockResolvedValue();
+      jest.spyOn(scraperApp, 'performEnhancedScrolling').mockResolvedValue();
+      jest.spyOn(scraperApp, 'delay').mockResolvedValue();
       jest.spyOn(scraperApp, 'filterNewTweets').mockReturnValue([]);
       jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
       jest.spyOn(scraperApp, 'processNewTweet').mockResolvedValue();
@@ -384,9 +386,10 @@ describe('ScraperApplication Content Detection', () => {
         })
       );
       expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
+      expect(scraperApp.performEnhancedScrolling).toHaveBeenCalled();
       expect(scraperApp.processNewTweet).toHaveBeenCalled();
       expect(scraperApp.stats.totalTweetsAnnounced).toBe(1);
-    });
+    }, 10000);
 
     it('should log debug information with sampling during retweet detection', async () => {
       jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
@@ -408,7 +411,7 @@ describe('ScraperApplication Content Detection', () => {
           module: 'scraper',
         })
       );
-    });
+    }, 10000);
 
     it('should log verbose information for old tweets with sampling', async () => {
       jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);

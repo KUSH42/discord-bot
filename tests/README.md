@@ -45,7 +45,7 @@ Our testing strategy is guided by the following core principles:
 **Major fixes completed in 2025-07-21:**
 
 - **Timer Testing Resolution:** Implemented reliable patterns for testing async
-  timer-dependent code (see `tests/TIMER-TESTING-GUIDE.md`)
+  timer-dependent code (see `tests/TESTING.md`)
 - **Enhanced Duplicate Detection:** Complete test coverage for content
   fingerprinting and persistent storage integration
 - **YouTube Scraper Updates:** Updated tests for new architecture with content
@@ -91,6 +91,8 @@ Our testing strategy is guided by the following core principles:
   automation security
 - **Discord Integration Testing**: Full coverage of Discord bot commands,
   message processing, rate limiting integration, and health monitoring
+
+📚 **Quick Start Guide**: See `tests/TESTING.md` for practical testing patterns and utilities.
 
 For detailed information on recent fixes, see
 `docs/TEST-INFRASTRUCTURE-FIXES.md` and

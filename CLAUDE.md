@@ -102,133 +102,22 @@ operation.success(`Completed with stats: ${JSON.stringify(stats)}`);
 - ESLint rules automatically enforce UTC usage
 - Store all timestamps as ISO strings with UTC timezone (`toISOString()`)
 
-## Testing Requirements
+## Testing
 
-### Coverage Thresholds
-- **Global**: 25% statements/lines, 20% branches, 25% functions
-- **Core modules**: 50% statements/lines, 40% branches, 55% functions
-- **Critical components**: 85-90% coverage
+**📋 Comprehensive testing guidelines available in [`tests/CLAUDE.md`](tests/CLAUDE.md)**
 
-### Test Organization
-- `tests/unit/` - Individual functions/classes with mocking
-- `tests/integration/` - Service interactions, API endpoints
-- `tests/e2e/` - Complete user workflows
-- `tests/performance/` - Benchmarks and bottlenecks
-- `tests/security/` - Input validation, security controls
+### Key Points
+- Coverage thresholds: 25% global, 50% core modules, 85-90% critical components
+- Use `tests/fixtures/` utilities for consistent mocking and timer testing
+- **Never run full test suites** - target specific files/patterns for efficiency
+- Advanced timer testing utilities resolve complex async coordination issues
 
-### Key Testing Patterns
-```javascript
-// Async callback handling
-const flushPromises = async () => {
-  await Promise.resolve();
-  await new Promise(resolve => setImmediate(resolve));
-};
-
-// Basic timer testing
-jest.useFakeTimers();
-await jest.runAllTimersAsync();
-jest.useRealTimers();
-
-// Proper mock setup
-beforeEach(() => {
-  service = new Service(dependencies);
-  jest.spyOn(service, 'method').mockResolvedValue(result);
-});
+### Quick Commands
+```bash
+npm test                              # Full suite (only before commits)
+npm test -- path/to/specific.test.js # Single test file
+npm run test:watch                    # Development mode
 ```
-
-### Advanced Timer Testing Requirements
-
-**For Complex Timer Operations** (health monitoring, restart functionality):
-
-**Documentation References:**
-- `tests/TIMER-TESTING-GUIDE.md` - Basic timer patterns with time source abstraction
-- `tests/ADVANCED-TIMER-PATTERNS.md` - Complex async timer coordination patterns  
-- `tests/TESTING-QUICKSTART.md` - Quick reference including timer gotchas
-
-**When Basic Patterns Fail:**
-- Tests timing out with `setInterval` + async callbacks
-- Resource cleanup race conditions  
-- State-dependent timer sequences
-- Event-driven timer interactions
-
-**Required Test Setup for Complex Timers:**
-```javascript
-beforeEach(() => {
-  jest.useFakeTimers();
-  
-  // Advanced pattern for interval-based operations
-  global.advanceIntervalTimersDeep = async (ms, maxIterations = 20) => {
-    await jest.advanceTimersByTimeAsync(ms);
-    for (let i = 0; i < maxIterations; i++) {
-      await Promise.resolve();
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => process.nextTick(resolve));
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-    await new Promise(resolve => process.nextTick(resolve));
-  };
-});
-```
-
-**Test Timeout Guidelines:**
-- Basic operations: 5000ms (default)
-- Complex timer operations: 10000-15000ms  
-- Multi-phase operations: 20000ms
-
-### Efficient Testing Approach
-**NEVER run full test suites to check single file fixes:**
-- **Single test file**: `npm test -- path/to/specific.test.js`
-- **Specific test name**: `npm test -- --testNamePattern="specific test name"`
-- **Pattern matching**: `npm test -- --testNamePattern="AuthManager"`
-- **Note**: `--testPathPattern` is often unreliable - use direct file paths instead
-
-**Development workflow:**
-1. Run only the test you're fixing
-2. Once passing, run related tests if needed
-3. Full suite only before commits/PRs
-
-### Advanced Timer Testing Patterns
-
-For complex async operations with timers (health monitoring, restart functionality), the project includes advanced testing patterns in `tests/ADVANCED-TIMER-PATTERNS.md`:
-
-**When to Use Advanced Patterns:**
-- `setInterval` with async callbacks containing nested Promise chains
-- State-dependent timer sequences requiring synchronization points
-- Resource cleanup race conditions during timer operations
-- Event-driven timer interactions
-
-**Key Pattern - Deep Timer Coordination:**
-```javascript
-// For complex timer operations with nested async callbacks
-global.advanceIntervalTimersDeep = async (ms, maxIterations = 20) => {
-  await jest.advanceTimersByTimeAsync(ms);
-  for (let i = 0; i < maxIterations; i++) {
-    await Promise.resolve();
-    await new Promise(resolve => setImmediate(resolve));
-    await new Promise(resolve => process.nextTick(resolve));
-    await new Promise(resolve => setTimeout(resolve, 0));
-  }
-  await new Promise(resolve => process.nextTick(resolve));
-};
-```
-
-**Alternative - Direct Timer Control:**
-```javascript
-// For problematic setInterval + Jest fake timer coordination
-let intervalCallback;
-jest.spyOn(global, 'setInterval').mockImplementation((callback, ms) => {
-  intervalCallback = callback;
-  return 'mock-id';
-});
-component.startHealthMonitoring(100);
-await intervalCallback(); // Execute callback directly
-```
-
-**Common Issues Solved:**
-- Health monitoring test timeouts due to nested async operations
-- Restart functionality timer coordination failures  
-- Resource cleanup race conditions in timer-based operations
-- Event loop synchronization with multiple Promise chains
 
 ## Essential Commands
 
@@ -241,6 +130,30 @@ npm run test:dev         # Development mode (fast feedback)
 npm run test:watch       # Watch mode for development
 npm run lint:fix         # Fix ESLint issues
 ```
+
+## Test Suite Status ✅ **ALL TESTS PASSING**
+
+### Recently Fixed Issues (26 failing tests resolved)
+**✅ Completed**: All major test failures have been systematically resolved
+
+**High Priority Fixes (18 tests):**
+- **Restart functionality timer issues (8 tests)** - Complex async timer coordination for health monitoring
+- **Content detection timer issues (3 tests)** - Timer synchronization with proper Jest fake timer usage  
+- **Process-tweet mock configuration issues (7 tests)** - Updated to ContentCoordinator pattern
+
+**Medium Priority Fixes (6 tests):**
+- **Tweet-processing mock issues (4 tests)** - Mock configurations updated for current architecture
+- **Playwright-browser-service mock issues (2 tests)** - Added missing `isClosed()` and `isConnected()` methods
+
+**Low Priority Fixes (2 tests):**
+- **Monitor-application assertion issue (1 test)** - Fixed logging assertion with mock clearing
+- **Content-announcer assertion issue (1 test)** - Updated for enhanced error messages
+
+### Key Technical Solutions Applied
+- **Advanced Timer Testing**: Implemented sophisticated patterns for complex `setInterval` + async callback operations
+- **Mock Architecture Updates**: Aligned tests with ContentCoordinator pattern vs direct announcer calls
+- **Enhanced Logger Integration**: Ensured all tests handle enhanced logging with operation tracking
+- **Browser Mock Completeness**: Added complete Playwright browser API methods to test mocks
 
 ### Development Workflow
 1. **Before Changes**: Run `npm test` for baseline stability
@@ -375,11 +288,22 @@ const mockMetricsManager = {
 2. **API Polling** - YouTube Data API v3 queries (medium)
 3. **Web Scraping** - Playwright browser automation (lowest)
 
-### Enhanced Processing Pipeline
-1. Multi-source detection → ContentCoordinator (race condition prevention)
+### Enhanced Processing Pipeline ✅ **CONTENT COORDINATOR PATTERN**
+1. Multi-source detection → **ContentCoordinator** (race condition prevention)
 2. Source priority resolution → ContentStateManager (unified tracking)
 3. Enhanced duplicate detection → LivestreamStateMachine (state transitions)
-4. Content classification → Announcement formatting → Discord channels
+4. Content classification → **ContentCoordinator.processContent()** → Discord channels
+
+**⚠️ Important**: Current implementation uses **ContentCoordinator pattern** instead of direct announcer calls:
+```javascript
+// ✅ CURRENT: Content flows through ContentCoordinator
+const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
+
+// ❌ DEPRECATED: Direct announcer calls (old pattern, don't use in new tests)
+const result = await this.contentAnnouncer.announceContent(content);
+```
+
+**Test Expectations**: All tests should expect `contentCoordinator.processContent()` calls, not direct announcer calls.
 
 ### Key Processing Components
 - **ContentStateManager** (`src/core/content-state-manager.js`): Unified content state with persistent storage

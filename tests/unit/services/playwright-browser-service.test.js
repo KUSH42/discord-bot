@@ -33,8 +33,15 @@ describe('Playwright Browser Service', () => {
   });
 
   it('should launch a browser successfully', async () => {
-    const mockPage = { close: jest.fn() };
-    const mockBrowser = { newPage: jest.fn().mockResolvedValue(mockPage), close: mockClose };
+    const mockPage = {
+      close: jest.fn(),
+      isClosed: jest.fn().mockReturnValue(false),
+    };
+    const mockBrowser = {
+      newPage: jest.fn().mockResolvedValue(mockPage),
+      close: mockClose,
+      isConnected: jest.fn().mockReturnValue(true),
+    };
     mockLaunch.mockResolvedValue(mockBrowser);
 
     await browserService.launch();
@@ -45,8 +52,16 @@ describe('Playwright Browser Service', () => {
   });
 
   it('should close the browser successfully', async () => {
-    const mockBrowser = { close: mockClose };
+    const mockPage = {
+      close: jest.fn(),
+      isClosed: jest.fn().mockReturnValue(false),
+    };
+    const mockBrowser = {
+      close: mockClose,
+      isConnected: jest.fn().mockReturnValue(true),
+    };
     browserService.browser = mockBrowser;
+    browserService.page = mockPage;
 
     await browserService.close();
 
