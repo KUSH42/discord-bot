@@ -131,8 +131,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          mkdir -p test-results
-          
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
@@ -217,7 +215,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
@@ -250,6 +247,7 @@ jobs:
         env:
           NODE_VERSION: ${{ matrix.node-version }}
         run: |
+          mkdir -p test-results
           mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
@@ -505,6 +503,7 @@ jobs:
         env:
           NODE_ENV: test
         run: |
+          mkdir -p test-results
           mkdir -p coverage/integration-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
@@ -617,6 +616,7 @@ jobs:
         env:
           NODE_ENV: test
         run: |
+          mkdir -p test-results
           mkdir -p coverage/e2e-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
@@ -706,6 +706,7 @@ jobs:
 
       - name: Run performance tests
         run: |
+          mkdir -p test-results
           mkdir -p coverage/performance-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
