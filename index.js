@@ -68,7 +68,7 @@ async function startBot() {
     const eventBus = container.resolve('eventBus');
     const contentStateManager = container.resolve('contentStateManager');
 
-    eventBus.on('bot.initialization.complete', event => {
+    eventBus.on('bot.initialization.complete', async event => {
       logger.info('Bot initialization complete - enabling comprehensive content evaluation logging', {
         timestamp: event.timestamp,
         historyScanned: event.historyScanned,
@@ -76,6 +76,35 @@ async function startBot() {
       });
 
       contentStateManager.markFullyInitialized();
+
+      // Initialize Discord channel scanning for ContentCoordinator duplicate detection
+      try {
+        const contentCoordinator = container.resolve('contentCoordinator');
+        const discordService = container.resolve('discordService');
+        const config = container.resolve('config');
+
+        logger.info('Starting ContentCoordinator Discord channel scanning for race condition prevention');
+        const scanResults = await contentCoordinator.initializeDiscordChannelScanning(discordService, config);
+
+        if (scanResults.scanned) {
+          logger.info('ContentCoordinator Discord channel scanning completed successfully', {
+            totalScanned: scanResults.results.totalScanned,
+            totalAdded: scanResults.results.totalAdded,
+            youtubeResults: scanResults.results.youtube,
+            xResults: scanResults.results.x,
+          });
+        } else {
+          logger.info('ContentCoordinator Discord channel scanning skipped', {
+            reason: scanResults.reason,
+          });
+        }
+      } catch (scanError) {
+        logger.error('ContentCoordinator Discord channel scanning failed, continuing without it', {
+          error: scanError.message,
+          stack: scanError.stack,
+        });
+        // Don't exit - continue without Discord scanning
+      }
     });
 
     if (hasErrors) {

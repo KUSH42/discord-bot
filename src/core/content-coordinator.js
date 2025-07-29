@@ -264,6 +264,28 @@ export class ContentCoordinator {
         operation.progress('✅ Content state updated');
       }
 
+      // Before announcing, check Discord channels for recent announcements to prevent race conditions
+      operation.progress('🔍 Checking Discord channels for recent announcements to prevent race conditions');
+      const recentCheck = await this.checkDiscordForRecentAnnouncements(contentData);
+
+      if (recentCheck.found) {
+        operation.success('⏭️ Content recently announced via Discord, skipping to prevent race condition', {
+          foundIn: recentCheck.foundIn,
+          reason: 'recent_discord_announcement',
+        });
+
+        // Mark as seen in duplicate detector to prevent future processing
+        await this.markContentAsSeen(contentData);
+
+        return {
+          action: 'skip',
+          reason: 'recent_discord_announcement',
+          source,
+          contentId,
+          foundIn: recentCheck.foundIn,
+        };
+      }
+
       // Process and announce content
       const announcementAttemptInfo = {
         platform: contentData.platform,
@@ -610,6 +632,194 @@ export class ContentCoordinator {
       oldPriority,
       newPriority: this.sourcePriority,
     });
+  }
+
+  /**
+   * Initialize Discord channel scanning for duplicate detection integration
+   * This method should be called after Discord client is ready
+   * @param {Object} discordService - Discord service instance
+   * @param {Object} config - Configuration instance
+   * @returns {Promise<Object>} Scanning results summary
+   */
+  async initializeDiscordChannelScanning(discordService, config) {
+    const operation = this.logger.startOperation('initializeDiscordChannelScanning', {
+      duplicateDetectorAvailable: !!this.duplicateDetector,
+    });
+
+    try {
+      if (!this.duplicateDetector) {
+        operation.progress('No duplicate detector available, skipping Discord scanning');
+        return operation.success('Discord scanning skipped - no duplicate detector', {
+          scanned: false,
+          reason: 'no_duplicate_detector',
+        });
+      }
+
+      if (!discordService || !discordService.isReady()) {
+        operation.progress('Discord service not ready, skipping Discord scanning');
+        return operation.success('Discord scanning skipped - service not ready', {
+          scanned: false,
+          reason: 'discord_not_ready',
+        });
+      }
+
+      operation.progress('Starting Discord channel scanning for duplicate detection');
+
+      const scanResults = {
+        youtube: { messagesScanned: 0, videoIdsAdded: 0, errors: [] },
+        x: { messagesScanned: 0, tweetIdsAdded: 0, channelsScanned: 0, errors: [] },
+        totalScanned: 0,
+        totalAdded: 0,
+      };
+
+      // Scan YouTube announcement channel
+      const youtubeChannelId = config.get('DISCORD_YOUTUBE_CHANNEL_ID');
+      if (youtubeChannelId) {
+        try {
+          operation.progress('Scanning YouTube announcement channel', { channelId: youtubeChannelId });
+          const youtubeChannel = await discordService.fetchChannel(youtubeChannelId);
+          if (youtubeChannel) {
+            const videoResults = await this.duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 100);
+            scanResults.youtube = videoResults;
+            scanResults.totalScanned += videoResults.messagesScanned;
+            scanResults.totalAdded += videoResults.videoIdsAdded;
+
+            operation.progress(
+              `YouTube channel scanned: ${videoResults.messagesScanned} messages, ${videoResults.videoIdsAdded} videos added`
+            );
+          }
+        } catch (error) {
+          const errorMsg = `Failed to scan YouTube channel: ${error.message}`;
+          operation.progress('Error scanning YouTube channel', { error: errorMsg });
+          scanResults.youtube.errors.push(errorMsg);
+        }
+      } else {
+        operation.progress('No YouTube channel ID configured, skipping YouTube history scanning');
+      }
+
+      // Scan X/Twitter announcement channels
+      const xChannelConfigs = [
+        { id: config.get('DISCORD_X_POSTS_CHANNEL_ID'), name: 'X posts' },
+        { id: config.get('DISCORD_X_REPLIES_CHANNEL_ID'), name: 'X replies' },
+        { id: config.get('DISCORD_X_QUOTES_CHANNEL_ID'), name: 'X quotes' },
+        { id: config.get('DISCORD_X_RETWEETS_CHANNEL_ID'), name: 'X retweets' },
+      ];
+
+      for (const channelConfig of xChannelConfigs) {
+        if (channelConfig.id) {
+          try {
+            operation.progress(`Scanning ${channelConfig.name} channel`, { channelId: channelConfig.id });
+            const xChannel = await discordService.fetchChannel(channelConfig.id);
+            if (xChannel) {
+              const tweetResults = await this.duplicateDetector.scanDiscordChannelForTweets(xChannel, 50);
+              scanResults.x.messagesScanned += tweetResults.messagesScanned;
+              scanResults.x.tweetIdsAdded += tweetResults.tweetIdsAdded;
+              scanResults.x.channelsScanned += 1;
+              scanResults.x.errors.push(...tweetResults.errors);
+              scanResults.totalScanned += tweetResults.messagesScanned;
+              scanResults.totalAdded += tweetResults.tweetIdsAdded;
+
+              operation.progress(
+                `${channelConfig.name} channel scanned: ${tweetResults.messagesScanned} messages, ${tweetResults.tweetIdsAdded} tweets added`
+              );
+            }
+          } catch (error) {
+            const errorMsg = `Failed to scan ${channelConfig.name} channel: ${error.message}`;
+            operation.progress('Error scanning X channel', { channel: channelConfig.name, error: errorMsg });
+            scanResults.x.errors.push(errorMsg);
+          }
+        } else {
+          operation.progress(`No ${channelConfig.name} channel ID configured, skipping`);
+        }
+      }
+
+      return operation.success(
+        `Discord channel scanning completed: ${scanResults.totalScanned} messages scanned, ${scanResults.totalAdded} items cached`,
+        {
+          scanned: true,
+          results: scanResults,
+        }
+      );
+    } catch (error) {
+      operation.error(error, 'Discord channel scanning failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Check Discord channels for recent announcements to prevent race conditions
+   * @param {Object} contentData - Content data to check for
+   * @returns {Promise<Object>} Check result with found status and location
+   */
+  async checkDiscordForRecentAnnouncements(contentData) {
+    const operation = this.logger.startOperation('checkDiscordForRecentAnnouncements', {
+      platform: contentData.platform,
+      type: contentData.type,
+      contentId: contentData.id || contentData.videoId || contentData.tweetId,
+    });
+
+    try {
+      if (!this.duplicateDetector) {
+        operation.progress('No duplicate detector available, skipping Discord check');
+        return operation.success('Discord check skipped - no duplicate detector', {
+          found: false,
+          reason: 'no_duplicate_detector',
+        });
+      }
+
+      // For YouTube content, check video IDs
+      if (contentData.platform === 'YouTube' && contentData.videoId) {
+        operation.progress('Checking for YouTube video ID in duplicate detector');
+        const videoExists = this.duplicateDetector.hasVideoId(contentData.videoId);
+
+        if (videoExists) {
+          return operation.success('YouTube video found in duplicate detector', {
+            found: true,
+            foundIn: 'youtube_duplicate_detector',
+            contentId: contentData.videoId,
+          });
+        }
+      }
+
+      // For X/Twitter content, check tweet IDs
+      if (contentData.platform === 'X' && contentData.tweetId) {
+        operation.progress('Checking for X/Twitter tweet ID in duplicate detector');
+        const tweetExists = this.duplicateDetector.hasTweetId(contentData.tweetId);
+
+        if (tweetExists) {
+          return operation.success('X/Twitter tweet found in duplicate detector', {
+            found: true,
+            foundIn: 'x_duplicate_detector',
+            contentId: contentData.tweetId,
+          });
+        }
+      }
+
+      // For general URL-based content, check URLs
+      if (contentData.url) {
+        operation.progress('Checking for URL in duplicate detector');
+        const urlExists = this.duplicateDetector.hasUrl(contentData.url);
+
+        if (urlExists) {
+          return operation.success('URL found in duplicate detector', {
+            found: true,
+            foundIn: 'url_duplicate_detector',
+            url: contentData.url,
+          });
+        }
+      }
+
+      return operation.success('No recent announcements found in Discord channels', {
+        found: false,
+      });
+    } catch (error) {
+      operation.error(error, 'Failed to check Discord for recent announcements');
+      // Return false on error to allow announcement to proceed
+      return {
+        found: false,
+        error: error.message,
+      };
+    }
   }
 
   /**

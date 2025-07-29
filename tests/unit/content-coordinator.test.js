@@ -669,4 +669,309 @@ describe('ContentCoordinator', () => {
       expect(result.action).toBe('announced');
     });
   });
+
+  describe('Discord Channel Scanning Integration', () => {
+    beforeEach(() => {
+      coordinator = new ContentCoordinator(
+        mockContentStateManager,
+        mockContentAnnouncer,
+        mockDuplicateDetector,
+        mockDependencies.baseLogger,
+        mockDependencies.debugManager,
+        mockDependencies.metricsManager,
+        mockConfig
+      );
+    });
+
+    describe('initializeDiscordChannelScanning', () => {
+      let mockDiscordService;
+
+      beforeEach(() => {
+        mockDiscordService = {
+          isReady: jest.fn().mockReturnValue(true),
+          fetchChannel: jest.fn(),
+        };
+
+        mockConfig.get.mockImplementation(key => {
+          const configMap = {
+            DISCORD_YOUTUBE_CHANNEL_ID: 'youtube-channel-123',
+            DISCORD_X_POSTS_CHANNEL_ID: 'x-posts-456',
+            DISCORD_X_REPLIES_CHANNEL_ID: 'x-replies-789',
+            DISCORD_X_QUOTES_CHANNEL_ID: 'x-quotes-012',
+            DISCORD_X_RETWEETS_CHANNEL_ID: 'x-retweets-345',
+          };
+          return configMap[key];
+        });
+
+        mockDuplicateDetector.scanDiscordChannelForVideos = jest.fn().mockResolvedValue({
+          messagesScanned: 50,
+          videoIdsAdded: 3,
+          errors: [],
+        });
+
+        mockDuplicateDetector.scanDiscordChannelForTweets = jest.fn().mockResolvedValue({
+          messagesScanned: 25,
+          tweetIdsAdded: 2,
+          errors: [],
+        });
+      });
+
+      it('should successfully scan Discord channels for duplicate detection', async () => {
+        const mockYouTubeChannel = { id: 'youtube-channel-123', name: 'YouTube Channel' };
+        const mockXChannel = { id: 'x-posts-456', name: 'X Posts Channel' };
+
+        mockDiscordService.fetchChannel.mockImplementation(channelId => {
+          if (channelId === 'youtube-channel-123') {
+            return Promise.resolve(mockYouTubeChannel);
+          }
+          if (channelId.startsWith('x-')) {
+            return Promise.resolve(mockXChannel);
+          }
+          return Promise.resolve(null);
+        });
+
+        const result = await coordinator.initializeDiscordChannelScanning(mockDiscordService, mockConfig);
+
+        expect(result.scanned).toBe(true);
+        expect(result.results.totalScanned).toBe(150); // 50 + 25*4
+        expect(result.results.totalAdded).toBe(11); // 3 + 2*4
+        expect(mockDuplicateDetector.scanDiscordChannelForVideos).toHaveBeenCalledWith(mockYouTubeChannel, 100);
+        expect(mockDuplicateDetector.scanDiscordChannelForTweets).toHaveBeenCalledTimes(4);
+      });
+
+      it('should skip scanning when Discord service is not ready', async () => {
+        mockDiscordService.isReady.mockReturnValue(false);
+
+        const result = await coordinator.initializeDiscordChannelScanning(mockDiscordService, mockConfig);
+
+        expect(result.scanned).toBe(false);
+        expect(result.reason).toBe('discord_not_ready');
+        expect(mockDuplicateDetector.scanDiscordChannelForVideos).not.toHaveBeenCalled();
+      });
+
+      it('should skip scanning when no duplicate detector is available', async () => {
+        coordinator.duplicateDetector = null;
+
+        const result = await coordinator.initializeDiscordChannelScanning(mockDiscordService, mockConfig);
+
+        expect(result.scanned).toBe(false);
+        expect(result.reason).toBe('no_duplicate_detector');
+      });
+
+      it('should handle errors gracefully and continue with other channels', async () => {
+        mockDiscordService.fetchChannel.mockImplementation(channelId => {
+          if (channelId === 'youtube-channel-123') {
+            throw new Error('Channel not found');
+          }
+          return Promise.resolve({ id: channelId, name: 'Test Channel' });
+        });
+
+        const result = await coordinator.initializeDiscordChannelScanning(mockDiscordService, mockConfig);
+
+        expect(result.scanned).toBe(true);
+        expect(result.results.youtube.errors).toContain('Failed to scan YouTube channel: Channel not found');
+        expect(result.results.x.tweetIdsAdded).toBe(8); // 2*4 from X channels
+      });
+    });
+
+    describe('checkDiscordForRecentAnnouncements', () => {
+      beforeEach(() => {
+        coordinator = new ContentCoordinator(
+          mockContentStateManager,
+          mockContentAnnouncer,
+          mockDuplicateDetector,
+          mockDependencies.baseLogger,
+          mockDependencies.debugManager,
+          mockDependencies.metricsManager,
+          mockConfig
+        );
+
+        mockDuplicateDetector.hasVideoId = jest.fn().mockReturnValue(false);
+        mockDuplicateDetector.hasTweetId = jest.fn().mockReturnValue(false);
+        mockDuplicateDetector.hasUrl = jest.fn().mockReturnValue(false);
+      });
+
+      it('should detect YouTube video already announced', async () => {
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'test-video-123',
+          type: 'video',
+          url: 'https://www.youtube.com/watch?v=test-video-123',
+        };
+
+        mockDuplicateDetector.hasVideoId.mockReturnValue(true);
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(true);
+        expect(result.foundIn).toBe('youtube_duplicate_detector');
+        expect(result.contentId).toBe('test-video-123');
+        expect(mockDuplicateDetector.hasVideoId).toHaveBeenCalledWith('test-video-123');
+      });
+
+      it('should detect X/Twitter tweet already announced', async () => {
+        const contentData = {
+          platform: 'X',
+          tweetId: 'test-tweet-456',
+          type: 'post',
+          url: 'https://twitter.com/user/status/test-tweet-456',
+        };
+
+        mockDuplicateDetector.hasTweetId.mockReturnValue(true);
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(true);
+        expect(result.foundIn).toBe('x_duplicate_detector');
+        expect(result.contentId).toBe('test-tweet-456');
+        expect(mockDuplicateDetector.hasTweetId).toHaveBeenCalledWith('test-tweet-456');
+      });
+
+      it('should detect content by URL when specific ID not available', async () => {
+        const contentData = {
+          platform: 'YouTube',
+          type: 'video',
+          url: 'https://www.youtube.com/watch?v=test-video-789',
+        };
+
+        mockDuplicateDetector.hasUrl.mockReturnValue(true);
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(true);
+        expect(result.foundIn).toBe('url_duplicate_detector');
+        expect(result.url).toBe('https://www.youtube.com/watch?v=test-video-789');
+        expect(mockDuplicateDetector.hasUrl).toHaveBeenCalledWith('https://www.youtube.com/watch?v=test-video-789');
+      });
+
+      it('should return not found when content is not in duplicate detector', async () => {
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'new-video-123',
+          type: 'video',
+          url: 'https://www.youtube.com/watch?v=new-video-123',
+        };
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(false);
+        expect(mockDuplicateDetector.hasVideoId).toHaveBeenCalledWith('new-video-123');
+        expect(mockDuplicateDetector.hasUrl).toHaveBeenCalledWith('https://www.youtube.com/watch?v=new-video-123');
+      });
+
+      it('should skip check when no duplicate detector is available', async () => {
+        coordinator.duplicateDetector = null;
+
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'test-video-123',
+          type: 'video',
+        };
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(false);
+        expect(result.reason).toBe('no_duplicate_detector');
+      });
+
+      it('should handle errors gracefully and allow announcement to proceed', async () => {
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'test-video-123',
+          type: 'video',
+        };
+
+        mockDuplicateDetector.hasVideoId.mockImplementation(() => {
+          throw new Error('Database connection failed');
+        });
+
+        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+
+        expect(result.found).toBe(false);
+        expect(result.error).toBe('Database connection failed');
+      });
+    });
+
+    describe('Race Condition Prevention Integration', () => {
+      beforeEach(() => {
+        coordinator = new ContentCoordinator(
+          mockContentStateManager,
+          mockContentAnnouncer,
+          mockDuplicateDetector,
+          mockDependencies.baseLogger,
+          mockDependencies.debugManager,
+          mockDependencies.metricsManager,
+          mockConfig
+        );
+
+        // Set up base mocks for processing
+        mockContentStateManager.getContentState.mockReturnValue(null);
+        mockContentStateManager.isNewContent.mockReturnValue(true);
+        mockContentStateManager.addContent.mockResolvedValue();
+        mockDuplicateDetector.isDuplicateWithFingerprint.mockResolvedValue(false);
+        mockDuplicateDetector.markAsSeenWithFingerprint.mockResolvedValue();
+      });
+
+      it('should prevent announcement when content found in Discord channels', async () => {
+        const contentId = 'test-video-123';
+        const source = 'webhook';
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'test-video-123',
+          type: 'video',
+          title: 'Test Video',
+          url: 'https://www.youtube.com/watch?v=test-video-123',
+          publishedAt: new Date().toISOString(),
+        };
+
+        // Mock that content is found in Discord channels
+        mockDuplicateDetector.hasVideoId = jest.fn().mockReturnValue(true);
+        coordinator.checkDiscordForRecentAnnouncements = jest.fn().mockResolvedValue({
+          found: true,
+          foundIn: 'youtube_duplicate_detector',
+          contentId: 'test-video-123',
+        });
+
+        const result = await coordinator.processContent(contentId, source, contentData);
+
+        expect(result.action).toBe('skip');
+        expect(result.reason).toBe('recent_discord_announcement');
+        expect(result.foundIn).toBe('youtube_duplicate_detector');
+        expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
+        expect(mockDuplicateDetector.markAsSeenWithFingerprint).toHaveBeenCalled();
+      });
+
+      it('should proceed with announcement when content not found in Discord channels', async () => {
+        const contentId = 'new-video-456';
+        const source = 'webhook';
+        const contentData = {
+          platform: 'YouTube',
+          videoId: 'new-video-456',
+          type: 'video',
+          title: 'New Test Video',
+          url: 'https://www.youtube.com/watch?v=new-video-456',
+          publishedAt: new Date().toISOString(),
+        };
+
+        // Mock that content is NOT found in Discord channels
+        coordinator.checkDiscordForRecentAnnouncements = jest.fn().mockResolvedValue({
+          found: false,
+        });
+
+        mockContentAnnouncer.announceContent.mockResolvedValue({
+          success: true,
+          channelId: 'youtube-channel-123',
+          messageId: 'message-456',
+        });
+        mockContentStateManager.markAsAnnounced.mockResolvedValue();
+
+        const result = await coordinator.processContent(contentId, source, contentData);
+
+        expect(result.action).toBe('announced');
+        expect(coordinator.checkDiscordForRecentAnnouncements).toHaveBeenCalledWith(contentData);
+        expect(mockContentAnnouncer.announceContent).toHaveBeenCalled();
+        expect(mockContentStateManager.markAsAnnounced).toHaveBeenCalledWith(contentId);
+      });
+    });
+  });
 });
