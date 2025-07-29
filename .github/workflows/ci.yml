@@ -247,6 +247,7 @@ jobs:
           NODE_VERSION: ${{ matrix.node-version }}
         run: |
           mkdir -p test-results
+          mkdir -p logs
           mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
@@ -259,7 +260,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee test-results/unit-tests-node${{ matrix.node-version }}.log
+            2>&1 | tee logs/unit-tests-node${{ matrix.node-version }}.log
 
       - name: Store unit test results
         uses: actions/upload-artifact@v4
@@ -267,8 +268,10 @@ jobs:
         with:
           name: unit-tests-node${{ matrix.node-version }}
           path: |
-            coverage/unit-tests-node${{ matrix.node-version }}/lcov.info
-            test-results/unit-tests-node${{ matrix.node-version }}/*.xml
+            coverage/
+            test-results/
+            logs/
+            reports/
           retention-days: 7
 
 # Build and Push Docker Image
@@ -493,6 +496,7 @@ jobs:
           NODE_ENV: test
         run: |
           mkdir -p test-results
+          mkdir -p logs
           mkdir -p coverage/integration-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
@@ -505,7 +509,7 @@ jobs:
             --verbose=true \
             --passWithNoTests \
             --coverageThreshold='{}' \
-            2>&1 | tee test-results/integration-tests-output.log
+            2>&1 | tee logs/integration-tests-output.log
 
       - name: Store integration test results
         uses: actions/upload-artifact@v4
@@ -513,8 +517,8 @@ jobs:
         with:
           name: integration-tests
           path: |
-            coverage/integration-tests/lcov.info
-            test-results/integration-tests/integration-tests.xml
+            coverage/integration-tests/
+            test-results/integration-tests.xml
             logs/
           retention-days: 7
 
@@ -596,6 +600,7 @@ jobs:
           NODE_ENV: test
         run: |
           mkdir -p test-results
+          mkdir -p logs
           mkdir -p coverage/e2e-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
@@ -606,7 +611,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee test-results/e2e-tests-output.log
+            2>&1 | tee logs/e2e-tests-output.log
           echo "echo "Current working directory: $(pwd)""
           $(echo ls -a -F)
 
@@ -616,9 +621,10 @@ jobs:
         with:
           name: e2e-tests
           path: |
-            coverage/e2e-tests/lcov.info
-            test-results/e2e-tests.xml
+            coverage/
+            test-results/
             logs/
+            reports/
             screenshots/
             .env.e2e
           retention-days: 7
@@ -675,6 +681,7 @@ jobs:
       - name: Run performance tests
         run: |
           mkdir -p test-results
+          mkdir -p logs
           mkdir -p coverage/performance-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
@@ -687,7 +694,7 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            2>&1 | tee test-results/performance-tests-output.log
+            2>&1 | tee logs/performance-tests-output.log
 
       - name: Generate performance report
         run: |
@@ -738,8 +745,9 @@ jobs:
         with:
           name: performance-tests
           path: |
-            coverage/performance-tests/lcov.inf
-            test-results/performance-tests/performance-tests.xml
+            coverage/
+            test-results/
+            logs/
             reports/
             performance-metrics.json
           retention-days: 30
@@ -793,14 +801,15 @@ jobs:
 
       - name: Run security tests
         run: |
-          mkdir -p test-results/security-tests
+          mkdir -p test-results
+          mkdir -p logs/security-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
             --testTimeout=20000 \
             --forceExit \
             --detectOpenHandles \
-            2>&1 | tee test-results/security-tests-output.log
+            2>&1 | tee logs/security-tests-output.log
 
       - name: Run security audit
         run: |
@@ -847,10 +856,12 @@ jobs:
         with:
           name: security-tests
           path: |
+            coverage/
+            test-results/
+            logs/
+            reports/
             security-audit.json
             security-report.json
-            test-results/security tests/security-tests.xml
-            coverage/security-tests/lcov.info
           retention-days: 30
 
   # Aggregate results and report
@@ -977,6 +988,8 @@ jobs:
             reports/
             coverage-summary.json
             coverage-metrics.json
+            security-audit.json
+            security-report.json
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
