@@ -11,6 +11,7 @@ export default {
   cache: false,
   collectCoverage: true,
   coverageReporters: ['lcov', 'text-summary'],
+  coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
   // Override reporters for CI with structured output
   reporters: [
