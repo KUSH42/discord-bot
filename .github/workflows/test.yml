@@ -715,7 +715,7 @@ jobs:
             --detectOpenHandles \
             --passWithNoTests \
             --verbose=true \
-            2>&1 | tee test.results/performance-tests/test-output.log
+            2>&1 | tee test-results/performance-tests/test-output.log
 
       - name: Generate performance report
         run: |
