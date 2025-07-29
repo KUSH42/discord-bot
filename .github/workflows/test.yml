@@ -963,41 +963,6 @@ jobs:
         run: |
           node scripts/ci/ci-coverage-merger.js
 
-      - name: Generate LCOV HTML Report
-        if: steps.coverage.outputs.status == 'available'
-        run: |
-          LCOV_REPORT_DIR="coverage/merged"
-          mkdir -p "$LCOV_REPORT_DIR"
-          
-          if [ -d "assets/lcov" ]; then
-            find assets/lcov -name "*.css" -exec cp {} "$LCOV_REPORT_DIR" \;
-          fi
-          
-          if [ -f "coverage/merged/lcov.info" ]; then
-            if genhtml coverage/merged/lcov.info \
-              --output-directory "$LCOV_REPORT_DIR" \
-              --branch_coverage=1 \ 
-              --css-file "$LCOV_REPORT_DIR/lcov_dark_theme.css" \
-              --derive_function_end_line=0 \
-              --title "Discord Bot - Enhanced Code Coverage Report" \
-              --function-coverage \
-              --dark-mode \
-              --prefix "$(pwd)" \
-              --include "-/**/lcov.info" \
-              --legend \
-              --show-details; then
-              echo "✅ LCOV HTML report generated successfully"
-              echo "lcov_html_generated=true" >> $GITHUB_ENV
-            else
-              echo "⚠️ genhtml failed, creating basic report"
-              echo "<html><body><h1>Coverage Report Generation Failed</h1><p>See coverage-summary.json for metrics</p></body></html>" > "$LCOV_REPORT_DIR/index.html"
-              echo "lcov_html_generated=false" >> $GITHUB_ENV
-            fi
-          else
-            echo "⚠️ No merged LCOV info found, creating placeholder"
-            echo "<html><body><h1>No Coverage Data</h1><p>Coverage merging may have failed</p></body></html>" > "$LCOV_REPORT_DIR/index.html"
-            echo "lcov_html_generated=false" >> $GITHUB_ENV
-          fi
 
       - name: Generate comprehensive test report
         env:
@@ -1054,7 +1019,7 @@ jobs:
           retention-days: 14
 
       - name: Upload LCOV HTML Report Artifact
-        if: steps.coverage.outputs.status == 'available' && env.lcov_html_generated == 'true'
+        if: steps.coverage.outputs.status == 'available'
         uses: actions/upload-artifact@v4
         with:
           name: lcov-html-report

@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
-import { toISOStringUTC } from '../../src/utilities/utc-time.js';
+import { toISOStringUTC } from '../../utilities/utc-time-test.js';
 
 class CICoverageMerger {
   constructor() {
@@ -650,7 +650,7 @@ class CICoverageMerger {
     console.log('🌐 Generating HTML coverage report...');
 
     const lcovFile = path.join(this.mergedDir, 'lcov.info');
-    const htmlDir = path.join(this.outputDir, 'html');
+    const htmlDir = path.join(this.outputDir, 'merged');
 
     if (!fs.existsSync(lcovFile)) {
       console.log('⚠️  No LCOV file found, skipping HTML report');
@@ -673,38 +673,32 @@ class CICoverageMerger {
 
       // Generate HTML report using genhtml
       const command = [
+        'lcov',
+        '--extract lcov.info',
+        '--branch_coverage=1',
+        '--rc derive_fuwnction_end_line=0',
+        '-o "coverage/merged/lcov.info"',
+        'src/*',
+        '&&',
+        'genhtml',
+        'coverage/merged/lcov.info',
+        '&&',
         'genhtml',
         `"${lcovFile}"`,
         `--output-directory "${htmlDir}"`,
         '--title "Discord Bot Coverage Report"',
+        '--prefix "$(pwd)',
         '--legend',
         '--show-details',
         '--dark-mode',
-        ` && lcov --extract lcov.info --rc lcov_branch_coverage=1 --rc derive_function_end_line=0 -o lcov.info 'src/*' && genhtml lcov.info --rc branch_coverage=1 --rc derive_function_end_line=0 -o coverage`,
+        '--rc branch_coverage=1',
+        '--rc derive_function_end_line=0',
       ].join(' ');
 
       console.log(`Executing: ${command}`);
       execSync(command, { stdio: 'pipe' });
 
       console.log(`✅ HTML coverage report generated in ${htmlDir}`);
-
-      // Create an index file for easy access
-      const indexPath = path.join(this.outputDir, 'index.html');
-      fs.writeFileSync(
-        indexPath,
-        `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Coverage Report</title>
-    <meta http-equiv="refresh" content="0; url=html/index.html">
-</head>
-<body>
-    <p>Redirecting to <a href="html/index.html">coverage report</a>...</p>
-</body>
-</html>
-      `.trim()
-      );
     } catch (error) {
       console.log(`⚠️  HTML report generation failed: ${error.message}`);
       console.log('Creating fallback HTML report...');
