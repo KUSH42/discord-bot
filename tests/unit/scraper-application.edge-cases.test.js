@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
-import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
+import { createScraperApplicationMocks } from '../fixtures/application-mocks.js';
 
 describe('ScraperApplication Edge Cases and Error Scenarios', () => {
   let scraperApp;
@@ -15,7 +15,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
   let mockMetricsManager;
 
   beforeEach(() => {
-    mockDependencies = createMockDependenciesWithEnhancedLogging();
+    mockDependencies = createScraperApplicationMocks();
 
     // Extract mocks from dependencies
     mockConfig = mockDependencies.config;
@@ -27,11 +27,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
     mockDebugManager = mockDependencies.debugManager;
     mockMetricsManager = mockDependencies.metricsManager;
 
-    // Configure default behavior
-    mockConfig.xUserHandle = 'testuser';
-    mockConfig.xPollingInterval = 30000;
-    mockConfig.isAnnouncingEnabled = jest.fn(() => true);
-
+    // Configure browser service methods
     mockBrowserService.isHealthy = jest.fn(() => true);
     mockBrowserService.launch = jest.fn().mockResolvedValue(undefined);
     mockBrowserService.navigateTo = jest.fn().mockResolvedValue(undefined);
@@ -42,7 +38,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
     mockAuthManager.isAuthenticated = jest.fn(() => true);
 
     mockContentAnnouncer.announce = jest.fn().mockResolvedValue(undefined);
-    mockContentClassifier.classifyContent = jest.fn().mockReturnValue('post');
+    mockContentClassifier.classifyXContent = jest.fn().mockReturnValue({ type: 'post', platform: 'x' });
 
     // Create ScraperApplication instance
     scraperApp = new ScraperApplication(

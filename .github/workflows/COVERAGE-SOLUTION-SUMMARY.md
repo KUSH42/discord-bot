@@ -69,7 +69,7 @@ node scripts/merge-coverage-enhanced.js --search-paths "test-results,coverage" -
 
 ### Replace Existing Coverage Section
 
-**Location:** `.github/workflows/test.yml` lines 968-1217
+**Location:** `.github/workflows/ci.yml` lines 968-1217
 
 **New Implementation:**
 ```yaml
@@ -172,7 +172,7 @@ test-results/                       # Organized by test type
 1. ✅ **Scripts Created**: All enhanced coverage tools are implemented
 2. ✅ **Testing Complete**: System validated with comprehensive tests
 3. ✅ **Documentation Ready**: Complete usage and troubleshooting guides
-4. **Next**: Update `.github/workflows/test.yml` with new coverage section
+4. **Next**: Update `.github/workflows/ci.yml` with new coverage section
 
 ### Phase 2: Validate in CI
 1. **Test in Feature Branch**: Create PR to validate CI integration
@@ -251,7 +251,7 @@ After implementation, you should see:
 
 ## Next Steps
 
-1. **Immediate (5 minutes)**: Replace the problematic coverage section in `.github/workflows/test.yml`
+1. **Immediate (5 minutes)**: Replace the problematic coverage section in `.github/workflows/ci.yml`
 2. **Testing (1 PR)**: Create a feature branch to validate the new system in CI
 3. **Deployment (Same day)**: Merge to production once validated
 

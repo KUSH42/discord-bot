@@ -44,10 +44,7 @@ class CICoverageMerger {
       console.log(`📊 Test results path: ${this.testResults}`);
       console.log(`📁 Coverage artifacts path: ${this.coverageArtifacts}`);
 
-      // Step 1: Install required tools
-      await this.installTools();
-
-      // Step 2: Discover coverage files
+      // Step 1: Discover coverage files
       const coverageFiles = this.discoverCoverageFiles();
 
       if (coverageFiles.length === 0) {
@@ -100,13 +97,13 @@ class CICoverageMerger {
 
       console.log(`📊 Found ${coverageFiles.length} coverage files`);
 
-      // Step 3: Merge coverage files
+      // Step 2: Merge coverage files
       await this.mergeCoverageFiles(coverageFiles);
 
-      // Step 4: Generate comprehensive summary
+      // Step 3: Generate comprehensive summary
       await this.generateComprehensiveSummary();
 
-      // Step 5: Generate test summary report
+      // Step 4: Generate test summary report
       await this.generateTestSummary();
 
       console.log('✅ CI Coverage merging completed successfully!');
@@ -154,27 +151,6 @@ class CICoverageMerger {
       }
     } catch (error) {
       console.log(`${prefix}Error: ${error.message}`);
-    }
-  }
-
-  /**
-   * Install necessary tools for coverage processing
-   */
-  async installTools() {
-    console.log('🔧 Installing coverage tools...');
-
-    try {
-      // Check if lcov-result-merger is available
-      execSync('npm list lcov-result-merger', { stdio: 'pipe' });
-      console.log('✅ lcov-result-merger already available');
-    } catch {
-      try {
-        console.log('📦 Installing lcov-result-merger...');
-        execSync('npm install --no-save lcov-result-merger', { stdio: 'inherit' });
-        console.log('✅ lcov-result-merger installed');
-      } catch (_error) {
-        console.log('⚠️  Failed to install lcov-result-merger, will use fallback merger');
-      }
     }
   }
 
@@ -311,7 +287,7 @@ class CICoverageMerger {
     try {
       // Scan coverage directory if it exists (local development)
       if (fs.existsSync('coverage')) {
-        this.scanDirectoryForLcov('coverage', dynamicPaths);
+        this.scanDirectoryForLcov('coverage', dynamicPaths, 3);
       }
 
       // Scan coverage-artifacts directory if it exists (GitHub Actions coverage artifacts)

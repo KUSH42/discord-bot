@@ -123,7 +123,7 @@ npm run test:watch                    # Development mode
 
 ### Development
 ```bash
-npm start                 # Start bot with validation
+npm start                # Start bot with validation
 npm run decrypt          # Start with encrypted credentials
 npm test                 # Full test suite with coverage
 npm run test:dev         # Development mode (fast feedback)

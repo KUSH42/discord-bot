@@ -21,6 +21,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
     originalProcessExit = process.exit;
     processSignalHandlers = new Map();
 
+    // Setup fake timers to handle setTimeout in shutdown handler
+    jest.useFakeTimers();
+
     // Mock process.on to capture signal handlers
     mockProcessOn = jest.fn((signal, handler) => {
       processSignalHandlers.set(signal, handler);
@@ -59,6 +62,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
   });
 
   afterEach(async () => {
+    // Restore timers first
+    jest.useRealTimers();
+
     // Clean up container
     if (container) {
       try {
@@ -242,6 +248,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
 
       await shutdownHandler('SIGTERM');
 
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
+
       expect(botApp.stop).toHaveBeenCalledTimes(1);
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
       expect(scraperApp.stop).toHaveBeenCalledTimes(1);
@@ -263,6 +272,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       jest.spyOn(container, 'dispose').mockResolvedValue();
 
       await shutdownHandler('SIGINT');
+
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
 
       expect(botApp.stop).toHaveBeenCalledTimes(1);
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
@@ -289,6 +301,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
 
       await shutdownHandler('SIGTERM');
 
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
+
       // Should still try to stop all applications and dispose container
       expect(botApp.stop).toHaveBeenCalledTimes(1);
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
@@ -311,6 +326,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       jest.spyOn(container, 'dispose').mockRejectedValue(new Error('Container disposal failed'));
 
       await shutdownHandler('SIGTERM');
+
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
 
       expect(botApp.stop).toHaveBeenCalledTimes(1);
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
@@ -336,6 +354,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       // Simulate uncaught exception shutdown
       await shutdownHandler('uncaughtException');
 
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
+
       // Verify shutdown was triggered
       expect(botApp.stop).toHaveBeenCalled();
       expect(mockProcessExit).toHaveBeenCalledWith(0); // Exit successfully when apps stop cleanly
@@ -357,6 +378,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
 
       // Simulate unhandled promise rejection shutdown
       await shutdownHandler('unhandledRejection');
+
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
 
       // Verify shutdown was triggered
       expect(botApp.stop).toHaveBeenCalled();
@@ -394,6 +418,9 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       jest.spyOn(container, 'dispose').mockResolvedValue();
 
       await shutdownHandler('SIGTERM');
+
+      // Advance timers to trigger the setTimeout in the shutdown handler
+      await jest.advanceTimersByTimeAsync(100);
 
       // HTTP server should be handled by container disposal
       expect(container.dispose).toHaveBeenCalledTimes(1);

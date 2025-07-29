@@ -145,7 +145,7 @@ node scripts/coverage/test-coverage-simple.js
 
 ### GitHub Actions Integration
 
-Replace the existing coverage section in `.github/workflows/test.yml` with the enhanced implementation:
+Replace the existing coverage section in `.github/workflows/ci.yml` with the enhanced implementation:
 
 ```yaml
       - name: Install enhanced coverage tools
@@ -303,7 +303,7 @@ lcov-html-report/                   # Interactive HTML report
 
 ### From Old System
 
-1. **Remove old coverage section** from `.github/workflows/test.yml` (lines 968-1217)
+1. **Remove old coverage section** from `.github/workflows/ci.yml` (lines 968-1217)
 
 2. **Add new coverage section** using the enhanced implementation above
 

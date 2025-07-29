@@ -574,7 +574,7 @@ beforeEach(() => {
   - **Critical Components:** 85-90% for well-tested modules
 - **Reporting:**
   - **Code Coverage:** Coverage is collected using Jest's `--coverage` flag and
-    uploaded to [Codecov](https://app.codecov.io/gh/KUSH42/discord-youtube-bot).
+    uploaded to [Codecov](https://app.codecov.io/gh/KUSH42/discord-bot).
     Merged reports are generated in CI.
   - **Test Results:** Test results and artifacts are uploaded to GitHub Actions
     for each run.
@@ -773,7 +773,7 @@ The test suite includes several performance optimizations:
 - **Performance Optimization:** Analyze test runtimes and suggest optimizations
   using the available performance configurations.
 - **CI Optimization:** Propose improvements to the GitHub Actions workflow
-  (`.github/workflows/test.yml`) for speed, efficiency, or robustness.
+  (`.github/workflows/ci.yml`) for speed, efficiency, or robustness.
 - **Code Generation:** Generate new test files and test cases, strictly adhering
   to the conventions defined in this document.
 - **Configuration Management:** Utilize appropriate Jest configurations (main,

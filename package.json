@@ -65,12 +65,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KUSH42/discord-youtube-bot.git"
+    "url": "git+https://github.com/KUSH42/discord-bot.git"
   },
   "bugs": {
-    "url": "https://github.com/KUSH42/discord-youtube-bot/issues"
+    "url": "https://github.com/KUSH42/discord-bot/issues"
   },
-  "homepage": "https://github.com/KUSH42/discord-youtube-bot#readme",
+  "homepage": "https://github.com/KUSH42/discord-bot#readme",
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
