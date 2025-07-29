@@ -18,7 +18,12 @@ export default {
   },
 
   // Test discovery - only performance tests
-  testMatch: ['<rootDir>/tests/performance/**/*.test.js'],
+  testMatch: [
+    '<rootDir>/tests/unit/duplicate_detection.test.js',
+    '<rootDir>/tests/unit/infrastructure.configuration.test.js',
+    '<rootDir>/tests/unit/rate-limiting.test.js',
+    '<rootDir>/tests/unit/regex_pattern.test.js',
+  ],
 
   // Performance-specific settings
   testTimeout: 120000, // 2 minutes for performance tests

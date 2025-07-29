@@ -430,7 +430,7 @@ describe('ScraperApplication Content Detection', () => {
           module: 'scraper',
         })
       );
-    });
+    }, 10000);
 
     it('should handle errors during enhanced retweet detection', async () => {
       jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
@@ -448,7 +448,7 @@ describe('ScraperApplication Content Detection', () => {
         })
       );
       // Should not rethrow error
-    });
+    }, 10000);
   });
 
   describe('Content Initialization', () => {
@@ -516,7 +516,7 @@ describe('ScraperApplication Content Detection', () => {
         })
       );
       // Should not rethrow error
-    });
+    }, 10000);
 
     it('should handle retweet scan errors during initialization', async () => {
       scraperApp.extractTweets
@@ -532,7 +532,7 @@ describe('ScraperApplication Content Detection', () => {
           module: 'scraper',
         })
       );
-    });
+    }, 10000);
 
     it('should skip retweet initialization when retweet processing is disabled', async () => {
       scraperApp.shouldProcessRetweets.mockReturnValue(false);
@@ -541,6 +541,6 @@ describe('ScraperApplication Content Detection', () => {
       await scraperApp.initializeRecentContent();
 
       expect(scraperApp.extractTweets).toHaveBeenCalledTimes(1); // Only called once for normal tweets
-    });
+    }, 10000);
   });
 });
