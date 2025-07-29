@@ -4,7 +4,6 @@
  */
 
 export default {
-  rootDir: '../../', // Set root to project root
   testEnvironment: 'node',
 
   // Transform configuration

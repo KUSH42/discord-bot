@@ -151,11 +151,33 @@ describe('Logger Utils Tests', () => {
     });
 
     it('should send initialization message when channel is ready', async () => {
+      jest.useFakeTimers();
+
+      // Mock the messageSender to track queueMessage calls
+      const mockMessageSender = {
+        queueMessage: jest.fn().mockResolvedValue(true),
+        getMetrics: jest.fn().mockReturnValue({ queued: 0, sent: 0, failed: 0 }),
+        shutdown: jest.fn().mockResolvedValue(),
+      };
+      transport.messageSender = mockMessageSender;
+
       const callback = jest.fn();
 
       await transport.log({ level: 'info', message: 'First message' }, callback);
 
-      expect(mockChannel.send).toHaveBeenCalledWith('✅ **Winston logging transport initialized for this channel.**');
+      // Fast-forward past the 2-second delay
+      jest.advanceTimersByTime(2000);
+
+      // Wait for any pending promises
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockMessageSender.queueMessage).toHaveBeenCalledWith(
+        mockChannel,
+        '✅ **Winston logging transport initialized for this channel.**',
+        { priority: -1 }
+      );
+
+      jest.useRealTimers();
     });
 
     it('should handle periodic flushing', async () => {

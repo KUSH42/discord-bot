@@ -1,7 +1,10 @@
+/**
+ * Jest configuration for e2e tests
+ * Tests complete workflows while maintaining reasonable coverage expectations
+ */
 import baseConfig from '../../jest.config.js';
 
 export default {
-  rootDir: '../../', // Set root to project root
   testEnvironment: 'node',
 
   // Transform configuration
@@ -50,7 +53,7 @@ export default {
       {
         outputDirectory: 'test-results',
         outputName: 'e2e-tests.xml',
-        classNameTemplate: 'Integration.{classname}',
+        classNameTemplate: 'E2e.{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',
         usePathForSuiteName: true,

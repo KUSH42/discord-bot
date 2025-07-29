@@ -1,3 +1,6 @@
+/**
+ * Jest configuration for security tests
+ */
 import baseConfig from '../../jest.config.js';
 
 export default {
@@ -38,7 +41,7 @@ export default {
   setupFiles: ['<rootDir>/scripts/setup-env.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 
-  coverageDirectory: 'coverage/security-tests1',
+  coverageDirectory: 'coverage/security-tests',
   coverageReporters: ['text', 'lcov', 'html', 'clover'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
@@ -50,7 +53,7 @@ export default {
       {
         outputDirectory: 'test-results',
         outputName: 'security-tests.xml',
-        classNameTemplate: 'Integration.{classname}',
+        classNameTemplate: 'Security.{classname}',
         titleTemplate: '{title}',
         ancestorSeparator: ' › ',
         usePathForSuiteName: true,

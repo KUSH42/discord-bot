@@ -309,7 +309,7 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
       expect(scraperApp.stop).toHaveBeenCalledTimes(1);
       expect(container.dispose).toHaveBeenCalledTimes(1);
-      expect(mockProcessExit).toHaveBeenCalledWith(1); // Exit with error code
+      expect(mockProcessExit).toHaveBeenCalledWith(0); // Exit with code 0 for systemd restart
     });
 
     it('should handle shutdown with container disposal failure', async () => {
@@ -334,7 +334,7 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       expect(monitorApp.stop).toHaveBeenCalledTimes(1);
       expect(scraperApp.stop).toHaveBeenCalledTimes(1);
       expect(container.dispose).toHaveBeenCalledTimes(1);
-      expect(mockProcessExit).toHaveBeenCalledWith(1); // Exit with error code
+      expect(mockProcessExit).toHaveBeenCalledWith(0); // Exit with code 0 for systemd restart
     });
 
     it('should handle uncaught exception shutdown through createShutdownHandler', async () => {

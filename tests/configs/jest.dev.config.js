@@ -6,7 +6,6 @@ import baseConfig from '../../jest.config.js';
  */
 export default {
   ...baseConfig,
-  rootDir: '../../', // Set root to project root
   // Faster execution for development
   maxWorkers: 1,
   bail: 1, // Stop on first failure
