@@ -671,27 +671,17 @@ class CICoverageMerger {
         }
       }
 
-      // Generate HTML report using genhtml
+      // Generate HTML report using genhtml (coverage already merged)
       const command = [
-        'lcov',
-        '--extract lcov.info',
-        '--branch_coverage=1',
-        '--rc derive_fuwnction_end_line=0',
-        '-o "coverage/merged/lcov.info"',
-        'src/*',
-        '&&',
-        'genhtml',
-        'coverage/merged/lcov.info',
-        '&&',
         'genhtml',
         `"${lcovFile}"`,
         `--output-directory "${htmlDir}"`,
         '--title "Discord Bot Coverage Report"',
-        '--prefix "$(pwd)',
+        `--prefix "${this.workingDir}"`,
         '--legend',
         '--show-details',
-        '--dark-mode',
-        '--rc branch_coverage=1',
+        '--branch-coverage',
+        '--function-coverage',
         '--rc derive_function_end_line=0',
       ].join(' ');
 
