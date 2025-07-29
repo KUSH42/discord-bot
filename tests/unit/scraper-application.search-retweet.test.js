@@ -137,6 +137,7 @@ describe('Search and Retweet Logic', () => {
     jest.spyOn(scraperApp, 'getNextInterval').mockReturnValue(300000);
     jest.spyOn(scraperApp, 'verifyAuthentication').mockResolvedValue();
     jest.spyOn(scraperApp, 'navigateToProfileTimeline').mockResolvedValue();
+    jest.spyOn(scraperApp, 'performEnhancedScrolling').mockResolvedValue();
 
     // Mock browser evaluate method for scrolling
     mockBrowserService.evaluate.mockResolvedValue({ isLoggedIn: true });
@@ -146,29 +147,20 @@ describe('Search and Retweet Logic', () => {
     jest.clearAllMocks();
   });
 
-  it('should always navigate to search URL regardless of retweet processing setting', async () => {
+  it('should navigate to profile timeline regardless of retweet processing setting', async () => {
     jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
-    const expectedSearchUrl = `https://x.com/search?q=(from%3Atestuser)&f=live&pf=on&src=typed_query`;
-
-    // Mock generateSearchUrl to control the output for this test
-    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue(expectedSearchUrl);
 
     await scraperApp.pollXProfile();
 
-    expect(scraperApp.generateSearchUrl).toHaveBeenCalledWith(true);
-    expect(mockBrowserService.goto).toHaveBeenCalledWith(expectedSearchUrl);
+    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
   });
 
-  it('should generate correct search URL with date parameter', async () => {
-    const expectedSearchUrlWithDate = `https://x.com/search?q=(from%3Atestuser)%20since%3A2025-07-17&f=live&pf=on&src=typed_query`;
-
-    // Mock generateSearchUrl to return a predictable URL with a date
-    jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue(expectedSearchUrlWithDate);
-
+  it('should use profile timeline approach instead of search', async () => {
     await scraperApp.pollXProfile();
 
-    expect(scraperApp.generateSearchUrl).toHaveBeenCalledWith(true);
-    expect(mockBrowserService.goto).toHaveBeenCalledWith(expectedSearchUrlWithDate);
+    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
+    // Should not use browser.goto directly since navigateToProfileTimeline handles navigation
+    expect(mockBrowserService.goto).not.toHaveBeenCalled();
   });
 
   it('should log polling completion message', async () => {
@@ -190,27 +182,22 @@ describe('Search and Retweet Logic', () => {
     expect(mockLogger.info).not.toHaveBeenCalledWith(expect.stringContaining('Enhanced retweet detection'));
   });
 
-  it('should prioritize search URL navigation over retweet processing', async () => {
-    // Mock shouldProcessRetweets to return different values
-    const shouldProcessRetweetsSpy = jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
-
+  it('should use profile timeline navigation before processing content', async () => {
     await scraperApp.pollXProfile();
 
-    // Should navigate to search URL first, regardless of retweet processing setting
-    expect(mockBrowserService.goto).toHaveBeenCalledWith(
-      expect.stringMatching(/https:\/\/x.com\/search\?q=\(from%3Atestuser\)/)
-    );
+    // Should navigate to profile timeline first
+    expect(scraperApp.navigateToProfileTimeline).toHaveBeenCalledWith('testuser');
 
-    // Should then check for retweet processing
-    expect(shouldProcessRetweetsSpy).toHaveBeenCalled();
+    // Profile timeline approach includes both tweets and retweets automatically,
+    // so enhanced retweet detection is no longer needed
+    expect(scraperApp.performEnhancedScrolling).toHaveBeenCalled();
   });
 
   it('should perform scrolling to load more content', async () => {
     await scraperApp.pollXProfile();
 
-    // Should call evaluate multiple times for scrolling and content extraction
-    expect(mockBrowserService.evaluate).toHaveBeenCalled();
-    expect(mockBrowserService.evaluate).toHaveBeenCalledWith(expect.any(Function));
+    // Should call performEnhancedScrolling as part of the content loading process
+    expect(scraperApp.performEnhancedScrolling).toHaveBeenCalled();
   });
 
   it('should extract and process tweets after navigation', async () => {

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">29.96% </span>
+                <span class="strong">34.51% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>178/594</span>
+                <span class='fraction'>205/594</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">6.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>2/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">29.96% </span>
+                <span class="strong">34.51% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>178/594</span>
+                <span class='fraction'>205/594</span>
             </div>
         
             
@@ -680,24 +680,24 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -1205,15 +1205,15 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -1273,25 +1273,25 @@ export const tweetUrlRegex =
  * Implements persistent, reliable duplicate detection with content fingerprinting
  */
 export class DuplicateDetector {
-<span class="fstat-no" title="function not covered" >  constructor(persistentStorage, logger) {</span>
-<span class="cstat-no" title="statement not covered" >    // Make persistentStorage optional - we'll use only in-memory caches and Discord history</span>
-<span class="cstat-no" title="statement not covered" >    this.storage = persistentStorage; // May be null - that's fine</span>
-<span class="cstat-no" title="statement not covered" >    this.logger = logger;</span>
-<span class="cstat-no" title="statement not covered" >    // In-memory cache for performance</span>
-<span class="cstat-no" title="statement not covered" >    this.fingerprintCache = new Set();</span>
-<span class="cstat-no" title="statement not covered" >    this.urlCache = new Set();</span>
-<span class="cstat-no" title="statement not covered" >    this.maxSize = 10000; // Maximum cache size for memory management</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >    // Legacy compatibility cache</span>
-<span class="cstat-no" title="statement not covered" >    this.knownVideoIds = new Set();</span>
-<span class="cstat-no" title="statement not covered" >    this.knownTweetIds = new Set();</span>
-<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" >    // Flag to indicate whether persistent storage is disabled</span>
-<span class="cstat-no" title="statement not covered" >    this.persistentStorageDisabled = !persistentStorage;</span>
-<span class="cstat-no" title="statement not covered" >    if (this.persistentStorageDisabled &amp;&amp; this.logger) {</span>
-<span class="cstat-no" title="statement not covered" >      this.logger.info('PersistentStorage disabled - using only in-memory caches and Discord history');</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
+  constructor(persistentStorage, logger) {
+    // Make persistentStorage optional - we'll use only in-memory caches and Discord history
+    this.storage = persistentStorage; // May be null - that's fine
+    this.logger = logger;
+    // In-memory cache for performance
+    this.fingerprintCache = new Set();
+    this.urlCache = new Set();
+    this.maxSize = 10000; // Maximum cache size for memory management
+&nbsp;
+    // Legacy compatibility cache
+    this.knownVideoIds = new Set();
+    this.knownTweetIds = new Set();
+&nbsp;
+    // Flag to indicate whether persistent storage is disabled
+    this.persistentStorageDisabled = !persistentStorage;
+    if (this.persistentStorageDisabled &amp;&amp; this.logger) {
+      this.logger.info('PersistentStorage disabled - using only in-memory caches and Discord history');
+    }
+  }
 &nbsp;
   /**
    * Generates a unique "fingerprint" for a piece of content.
@@ -1798,16 +1798,16 @@ export class DuplicateDetector {
    * Get statistics about the duplicate detector
    * @returns {Object} Statistics object
    */
-<span class="fstat-no" title="function not covered" >  getStats() {</span>
-<span class="cstat-no" title="statement not covered" >    return {</span>
-<span class="cstat-no" title="statement not covered" >      fingerprints: this.fingerprintCache.size,</span>
-<span class="cstat-no" title="statement not covered" >      urls: this.urlCache.size,</span>
-<span class="cstat-no" title="statement not covered" >      knownVideoIds: this.knownVideoIds.size,</span>
-<span class="cstat-no" title="statement not covered" >      knownTweetIds: this.knownTweetIds.size,</span>
-<span class="cstat-no" title="statement not covered" >      totalKnownIds: this.fingerprintCache.size + this.urlCache.size,</span>
-<span class="cstat-no" title="statement not covered" >      fingerprintingEnabled: true,</span>
-<span class="cstat-no" title="statement not covered" >    };</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
+  getStats() {
+    return {
+      fingerprints: this.fingerprintCache.size,
+      urls: this.urlCache.size,
+      knownVideoIds: this.knownVideoIds.size,
+      knownTweetIds: this.knownTweetIds.size,
+      totalKnownIds: this.fingerprintCache.size + this.urlCache.size,
+      fingerprintingEnabled: true,
+    };
+  }
 &nbsp;
   /**
    * Check if a video ID is known
@@ -1852,7 +1852,7 @@ export class DuplicateDetector {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-29T03:14:40.479Z
+                at 2025-07-29T11:14:24.565Z
             </div>
         <script src="../prettify.js"></script>
         <script>

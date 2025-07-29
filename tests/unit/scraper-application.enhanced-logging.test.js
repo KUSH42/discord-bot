@@ -1,6 +1,10 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
-import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
+import {
+  createMockDependenciesWithEnhancedLogging,
+  createMockEnhancedLogger,
+} from '../utils/enhanced-logging-mocks.js';
+import * as EnhancedLoggerModule from '../../src/utilities/enhanced-logger.js';
 
 describe('ScraperApplication Enhanced Logging Integration', () => {
   let scraperApp;
@@ -17,40 +21,88 @@ describe('ScraperApplication Enhanced Logging Integration', () => {
   beforeEach(() => {
     mockDependencies = createMockDependenciesWithEnhancedLogging();
 
-    // Extract mocks from dependencies
-    mockConfig = mockDependencies.config;
-    mockBrowserService = mockDependencies.browserService;
-    mockAuthManager = mockDependencies.authManager;
-    mockContentAnnouncer = mockDependencies.contentAnnouncer;
-    mockContentClassifier = mockDependencies.contentClassifier;
-    mockLogger = mockDependencies.logger;
+    // Setup the createEnhancedLogger mock to return a mock enhanced logger
+    const mockEnhancedLogger = createMockEnhancedLogger('scraper');
+    jest.spyOn(EnhancedLoggerModule, 'createEnhancedLogger').mockReturnValue(mockEnhancedLogger);
+
+    // Store reference to the enhanced logger for test assertions
+    mockLogger = mockEnhancedLogger;
+
+    // Create config separately as it's not included in enhanced logging mocks
+    mockConfig = {
+      xUserHandle: 'testuser',
+      xPollingInterval: 30000,
+      isAnnouncingEnabled: jest.fn(() => true),
+      getRequired: jest.fn(key => {
+        const configValues = {
+          X_USER_HANDLE: 'testuser',
+          TWITTER_USERNAME: 'testuser',
+          TWITTER_PASSWORD: 'testpass',
+          X_POLLING_INTERVAL: 30000,
+        };
+        return configValues[key] || 'mock-value';
+      }),
+      get: jest.fn((key, defaultValue) => {
+        const configValues = {
+          X_POLLING_INTERVAL: 30000,
+          BROWSER_STEALTH_ENABLED: true,
+        };
+        return configValues[key] || defaultValue;
+      }),
+      getBoolean: jest.fn((key, defaultValue) => {
+        const configValues = {
+          ENABLE_RETWEET_PROCESSING: true,
+          BROWSER_STEALTH_ENABLED: true,
+        };
+        return configValues[key] !== undefined ? configValues[key] : defaultValue;
+      }),
+    };
+
+    // Create other mocks
+    mockBrowserService = {
+      isHealthy: jest.fn(() => true),
+      launch: jest.fn().mockResolvedValue(undefined),
+      navigateTo: jest.fn().mockResolvedValue(undefined),
+      scrapePage: jest.fn().mockResolvedValue([]),
+      goto: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+      isRunning: jest.fn().mockReturnValue(true),
+    };
+
+    mockAuthManager = {
+      login: jest.fn().mockResolvedValue({ success: true }),
+      isAuthenticated: jest.fn(() => true),
+    };
+
+    mockContentAnnouncer = {
+      announce: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockContentClassifier = {
+      classifyXContent: jest.fn().mockReturnValue({ type: 'original_post' }),
+    };
+
+    // Extract enhanced logging mocks
+    // mockLogger is already set above to the enhanced logger mock
     mockDebugManager = mockDependencies.debugManager;
     mockMetricsManager = mockDependencies.metricsManager;
 
-    // Configure default behavior
-    mockConfig.xUserHandle = 'testuser';
-    mockConfig.xPollingInterval = 30000;
-    mockConfig.isAnnouncingEnabled = jest.fn(() => true);
-
-    mockBrowserService.isHealthy = jest.fn(() => true);
-    mockBrowserService.launch = jest.fn().mockResolvedValue(undefined);
-    mockBrowserService.navigateTo = jest.fn().mockResolvedValue(undefined);
-    mockBrowserService.scrapePage = jest.fn().mockResolvedValue([]);
-
-    mockAuthManager.login = jest.fn().mockResolvedValue({ success: true });
-    mockAuthManager.isAuthenticated = jest.fn(() => true);
-
-    // Create ScraperApplication instance
-    scraperApp = new ScraperApplication(
-      mockConfig,
-      mockBrowserService,
-      mockAuthManager,
-      mockContentAnnouncer,
-      mockContentClassifier,
-      mockLogger,
-      mockDebugManager,
-      mockMetricsManager
-    );
+    // Create ScraperApplication instance with dependencies object
+    scraperApp = new ScraperApplication({
+      config: mockConfig,
+      browserService: mockBrowserService,
+      authManager: mockAuthManager,
+      contentAnnouncer: mockContentAnnouncer,
+      contentClassifier: mockContentClassifier,
+      logger: mockLogger,
+      debugManager: mockDebugManager,
+      metricsManager: mockMetricsManager,
+      // Add other required dependencies
+      contentCoordinator: { announce: jest.fn() },
+      stateManager: { saveState: jest.fn(), loadState: jest.fn() },
+      discordService: { sendMessage: jest.fn() },
+      eventBus: { emit: jest.fn(), on: jest.fn() },
+    });
 
     // Mock timers
     jest.useFakeTimers();
@@ -59,6 +111,7 @@ describe('ScraperApplication Enhanced Logging Integration', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Enhanced Logger Creation and Usage', () => {
