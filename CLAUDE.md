@@ -124,7 +124,7 @@ const flushPromises = async () => {
   await new Promise(resolve => setImmediate(resolve));
 };
 
-// Timer testing
+// Basic timer testing
 jest.useFakeTimers();
 await jest.runAllTimersAsync();
 jest.useRealTimers();
@@ -135,6 +135,100 @@ beforeEach(() => {
   jest.spyOn(service, 'method').mockResolvedValue(result);
 });
 ```
+
+### Advanced Timer Testing Requirements
+
+**For Complex Timer Operations** (health monitoring, restart functionality):
+
+**Documentation References:**
+- `tests/TIMER-TESTING-GUIDE.md` - Basic timer patterns with time source abstraction
+- `tests/ADVANCED-TIMER-PATTERNS.md` - Complex async timer coordination patterns  
+- `tests/TESTING-QUICKSTART.md` - Quick reference including timer gotchas
+
+**When Basic Patterns Fail:**
+- Tests timing out with `setInterval` + async callbacks
+- Resource cleanup race conditions  
+- State-dependent timer sequences
+- Event-driven timer interactions
+
+**Required Test Setup for Complex Timers:**
+```javascript
+beforeEach(() => {
+  jest.useFakeTimers();
+  
+  // Advanced pattern for interval-based operations
+  global.advanceIntervalTimersDeep = async (ms, maxIterations = 20) => {
+    await jest.advanceTimersByTimeAsync(ms);
+    for (let i = 0; i < maxIterations; i++) {
+      await Promise.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => process.nextTick(resolve));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    await new Promise(resolve => process.nextTick(resolve));
+  };
+});
+```
+
+**Test Timeout Guidelines:**
+- Basic operations: 5000ms (default)
+- Complex timer operations: 10000-15000ms  
+- Multi-phase operations: 20000ms
+
+### Efficient Testing Approach
+**NEVER run full test suites to check single file fixes:**
+- **Single test file**: `npm test -- path/to/specific.test.js`
+- **Specific test name**: `npm test -- --testNamePattern="specific test name"`
+- **Pattern matching**: `npm test -- --testNamePattern="AuthManager"`
+- **Note**: `--testPathPattern` is often unreliable - use direct file paths instead
+
+**Development workflow:**
+1. Run only the test you're fixing
+2. Once passing, run related tests if needed
+3. Full suite only before commits/PRs
+
+### Advanced Timer Testing Patterns
+
+For complex async operations with timers (health monitoring, restart functionality), the project includes advanced testing patterns in `tests/ADVANCED-TIMER-PATTERNS.md`:
+
+**When to Use Advanced Patterns:**
+- `setInterval` with async callbacks containing nested Promise chains
+- State-dependent timer sequences requiring synchronization points
+- Resource cleanup race conditions during timer operations
+- Event-driven timer interactions
+
+**Key Pattern - Deep Timer Coordination:**
+```javascript
+// For complex timer operations with nested async callbacks
+global.advanceIntervalTimersDeep = async (ms, maxIterations = 20) => {
+  await jest.advanceTimersByTimeAsync(ms);
+  for (let i = 0; i < maxIterations; i++) {
+    await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => process.nextTick(resolve));
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  await new Promise(resolve => process.nextTick(resolve));
+};
+```
+
+**Alternative - Direct Timer Control:**
+```javascript
+// For problematic setInterval + Jest fake timer coordination
+let intervalCallback;
+jest.spyOn(global, 'setInterval').mockImplementation((callback, ms) => {
+  intervalCallback = callback;
+  return 'mock-id';
+});
+component.startHealthMonitoring(100);
+await intervalCallback(); // Execute callback directly
+```
+
+**Common Issues Solved:**
+- Health monitoring test timeouts due to nested async operations
+- Restart functionality timer coordination failures  
+- Resource cleanup race conditions in timer-based operations
+- Event loop synchronization with multiple Promise chains
 
 ## Essential Commands
 
