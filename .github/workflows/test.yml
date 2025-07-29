@@ -259,7 +259,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee coverage/unit-tests-node${{ matrix.node-version }}.log
+            2>&1 | tee test-results/unit-tests-node${{ matrix.node-version }}.log
 
       - name: Upload unit test coverage
         uses: codecov/test-results-action@v1
@@ -624,7 +624,7 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            2>&1 | tee test-results/e2e-tests/tests-output.log
+            2>&1 | tee test-results/e2e-tests-output.log
           echo "echo "Current working directory: $(pwd)""
           $(echo ls -a -F)
 
@@ -836,7 +836,8 @@ jobs:
             --maxWorkers=1 \
             --testTimeout=20000 \
             --forceExit \
-            --detectOpenHandles
+            --detectOpenHandles \
+            2>&1 | tee test-results/security-tests-output.log
 
       - name: Run security audit
         run: |
