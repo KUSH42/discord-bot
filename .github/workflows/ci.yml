@@ -497,6 +497,7 @@ jobs:
         run: |
           mkdir -p test-results
           mkdir -p logs
+          mkdir -p reports
           mkdir -p coverage/integration-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
@@ -519,6 +520,7 @@ jobs:
           path: |
             coverage/integration-tests/
             test-results/integration-tests.xml
+            reports/
             logs/
           retention-days: 7
 
@@ -601,6 +603,7 @@ jobs:
         run: |
           mkdir -p test-results
           mkdir -p logs
+          mkdir -p reporst
           mkdir -p coverage/e2e-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
@@ -612,8 +615,6 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee logs/e2e-tests-output.log
-          echo "echo "Current working directory: $(pwd)""
-          $(echo ls -a -F)
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -682,6 +683,7 @@ jobs:
         run: |
           mkdir -p test-results
           mkdir -p logs
+          mkdir -p reports
           mkdir -p coverage/performance-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
@@ -802,6 +804,8 @@ jobs:
       - name: Run security tests
         run: |
           mkdir -p test-results
+          mkdir -p reports
+          mkdir -p coverage
           mkdir -p logs/security-tests
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
