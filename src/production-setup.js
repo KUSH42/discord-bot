@@ -156,8 +156,8 @@ async function setupExternalServices(container, config) {
     return app;
   });
 
-  // Browser Service
-  container.registerSingleton('browserService', () => {
+  // Browser Service - Create separate instances for each scraper to prevent conflicts
+  container.registerTransient('browserService', () => {
     return new PlaywrightBrowserService();
   });
 }
