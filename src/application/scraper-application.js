@@ -782,32 +782,69 @@ export class ScraperApplication {
         ];
 
         let articles = [];
+        let workingSelector = null;
         for (const selector of articleSelectors) {
           articles = document.querySelectorAll(selector);
-          // Log via browser console for debugging extraction
+          console.log(`Selector "${selector}" found ${articles.length} articles`);
           if (articles.length > 0) {
-            // Selected working selector for extraction
+            workingSelector = selector;
+            console.log(`Using working selector: ${selector}`);
             break;
           }
         }
 
         if (articles.length === 0) {
-          // No articles found with any selector
-          // Debug: Check what content is actually on the page
+          // Enhanced debugging for search results page issues
           const bodyText = document.body.innerText || '';
-          // Debug page content for troubleshooting
-          // Current page URL for debugging
+          const currentUrl = window.location.href;
 
-          // Check for common X.com indicators
-          const indicators = ['Sign up', 'Log in', "What's happening", 'Home', 'Timeline'];
+          console.log('DEBUG: No articles found with any selector');
+          console.log(`DEBUG: Current URL: ${currentUrl}`);
+          console.log(`DEBUG: Page contains ${bodyText.length} characters of text`);
 
-          for (const indicator of indicators) {
-            if (bodyText.includes(indicator)) {
-              // Found page indicator for debugging
+          // Check for specific search page indicators
+          const searchIndicators = ['Search results', 'Latest', 'Top', 'People', 'Photos', 'Videos'];
+          const foundIndicators = searchIndicators.filter(indicator => bodyText.includes(indicator));
+          if (foundIndicators.length > 0) {
+            console.log(`DEBUG: Found search page indicators: ${foundIndicators.join(', ')}`);
+          }
+
+          // Check for authentication issues
+          const authIndicators = ['Sign up', 'Log in', 'Try again', 'Something went wrong'];
+          const foundAuthIssues = authIndicators.filter(indicator => bodyText.includes(indicator));
+          if (foundAuthIssues.length > 0) {
+            console.log(`DEBUG: Possible auth issues: ${foundAuthIssues.join(', ')}`);
+          }
+
+          // Try some alternative selectors specific to search results
+          const searchSpecificSelectors = [
+            '[data-testid="SearchTimeline"] article',
+            '[aria-label="Timeline: Search timeline"] article',
+            'section[role="region"] article',
+            'div[aria-label="Timeline"] article',
+            '[data-testid="cellInnerDiv"] > div > div > article',
+          ];
+
+          for (const selector of searchSpecificSelectors) {
+            const searchArticles = document.querySelectorAll(selector);
+            console.log(`Search-specific selector "${selector}" found ${searchArticles.length} articles`);
+            if (searchArticles.length > 0) {
+              articles = searchArticles;
+              workingSelector = selector;
+              console.log(`Using search-specific selector: ${selector}`);
+              break;
             }
           }
 
-          return tweets;
+          if (articles.length === 0) {
+            // Final fallback: log page structure for debugging
+            const mainElement = document.querySelector('main');
+            if (mainElement) {
+              console.log('DEBUG: Main element HTML structure (first 500 chars):');
+              console.log(mainElement.innerHTML.substring(0, 500));
+            }
+            return tweets;
+          }
         }
 
         // Processing articles for tweet extraction
@@ -1064,6 +1101,15 @@ export class ScraperApplication {
         }
 
         // Tweet extraction completed
+        console.log(`DEBUG: Extraction completed with selector "${workingSelector}", found ${tweets.length} tweets`);
+        if (tweets.length > 0) {
+          console.log(
+            `DEBUG: Sample tweet IDs: ${tweets
+              .slice(0, 3)
+              .map(t => t.tweetID)
+              .join(', ')}`
+          );
+        }
         return tweets;
         /* eslint-enable no-undef */
       }, monitoredUser);
@@ -1080,6 +1126,17 @@ export class ScraperApplication {
       };
 
       operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);
+
+      // Log browser console messages for debugging selector issues
+      try {
+        const browserLogs = (await this.browser.getConsoleLogs?.()) || [];
+        const debugLogs = browserLogs.filter(log => log.text && log.text.includes('DEBUG:'));
+        if (debugLogs.length > 0) {
+          operation.progress(`Browser debug messages: ${debugLogs.map(log => log.text).join(' | ')}`);
+        }
+      } catch (logError) {
+        // Browser console logging not available or failed
+      }
 
       return tweets;
     } catch (error) {

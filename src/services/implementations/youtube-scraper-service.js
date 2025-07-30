@@ -746,9 +746,9 @@ export class YouTubeScraperService {
           /* eslint-disable no-undef */
 
           /**
-           * Check if a video element has indicators that it's currently live
+           * Check if a video element has indicators that it's currently live RIGHT NOW
            * @param {Element} element - Video element or its container
-           * @returns {boolean} True if element shows live indicators
+           * @returns {boolean} True if element shows ACTIVE live indicators
            */
           function hasLiveIndicators(element) {
             if (!element) {
@@ -762,48 +762,75 @@ export class YouTubeScraperService {
               return false;
             }
 
-            const containerText = container.textContent?.toLowerCase() || '';
-
-            // Look for explicit live indicators
-            const liveIndicators = ['live now', 'streaming now', 'now playing', 'currently live', 'going live'];
-
-            // Check for live indicator text
-            for (const indicator of liveIndicators) {
-              if (containerText.includes(indicator)) {
-                return true;
-              }
-            }
-
-            // Look for live badges or visual indicators
+            // CRITICAL: First check for definitive LIVE badges (most reliable)
             const liveBadgeSelectors = [
-              '.ytp-live-badge',
-              '[aria-label*="live"]',
-              '.live-badge',
-              '.badge[data-style*="live"]',
-              '.ytd-badge-supported-renderer[aria-label*="live"]',
+              '.ytp-live-badge', // YouTube player live badge
+              '.badge-style-type-live-now', // YouTube live badge
+              '.ytd-badge-supported-renderer[aria-label*="live"]', // Accessibility live badge
+              '.live-badge', // Generic live badge
+              '[aria-label="LIVE"]', // Exact LIVE aria label
+              'yt-formatted-string:has-text("LIVE")', // LIVE text in formatted string
             ];
 
             for (const selector of liveBadgeSelectors) {
-              if (container.querySelector(selector)) {
+              const badge = container.querySelector(selector);
+              if (badge) {
+                // Double-check the badge actually says "LIVE" and is visible
+                const badgeText = badge.textContent?.trim().toUpperCase();
+                const isVisible = badge.offsetWidth > 0 && badge.offsetHeight > 0;
+                if (badgeText === 'LIVE' && isVisible) {
+                  return true;
+                }
+              }
+            }
+
+            // SECONDARY: Look for red "LIVE" text indicators (stricter validation)
+            const allElements = container.querySelectorAll('*');
+            for (const el of allElements) {
+              const text = el.textContent?.trim().toUpperCase();
+
+              // Must be exactly "LIVE", visible, and styled as live indicator
+              if (text === 'LIVE' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                const style = window.getComputedStyle(el);
+
+                // Check for red color or live-specific styling
+                const isRedLive =
+                  style.color.includes('rgb(255, 0, 0)') ||
+                  style.color.includes('#ff0000') ||
+                  style.backgroundColor.includes('rgb(255, 0, 0)') ||
+                  style.backgroundColor.includes('#ff0000');
+
+                const hasLiveClass = el.classList.toString().toLowerCase().includes('live');
+
+                if (isRedLive || hasLiveClass) {
+                  return true;
+                }
+              }
+            }
+
+            // TERTIARY: Check for "Now playing" text (only if combined with other indicators)
+            const containerText = container.textContent?.toLowerCase() || '';
+            if (containerText.includes('now playing')) {
+              // Only trust "now playing" if we also find viewer count or chat indicators
+              const hasViewerCount =
+                containerText.includes('watching') ||
+                containerText.includes('viewers') ||
+                container.querySelector('[aria-label*="viewers"]');
+
+              const hasChatIndicator =
+                container.querySelector('[aria-label*="chat"]') || containerText.includes('live chat');
+
+              if (hasViewerCount || hasChatIndicator) {
                 return true;
               }
             }
 
-            // Check for red "LIVE" indicators in various formats
-            const allElements = container.querySelectorAll('*');
-            for (const el of allElements) {
-              const text = el.textContent?.trim().toLowerCase();
-              const style = window.getComputedStyle(el);
-
-              // Look for red "LIVE" text indicators
-              if (
-                text === 'live' &&
-                (style.color.includes('rgb(255, 0, 0)') || // Red
-                  style.color.includes('#ff0000') ||
-                  style.backgroundColor.includes('rgb(255, 0, 0)') ||
-                  style.backgroundColor.includes('#ff0000') ||
-                  el.classList.toString().toLowerCase().includes('live'))
-              ) {
+            // QUATERNARY: Check URL for live indicators (very specific)
+            const videoLink = container.querySelector('a[href*="/watch?v="]');
+            if (videoLink) {
+              const url = videoLink.href;
+              // YouTube adds ?live=1 or similar for live streams
+              if (url.includes('live=1') || url.includes('&live=') || url.includes('?live=')) {
                 return true;
               }
             }
@@ -811,72 +838,101 @@ export class YouTubeScraperService {
             return false;
           }
 
-          // Primary strategy: Look for explicit "Now playing" indicators
-          const nowPlayingElements = Array.from(document.querySelectorAll('*')).filter(
-            el => el.textContent && el.textContent.trim().toLowerCase() === 'now playing'
-          );
-
           let liveElement = null;
           let detectionMethod = null;
+          const debugInfo = { strategiesAttempted: [], elementsFound: 0, indicatorCounts: {} };
 
-          // Strategy 1: Find video associated with "Now playing" text
-          if (nowPlayingElements.length > 0) {
-            for (const nowPlaying of nowPlayingElements) {
-              const container = nowPlaying.closest('div, article, section');
-              if (container) {
-                const videoLink = container.querySelector('a[href*="/watch?v="]');
-                if (videoLink && hasLiveIndicators(videoLink)) {
-                  liveElement = videoLink;
-                  detectionMethod = 'now-playing-indicator';
+          // Strategy 1: Look for the primary live stream on channel's /live page
+          // This should be the most reliable since we're on the dedicated live page
+          const candidateSelectors = [
+            'ytd-channel-featured-content-renderer a[href*="/watch?v="]', // Featured live content
+            'ytd-rich-grid-media:first-child a[href*="/watch?v="]', // First video in grid
+            'ytd-rich-item-renderer:first-child a[href*="/watch?v="]', // First rich item
+            'a#video-title-link[href*="/watch?v="]', // Video title links
+          ];
+
+          debugInfo.strategiesAttempted.push('primary-live-page-detection');
+
+          for (const selector of candidateSelectors) {
+            try {
+              const candidates = document.querySelectorAll(selector);
+              debugInfo.elementsFound += candidates.length;
+
+              // Only check the first few candidates to avoid false positives
+              const candidatesToCheck = Array.from(candidates).slice(0, 3);
+
+              for (let i = 0; i < candidatesToCheck.length; i++) {
+                const candidate = candidatesToCheck[i];
+                if (hasLiveIndicators(candidate)) {
+                  liveElement = candidate;
+                  detectionMethod = `primary-detection-${selector.split(' ')[0]}-index-${i}`;
                   break;
                 }
               }
+              if (liveElement) {
+                break;
+              }
+            } catch (error) {
+              debugInfo.strategiesAttempted.push(`error-${selector}: ${error.message}`);
             }
           }
 
-          // Strategy 2: Look for videos with strong live indicators
+          // Strategy 2: Look for explicit "Now playing" indicators (stricter validation)
           if (!liveElement) {
-            const candidateSelectors = [
-              'ytd-channel-featured-content-renderer a[href*="/watch?v="]',
-              'a#video-title-link[href*="/watch?v="]',
-              'ytd-rich-grid-media a[href*="/watch?v="]',
-              'ytd-rich-item-renderer a[href*="/watch?v="]',
-            ];
+            debugInfo.strategiesAttempted.push('now-playing-detection');
 
-            for (const selector of candidateSelectors) {
-              try {
-                const candidates = document.querySelectorAll(selector);
-                for (const candidate of candidates) {
-                  if (hasLiveIndicators(candidate)) {
-                    liveElement = candidate;
-                    detectionMethod = 'live-indicator-validation';
+            const nowPlayingElements = Array.from(document.querySelectorAll('*')).filter(
+              el => el.textContent && el.textContent.trim().toLowerCase() === 'now playing'
+            );
+
+            debugInfo.indicatorCounts.nowPlaying = nowPlayingElements.length;
+
+            if (nowPlayingElements.length > 0) {
+              for (let i = 0; i < nowPlayingElements.length; i++) {
+                const nowPlaying = nowPlayingElements[i];
+                const container = nowPlaying.closest('div, article, section');
+                if (container) {
+                  const videoLink = container.querySelector('a[href*="/watch?v="]');
+                  if (videoLink && hasLiveIndicators(videoLink)) {
+                    liveElement = videoLink;
+                    detectionMethod = `now-playing-validated-${i}`;
                     break;
                   }
                 }
-                if (liveElement) {
-                  break;
-                }
-              } catch (_e) {
-                // Ignore selector errors and continue
               }
             }
           }
 
-          // Strategy 3: Check for YouTube's live stream player indicators
+          // Strategy 3: YouTube player indicators (only if we're already watching a video)
           if (!liveElement) {
-            // Look for the main video player with live indicators
+            debugInfo.strategiesAttempted.push('player-badge-detection');
+
             const playerContainer = document.querySelector('#movie_player, .html5-video-player');
             if (playerContainer) {
               const liveIndicator = playerContainer.querySelector('.ytp-live, .ytp-live-badge, [aria-label*="live"]');
               if (liveIndicator) {
-                // Find associated video link
-                const videoLink = document.querySelector('a[href*="/watch?v="]');
-                if (videoLink) {
-                  liveElement = videoLink;
-                  detectionMethod = 'player-live-badge';
+                // Only trust this if the live indicator is actually visible and says "LIVE"
+                const indicatorText = liveIndicator.textContent?.trim().toUpperCase();
+                const isVisible = liveIndicator.offsetWidth > 0 && liveIndicator.offsetHeight > 0;
+
+                if (indicatorText === 'LIVE' && isVisible) {
+                  const videoLink = document.querySelector('a[href*="/watch?v="]');
+                  if (videoLink) {
+                    liveElement = videoLink;
+                    detectionMethod = 'player-live-badge-validated';
+                  }
                 }
               }
             }
+          }
+
+          // Add debug information to help troubleshoot false positives
+          if (liveElement) {
+            debugInfo.selectedElement = {
+              href: liveElement.href,
+              textContent: liveElement.textContent?.trim(),
+              title: liveElement.getAttribute('title'),
+            };
           }
 
           if (!liveElement) {
@@ -915,6 +971,7 @@ export class YouTubeScraperService {
             publishedAt: new Date().toISOString(),
             scrapedAt: new Date().toISOString(),
             detectionMethod, // Include detection method for debugging
+            debugInfo, // Include debug information for troubleshooting false positives
           };
           /* eslint-enable no-undef */
         });
@@ -930,6 +987,7 @@ export class YouTubeScraperService {
             publishedAt: liveStream.publishedAt,
             scrapedAt: liveStream.scrapedAt,
             detectionMethod: liveStream.detectionMethod,
+            debugInfo: liveStream.debugInfo,
           };
 
           operation.success(
