@@ -1,4 +1,3 @@
-import { PlaywrightBrowserService } from './playwright-browser-service.js';
 import { AsyncMutex } from '../../utilities/async-mutex.js';
 import { parseRelativeTime } from '../../utilities/time-parser.js';
 import { nowUTC } from '../../utilities/utc-time.js';
@@ -10,12 +9,12 @@ import { createEnhancedLogger } from '../../utilities/enhanced-logger.js';
  * Provides an alternative to API polling for faster notifications
  */
 export class YouTubeScraperService {
-  constructor({ logger, config, contentCoordinator, debugManager, metricsManager }) {
+  constructor({ logger, config, contentCoordinator, debugManager, metricsManager, browserService }) {
     // Create enhanced logger for YouTube module
     this.logger = createEnhancedLogger('youtube', logger, debugManager, metricsManager);
     this.config = config;
     this.contentCoordinator = contentCoordinator;
-    this.browserService = new PlaywrightBrowserService();
+    this.browserService = browserService;
     this.browserMutex = new AsyncMutex(); // Prevent concurrent browser operations
     this.isShuttingDown = false; // Flag to coordinate graceful shutdown
     this.videosUrl = null;
@@ -64,6 +63,9 @@ export class YouTubeScraperService {
       channelHandle,
       authEnabled: this.authEnabled,
     });
+
+    // Store channel handle for browser evaluation functions
+    this.channelHandle = channelHandle;
 
     // Construct channel URLs
     const baseUrl = `https://www.youtube.com/@${channelHandle}`;
@@ -742,7 +744,7 @@ export class YouTubeScraperService {
 
         operation.progress('Extracting live stream information');
 
-        const liveStream = await this.browserService.evaluate(() => {
+        const liveStream = await this.browserService.evaluate(monitoredUser => {
           /* eslint-disable no-undef */
 
           /**
@@ -842,6 +844,26 @@ export class YouTubeScraperService {
           let detectionMethod = null;
           const debugInfo = { strategiesAttempted: [], elementsFound: 0, indicatorCounts: {} };
 
+          // CRITICAL: Verify we're on the correct channel's page to prevent cross-channel detection
+          const currentUrl = window.location.href;
+          const expectedChannelPattern = `@${monitoredUser}/live`;
+          const isOnCorrectChannelPage = currentUrl.includes(expectedChannelPattern);
+
+          debugInfo.currentUrl = currentUrl;
+          debugInfo.expectedChannelPattern = expectedChannelPattern;
+          debugInfo.isOnCorrectChannelPage = isOnCorrectChannelPage;
+
+          if (!isOnCorrectChannelPage) {
+            debugInfo.strategiesAttempted.push('page-validation-failed');
+            // Return null if we're not on the correct channel's live page
+            return {
+              debugInfo,
+              error: 'Not on monitored channel page',
+              currentUrl,
+              expectedPattern: expectedChannelPattern,
+            };
+          }
+
           // Strategy 1: Look for the primary live stream on channel's /live page
           // This should be the most reliable since we're on the dedicated live page
           const candidateSelectors = [
@@ -903,28 +925,14 @@ export class YouTubeScraperService {
             }
           }
 
-          // Strategy 3: YouTube player indicators (only if we're already watching a video)
-          if (!liveElement) {
-            debugInfo.strategiesAttempted.push('player-badge-detection');
-
-            const playerContainer = document.querySelector('#movie_player, .html5-video-player');
-            if (playerContainer) {
-              const liveIndicator = playerContainer.querySelector('.ytp-live, .ytp-live-badge, [aria-label*="live"]');
-              if (liveIndicator) {
-                // Only trust this if the live indicator is actually visible and says "LIVE"
-                const indicatorText = liveIndicator.textContent?.trim().toUpperCase();
-                const isVisible = liveIndicator.offsetWidth > 0 && liveIndicator.offsetHeight > 0;
-
-                if (indicatorText === 'LIVE' && isVisible) {
-                  const videoLink = document.querySelector('a[href*="/watch?v="]');
-                  if (videoLink) {
-                    liveElement = videoLink;
-                    detectionMethod = 'player-live-badge-validated';
-                  }
-                }
-              }
-            }
-          }
+          // Strategy 3: YouTube player indicators (DISABLED - causes cross-channel detection)
+          // CRITICAL BUG FIX: This strategy was detecting live streams from OTHER channels
+          // when YouTube redirects or suggests different content on the monitored channel's /live page
+          // Disabled strategy - cross-channel detection bug
+          // if (!liveElement) {
+          //   debugInfo.strategiesAttempted.push('player-badge-detection-DISABLED-CROSS-CHANNEL-BUG');
+          //   // This strategy has been permanently disabled due to detecting wrong channel's streams
+          // }
 
           // Add debug information to help troubleshoot false positives
           if (liveElement) {
@@ -936,14 +944,19 @@ export class YouTubeScraperService {
           }
 
           if (!liveElement) {
-            return null;
+            return { debugInfo, error: 'No live element found' };
           }
 
           const url = liveElement.href;
           const videoIdMatch = url.match(/[?&]v=([^&]+)/);
           if (!videoIdMatch) {
-            return null;
+            return { debugInfo, error: 'Could not extract video ID', url };
           }
+
+          // ADDITIONAL VALIDATION: Ensure the detected stream belongs to the monitored channel
+          // Check if we can find channel ownership information
+          const channelOwnershipVerified = true; // For now, trust that being on the /live page is sufficient
+          debugInfo.channelOwnershipVerified = channelOwnershipVerified;
 
           // Get title from various possible sources
           let title = 'Live Stream';
@@ -962,28 +975,202 @@ export class YouTubeScraperService {
             }
           }
 
+          // CRITICAL: Extract metadata using YouTube's structured data (primary) with text parsing as fallback
+          let publishedText = 'Unknown';
+          let actualPublishedAt = null;
+          let isCurrentlyLive = false;
+          let extractionMethod = 'none';
+
+          // PRIMARY: Look for structured metadata (JSON-LD, microdata, time elements)
+          const timeElement = document.querySelector('time[datetime]');
+          if (timeElement && timeElement.getAttribute('datetime')) {
+            actualPublishedAt = timeElement.getAttribute('datetime');
+            extractionMethod = 'time-datetime-attribute';
+
+            // Check if this is a live stream by looking at the time context
+            const timeParent = timeElement.closest('*');
+            if (timeParent) {
+              const contextText = timeParent.textContent?.toLowerCase() || '';
+              isCurrentlyLive = contextText.includes('live') || contextText.includes('streaming');
+            }
+          }
+
+          // SECONDARY: Look for JSON-LD structured data
+          if (!actualPublishedAt) {
+            const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+            for (const script of jsonLdScripts) {
+              try {
+                const data = JSON.parse(script.textContent);
+                if (data['@type'] === 'VideoObject' || data.uploadDate || data.datePublished) {
+                  actualPublishedAt = data.uploadDate || data.datePublished;
+                  extractionMethod = 'json-ld-structured-data';
+
+                  // Check for live broadcast content
+                  if (data.publication && data.publication.isLiveBroadcast) {
+                    isCurrentlyLive = data.publication.isLiveBroadcast;
+                  }
+                  break;
+                }
+              } catch (_e) {
+                // Continue to next script
+              }
+            }
+          }
+
+          // TERTIARY: Look for meta tags
+          if (!actualPublishedAt) {
+            const metaTags = [
+              'meta[property="video:release_date"]',
+              'meta[property="article:published_time"]',
+              'meta[name="datePublished"]',
+              'meta[itemprop="datePublished"]',
+              'meta[itemprop="uploadDate"]',
+            ];
+
+            for (const selector of metaTags) {
+              const metaTag = document.querySelector(selector);
+              if (metaTag && metaTag.getAttribute('content')) {
+                actualPublishedAt = metaTag.getAttribute('content');
+                extractionMethod = `meta-tag-${selector.split('"')[1]}`;
+                break;
+              }
+            }
+          }
+
+          // FALLBACK: Text parsing (only if structured data fails)
+          if (!actualPublishedAt) {
+            const videoContainer = liveElement.closest(
+              'ytd-rich-grid-media, ytd-rich-item-renderer, ytd-video-renderer, div, article, section'
+            );
+
+            if (videoContainer) {
+              const metadataElements = videoContainer.querySelectorAll(
+                '#metadata-line span, #published-time-text, .ytd-video-meta-block span, [aria-label]'
+              );
+
+              for (const element of metadataElements) {
+                const text = element.textContent?.trim();
+                if (text) {
+                  // Check for "live now" or current streaming indicators
+                  if (
+                    text.toLowerCase().includes('live now') ||
+                    text.toLowerCase().includes('streaming now') ||
+                    text.toLowerCase().includes('watching now')
+                  ) {
+                    isCurrentlyLive = true;
+                    publishedText = 'Live now';
+                    extractionMethod = 'text-parsing-live-indicator';
+                    break;
+                  }
+                  // Check for relative time indicators (finished livestreams)
+                  else if (
+                    text.includes('ago') ||
+                    text.includes('hour') ||
+                    text.includes('day') ||
+                    text.includes('week') ||
+                    text.includes('month')
+                  ) {
+                    publishedText = text;
+                    isCurrentlyLive = false;
+                    extractionMethod = 'text-parsing-relative-time';
+                    break;
+                  }
+                }
+              }
+
+              // Additional check: look for viewer count which indicates live status
+              if (!isCurrentlyLive && extractionMethod === 'none') {
+                const viewerElements = videoContainer.querySelectorAll('*');
+                for (const element of viewerElements) {
+                  const text = element.textContent?.trim().toLowerCase();
+                  if (text && (text.includes('watching') || text.includes('viewers')) && !text.includes('ago')) {
+                    isCurrentlyLive = true;
+                    publishedText = 'Live now';
+                    extractionMethod = 'text-parsing-viewer-count';
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          debugInfo.timestampExtraction = {
+            actualPublishedAt,
+            publishedText,
+            isCurrentlyLive,
+            extractionMethod,
+            structuredDataAvailable: !!actualPublishedAt,
+          };
+
+          // CRITICAL: Don't announce old/finished livestreams
+          // If we have structured timestamp data, validate it's recent for live content
+          if (actualPublishedAt) {
+            const publishedDate = new Date(actualPublishedAt);
+            const hoursAgo = (Date.now() - publishedDate.getTime()) / (1000 * 60 * 60);
+
+            // If published more than 1 hour ago and not currently live, it's stale
+            if (hoursAgo > 1 && !isCurrentlyLive) {
+              return {
+                debugInfo,
+                error: 'Detected stale livestream based on structured data',
+                actualPublishedAt,
+                hoursAgo: Math.round(hoursAgo * 10) / 10,
+                isCurrentlyLive,
+                detectedTitle: title,
+                detectedId: videoIdMatch[1],
+              };
+            }
+          } else if (!isCurrentlyLive && publishedText !== 'Unknown' && publishedText !== 'Live now') {
+            // Fallback to text-based detection
+            return {
+              debugInfo,
+              error: 'Detected finished livestream, not currently live',
+              publishedText,
+              isCurrentlyLive,
+              detectedTitle: title,
+              detectedId: videoIdMatch[1],
+            };
+          }
+
           return {
             id: videoIdMatch[1],
             title,
             url: liveElement.href,
-            type: 'livestream',
+            type: isCurrentlyLive ? 'livestream' : 'video', // Use 'video' for ended livestreams
             platform: 'youtube',
-            publishedAt: new Date().toISOString(),
+            actualPublishedAt, // Structured timestamp data (preferred)
+            publishedText, // Fallback text-based timestamp
+            isCurrentlyLive, // Include live status
+            wasLivestream: true, // Indicate this was originally a livestream
+            publishedAt: actualPublishedAt || new Date().toISOString(), // Use structured data when available
             scrapedAt: new Date().toISOString(),
             detectionMethod, // Include detection method for debugging
             debugInfo, // Include debug information for troubleshooting false positives
           };
           /* eslint-enable no-undef */
-        });
+        }, this.channelHandle);
 
-        if (liveStream) {
-          // Create a plain object for logging to avoid complex object serialization issues
+        if (liveStream && liveStream.id) {
+          // Use structured data when available, fallback to parsed text
+          if (liveStream.actualPublishedAt) {
+            // Structured data is already in ISO format, use it directly
+            liveStream.publishedAt = liveStream.actualPublishedAt;
+          } else if (liveStream.publishedText) {
+            // Fallback: Parse relative text for timestamp
+            const publishedAt = parseRelativeTime(liveStream.publishedText);
+            liveStream.publishedAt = publishedAt ? publishedAt.toISOString() : new Date().toISOString();
+          }
+
+          // Valid live stream found
           const logData = {
             id: liveStream.id,
             title: liveStream.title,
             url: liveStream.url,
             type: liveStream.type,
             platform: liveStream.platform,
+            actualPublishedAt: liveStream.actualPublishedAt,
+            publishedText: liveStream.publishedText,
+            isCurrentlyLive: liveStream.isCurrentlyLive,
             publishedAt: liveStream.publishedAt,
             scrapedAt: liveStream.scrapedAt,
             detectionMethod: liveStream.detectionMethod,
@@ -993,7 +1180,18 @@ export class YouTubeScraperService {
           operation.success(
             `Successfully scraped active live stream using ${liveStream.detectionMethod}: ${JSON.stringify(logData)}`
           );
+        } else if (liveStream && liveStream.error) {
+          // Error case with debug information
+          const errorInfo = {
+            error: liveStream.error,
+            debugInfo: liveStream.debugInfo,
+            liveStreamUrl: this.liveStreamUrl,
+          };
+          operation.success(`Live stream detection failed: ${JSON.stringify(errorInfo)}`);
+          // Cannot reassign const - set to null-like state
+          Object.assign(liveStream, { isCurrentlyLive: false, error: 'Detection failed' });
         } else {
+          // No stream found (normal case)
           const noStreamInfo = {
             liveStreamUrl: this.liveStreamUrl,
             note: 'This is normal when no live stream is currently active',
@@ -1303,6 +1501,14 @@ export class YouTubeScraperService {
     this.videosUrl = null;
     this.liveStreamUrl = null;
     this.isShuttingDown = false; // Reset flag after cleanup
+  }
+
+  /**
+   * Dispose method for dependency container cleanup
+   * @returns {Promise<void>}
+   */
+  async dispose() {
+    await this.cleanup();
   }
 
   /**

@@ -332,6 +332,7 @@ async function setupApplicationServices(container, _config) {
       contentCoordinator: c.resolve('contentCoordinator'),
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
+      browserService: c.resolve('browserService'),
     });
   });
 }

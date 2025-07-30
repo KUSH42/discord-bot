@@ -764,7 +764,7 @@ export class ScraperApplication {
     try {
       operation.progress('Executing tweet extraction script in browser context');
       const result = await this.browser.evaluate(monitoredUser => {
-        /* eslint-disable no-undef */
+        /* eslint-disable no-undef, no-console */
         const tweets = [];
 
         // Try multiple selectors for tweet articles (X keeps changing these)
@@ -1134,7 +1134,7 @@ export class ScraperApplication {
         if (debugLogs.length > 0) {
           operation.progress(`Browser debug messages: ${debugLogs.map(log => log.text).join(' | ')}`);
         }
-      } catch (logError) {
+      } catch (_logError) {
         // Browser console logging not available or failed
       }
 
