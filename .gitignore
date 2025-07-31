@@ -180,6 +180,12 @@ enforcer.env
 # npm audit files
 *-audit.json
 
+# Data storage
+./data
+
+# MCP
+mcp.json
+
 # Debugging artifacts
 *.png
 bot-*.log.*
