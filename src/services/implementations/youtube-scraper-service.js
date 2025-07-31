@@ -749,7 +749,7 @@ export class YouTubeScraperService {
         operation.progress('Extracting live stream information');
 
         let liveStream = await this.browserService.evaluate(
-          (monitoredUser, embedLiveUrl) => {
+          ({ monitoredUser, embedLiveUrl }) => {
             /* eslint-disable no-undef */
 
             /**
@@ -1154,8 +1154,10 @@ export class YouTubeScraperService {
             };
             /* eslint-enable no-undef */
           },
-          this.channelHandle,
-          this.embedLiveUrl
+          {
+            monitoredUser: this.channelHandle,
+            embedLiveUrl: this.embedLiveUrl,
+          }
         );
 
         // Check embed URL if no livestream found but flag is set

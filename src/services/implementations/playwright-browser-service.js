@@ -31,6 +31,19 @@ export class PlaywrightBrowserService extends BrowserService {
 
     this.browser = await chromium.launch(options);
     this.page = await this.browser.newPage();
+
+    // Verify browser and page are ready
+    if (!this.browser || !this.page) {
+      throw new Error('Failed to initialize browser or page after launch');
+    }
+
+    if (!this.browser.isConnected()) {
+      throw new Error('Browser launched but not connected');
+    }
+
+    if (this.page.isClosed()) {
+      throw new Error('Page was closed immediately after creation');
+    }
   }
 
   /**
@@ -55,7 +68,7 @@ export class PlaywrightBrowserService extends BrowserService {
     for (let i = 0; i < retries; i++) {
       // Validate browser state before each attempt
       if (!this.browser || !this.page) {
-        throw new Error('Browser or page not available');
+        throw new Error(`Browser or page not available: browser=${!!this.browser}, page=${!!this.page}`);
       }
 
       // Check if browser is still connected
