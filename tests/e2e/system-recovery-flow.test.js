@@ -46,12 +46,18 @@ describe('System Recovery Flow E2E', () => {
       DISCORD_SUPPORT_CHANNEL_ID: '123456789012345678',
       DISCORD_YOUTUBE_CHANNEL_ID: '123456789012345679',
       DISCORD_X_POSTS_CHANNEL_ID: '123456789012345680',
+      DISCORD_X_REPLIES_CHANNEL_ID: '123456789012345681',
+      DISCORD_X_QUOTES_CHANNEL_ID: '123456789012345682',
+      DISCORD_X_RETWEETS_CHANNEL_ID: '123456789012345683',
       YOUTUBE_API_KEY: 'test-youtube-key',
       YOUTUBE_CHANNEL_ID: 'UCrAOyUwjSM5zzPz_FqsUhuQ',
       X_USER_HANDLE: 'testuser',
       X_LOGIN_EMAIL: 'test@example.com',
       X_LOGIN_PASSWORD: 'testpassword',
+      TWITTER_USERNAME: 'testuser',
+      TWITTER_PASSWORD: 'testpassword',
       PSH_WEBHOOK_URL: 'https://test.example.com/webhook',
+      PSH_CALLBACK_URL: 'https://test.example.com/webhook/psh',
       PSH_SECRET: 'test-secret',
 
       // Recovery-specific configuration
@@ -191,9 +197,9 @@ describe('System Recovery Flow E2E', () => {
     };
 
     // Register mocked services in container
-    container.register('discordService', mockDiscordService);
-    container.register('browserService', mockBrowserService);
-    container.register('youtubeService', mockYoutubeService);
+    container.register('discordService', () => mockDiscordService);
+    container.register('browserService', () => mockBrowserService);
+    container.register('youtubeService', () => mockYoutubeService);
   }
 
   describe('Browser Crash Recovery E2E', () => {
