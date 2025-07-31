@@ -767,31 +767,35 @@ export class ScraperApplication {
         /* eslint-disable no-undef, no-console */
         const tweets = [];
 
+        // Enhanced error handling for selector evolution
+        function robustQuerySelector(selectors, context = document) {
+          for (const selector of selectors) {
+            try {
+              const elements = context.querySelectorAll(selector);
+              if (elements.length > 0) {
+                console.log(`SUCCESS: Using selector "${selector}" found ${elements.length} elements`);
+                return elements;
+              }
+            } catch (error) {
+              console.log(`FAILED: Selector "${selector}" error:`, error.message);
+            }
+          }
+          return [];
+        }
+
         // Try multiple selectors for tweet articles (X keeps changing these)
+        // Updated priority order based on reliability analysis
         const articleSelectors = [
-          'article[data-testid="tweet"]',
-          'article[role="article"]',
-          'div[data-testid="cellInnerDiv"] article',
-          'article',
-          // Additional selectors for newer X.com layout
-          '[data-testid="tweet"]',
-          '[role="article"]',
-          'div[data-testid="cellInnerDiv"]',
-          'article[tabindex="-1"]',
-          'div[aria-labelledby]',
+          'article[data-testid="tweet"]', // Highest priority - very reliable
+          'div[data-testid="cellInnerDiv"] article', // Second priority - good for search
+          'article[role="article"]', // Third priority - generic fallback
+          'article[tabindex="-1"]', // Fourth priority - new layout support
+          'article', // Last resort - catch all
         ];
 
-        let articles = [];
-        let workingSelector = null;
-        for (const selector of articleSelectors) {
-          articles = document.querySelectorAll(selector);
-          console.log(`Selector "${selector}" found ${articles.length} articles`);
-          if (articles.length > 0) {
-            workingSelector = selector;
-            console.log(`Using working selector: ${selector}`);
-            break;
-          }
-        }
+        // Use robust selector function for article detection
+        let articles = robustQuerySelector(articleSelectors);
+        let workingSelector = articles.length > 0 ? 'robust-selection' : null;
 
         if (articles.length === 0) {
           // Enhanced debugging for search results page issues
@@ -852,16 +856,13 @@ export class ScraperApplication {
         for (const article of articles) {
           try {
             // Extract tweet URL with multiple selectors
+            // Updated priority order for better reliability
             const linkSelectors = [
-              'a[href*="/status/"]',
-              'time[datetime] + a',
-              'a[role="link"][href*="/status/"]',
-              // Additional selectors for newer layouts
-              'time[datetime]',
-              'time + a',
-              'a[href*="status"]',
-              '[data-testid="User-Name"] ~ * a[href*="/status/"]',
-              'div a[href*="/status/"]',
+              'a[href*="/status/"]', // Most direct and reliable
+              'time[datetime] ~ a[href*="/status/"]', // Time element siblings
+              'time[datetime]', // Time elements (parent may be link)
+              '[data-testid="User-Name"] ~ * a[href*="/status/"]', // User area siblings
+              'div a[href*="/status/"]', // Fallback within divs
             ];
 
             let tweetLink = null;
@@ -906,35 +907,51 @@ export class ScraperApplication {
 
             // Extract author username (not display name) - prioritize username extraction
             let author = 'Unknown';
+            let retweetedBy = null;
 
-            // Method 1: Try to extract username from href attribute (most reliable)
-            const userLinkSelectors = [
-              '[data-testid="User-Name"] a[href^="/"]',
-              '[data-testid="User-Names"] a[href^="/"]',
-              'a[role="link"][href^="/"][href*="status"]',
-              'a[href^="/"][href*="status"]',
-            ];
+            // Method 1: Extract from URL (most reliable, especially for retweets)
+            if (url) {
+              const usernameMatch = url.match(/\/([^/]+)\/status/);
+              if (usernameMatch && usernameMatch[1]) {
+                author = usernameMatch[1];
+              }
+            }
 
-            for (const selector of userLinkSelectors) {
-              const linkElement = article.querySelector(selector);
-              if (linkElement && linkElement.href) {
-                const usernameMatch = linkElement.href.match(/\/([^/]+)\/status/);
-                if (usernameMatch && usernameMatch[1]) {
-                  author = usernameMatch[1];
-                  break;
+            // Method 2: Check for social context to identify retweets
+            const socialContext = article.querySelector('[data-testid="socialContext"]');
+            if (socialContext && socialContext.innerText.includes('reposted')) {
+              const retweetUserLink = socialContext.querySelector('a[href^="/"]');
+              if (retweetUserLink) {
+                const retweetUser = retweetUserLink.href.match(/\/([^/?]+)/)?.[1];
+                if (retweetUser) {
+                  retweetedBy = retweetUser;
+                  // Keep original author from URL, but note who retweeted it
                 }
               }
             }
 
-            // Method 2: Try to extract from tweet URL as fallback
-            if (author === 'Unknown' && url) {
-              const urlUsernameMatch = url.match(/\/([^/]+)\/status/);
-              if (urlUsernameMatch && urlUsernameMatch[1]) {
-                author = urlUsernameMatch[1];
+            // Method 3: Try to extract username from href attribute (fallback)
+            if (author === 'Unknown') {
+              const userLinkSelectors = [
+                '[data-testid="User-Name"] a[href^="/"]',
+                '[data-testid="User-Names"] a[href^="/"]',
+                'a[role="link"][href^="/"][href*="status"]',
+                'a[href^="/"][href*="status"]',
+              ];
+
+              for (const selector of userLinkSelectors) {
+                const linkElement = article.querySelector(selector);
+                if (linkElement && linkElement.href) {
+                  const usernameMatch = linkElement.href.match(/\/([^/]+)\/status/);
+                  if (usernameMatch && usernameMatch[1]) {
+                    author = usernameMatch[1];
+                    break;
+                  }
+                }
               }
             }
 
-            // Method 3: Try to extract username from profile links (without status)
+            // Method 4: Try to extract username from profile links (without status)
             if (author === 'Unknown') {
               const profileLinkSelectors = [
                 '[data-testid="User-Name"] a[href^="/"]',
@@ -955,7 +972,7 @@ export class ScraperApplication {
               }
             }
 
-            // Method 4: Only use display name as absolute last resort and log warning
+            // Method 5: Only use display name as absolute last resort and log warning
             if (author === 'Unknown') {
               const displayNameSelectors = [
                 '[data-testid="User-Name"] span',
@@ -979,19 +996,13 @@ export class ScraperApplication {
             }
 
             // Extract text content with multiple selectors
+            // Enhanced hierarchy for better text extraction
             const textSelectors = [
-              '[data-testid="tweetText"]',
-              '[lang] span',
-              'div[dir="ltr"]',
-              'span[dir="ltr"]',
-              // Additional selectors for newer layouts
-              '[data-testid="tweetText"] span',
-              'div[lang] span',
-              'div[lang]',
-              'span[lang]',
-              'div[data-testid="tweetText"]',
-              // Fallback to any text in the article
-              'div:not([data-testid="User-Name"]):not([data-testid="User-Names"]) span',
+              '[data-testid="tweetText"]', // Primary - most reliable
+              '[data-testid="tweetText"] span', // Child spans within tweet text
+              'div[lang] span', // Language-specific content
+              'div[dir="ltr"] span', // Direction-specific content
+              'span[dir="ltr"]', // Direct direction spans
             ];
 
             let text = '';
@@ -1022,9 +1033,16 @@ export class ScraperApplication {
               }
             }
 
-            // Extract timestamp
+            // Extract timestamp with validation
             const timeElement = article.querySelector('time');
-            const timestamp = timeElement ? timeElement.getAttribute('datetime') : null;
+            let timestamp = null;
+            if (timeElement) {
+              const datetime = timeElement.getAttribute('datetime');
+              // Validate timestamp format before using
+              if (datetime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(datetime)) {
+                timestamp = datetime;
+              }
+            }
 
             // Determine tweet category
             let tweetCategory = 'Post';
@@ -1050,28 +1068,24 @@ export class ScraperApplication {
             // Check for retweet - only when monitored user retweets someone else's content
             let isRetweet = false;
 
-            // Method 1: Check for social context element with monitored user link (most reliable)
-            const socialContext = article.querySelector('[data-testid="socialContext"]');
+            // Method 1: Social context with user verification (MOST RELIABLE)
             if (socialContext) {
-              // Look for a link to our monitored user within the social context
+              const socialText = socialContext.innerText || '';
+              const hasReposted = socialText.includes('reposted');
               const monitoredUserLink = socialContext.querySelector(`a[href="/${monitoredUser}"]`);
-              if (monitoredUserLink && socialContext.innerText.includes('reposted')) {
+
+              if (hasReposted && monitoredUserLink) {
                 isRetweet = true;
               }
             }
 
-            // Method 2: Check for classic RT @ pattern (when found on monitored user's timeline)
-            if (!isRetweet && text.startsWith('RT @') && window.location.href.includes(`/${monitoredUser}`)) {
+            // Method 2: Classic RT pattern (still valid)
+            if (!isRetweet && text.startsWith('RT @')) {
               isRetweet = true;
             }
 
-            // Method 3: Fallback - if social context says "reposted" and we're on the monitored user's timeline
-            if (
-              !isRetweet &&
-              socialContext &&
-              socialContext.innerText.includes('reposted') &&
-              window.location.href.includes(`/${monitoredUser}`)
-            ) {
+            // Method 3: Use retweetedBy info from earlier extraction
+            if (!isRetweet && retweetedBy === monitoredUser) {
               isRetweet = true;
             }
 
