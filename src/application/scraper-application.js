@@ -926,20 +926,31 @@ export class ScraperApplication {
       // Classify tweets for logging breakdown
       for (const tweet of tweets) {
         try {
-          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, {
+          const classificationInput = {
             author: tweet.author,
             monitoredUser: this.xUser,
             retweetedBy: tweet.retweetedBy,
             ...tweet.rawClassificationData,
-          });
+          };
 
+          this.logger.debug(
+            `Classifying tweet ${tweet.tweetID}: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}...", metadata=${JSON.stringify(classificationInput)}`
+          );
+
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
           const category = classification.type || 'unknown';
+
+          this.logger.debug(
+            `Tweet ${tweet.tweetID} classified as: ${category}, full result: ${JSON.stringify(classification)}`
+          );
+
           if (stats.breakdown[category] !== undefined) {
             stats.breakdown[category]++;
           } else {
             stats.breakdown.unknown++;
           }
-        } catch (_error) {
+        } catch (error) {
+          this.logger.debug(`Classification failed for tweet ${tweet.tweetID}: ${error.message}`);
           stats.breakdown.unknown++;
         }
       }
@@ -1036,14 +1047,23 @@ export class ScraperApplication {
         // Get tweet category for enhanced logging
         let category = 'unknown';
         try {
-          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, {
+          const classificationInput = {
             author: tweet.author,
             monitoredUser: this.xUser,
             retweetedBy: tweet.retweetedBy,
             ...tweet.rawClassificationData,
-          });
+          };
+
+          this.logger.debug(
+            `Classifying tweet for logging: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}...", input=${JSON.stringify(classificationInput)}`
+          );
+
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
           category = classification.type || 'unknown';
-        } catch (_error) {
+
+          this.logger.debug(`Classification result: ${JSON.stringify(classification)}`);
+        } catch (error) {
+          this.logger.debug(`Classification failed: ${error.message}`);
           // Keep default category if classification fails
         }
 
