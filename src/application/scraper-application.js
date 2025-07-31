@@ -964,18 +964,19 @@ export class ScraperApplication {
       });
 
       // Log result based on ContentCoordinator response
-      if (result.success) {
+      if (result.action === 'announced') {
         const authorInfo = tweet.retweetedBy ? `@${tweet.retweetedBy}` : `@${tweet.author}`;
         operation.success(`Successfully processed content from ${authorInfo}`, {
           tweetId: tweet.tweetID,
           result: result.reason || 'announced',
         });
-      } else if (result.skipped) {
+      } else if (result.action === 'skip') {
         operation.success(`Content skipped - ${result.reason}`, {
           tweetId: tweet.tweetID,
           skipReason: result.reason,
+          publishedAt: tweet.timestamp,
         });
-      } else {
+      } else if (result.action === 'failed') {
         operation.error(
           new Error(result.reason || 'ContentCoordinator processing failed'),
           'Content processing failed',
@@ -983,6 +984,17 @@ export class ScraperApplication {
             tweetId: tweet.tweetID,
             author: tweet.author,
             reason: result.reason,
+          }
+        );
+      } else {
+        // Handle unexpected result format
+        operation.error(
+          new Error(`Unexpected ContentCoordinator result: ${JSON.stringify(result)}`),
+          'Unexpected processing result format',
+          {
+            tweetId: tweet.tweetID,
+            author: tweet.author,
+            result: JSON.stringify(result),
           }
         );
       }

@@ -205,13 +205,12 @@ export class ContentCoordinator {
       const isNew = this.contentStateManager.isNewContent(contentId, contentData.publishedAt, nowUTC());
 
       if (!isNew) {
-        operation.success(
-          `⏭️ Skipping content: ${contentData.type} too old ${contentData.publishedAt}, skipping: ${contentData.title}`,
-          {
-            publishedAt: contentData.publishedAt,
-            currentTime: nowUTC().toISOString(),
-          }
-        );
+        operation.success(`⏭️ Skipping content: ${contentData.type} too old - published ${contentData.publishedAt}`, {
+          publishedAt: contentData.publishedAt,
+          currentTime: nowUTC().toISOString(),
+          title: contentData.title,
+          contentId,
+        });
         return {
           action: 'skip',
           reason: 'content_too_old',

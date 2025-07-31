@@ -396,15 +396,108 @@ export class YouTubeScraperService {
       });
 
       try {
-        operation.progress('Navigating to channel live stream page');
+        operation.progress('Navigating to embed live stream URL to bypass consent issues');
+        await this.browserService.goto(this.embedLiveUrl, {
+          waitUntil: 'networkidle',
+          timeout: this.timeoutMs,
+        });
+
+        operation.progress('Checking embed for active livestream first');
+
+        // First try the embed URL approach (most reliable, bypasses consent)
+        const embedCheck = await this.browserService.evaluate(() => {
+          /* eslint-disable no-undef */
+          const player = document.querySelector('#movie_player');
+          const video = document.querySelector('video');
+
+          if (!player || !video) {
+            return { hasActiveStream: false, reason: 'no-player-or-video' };
+          }
+
+          // Check for live indicators in the embed player
+          const hasLiveBadge = !!player.querySelector('.ytp-live, .ytp-live-badge');
+          const hasLiveClass = player.className.includes('live') || player.className.includes('ytp-live');
+
+          // Check video state - live streams typically have no defined duration
+          const isLiveVideo = video.duration === null || isNaN(video.duration) || video.duration === Infinity;
+
+          // Check for active video (not paused, has video source)
+          const hasVideoContent = video.readyState >= 2 && !video.ended;
+
+          const isActive = (hasLiveBadge || hasLiveClass) && isLiveVideo && hasVideoContent;
+
+          return {
+            hasActiveStream: isActive,
+            hasLiveBadge,
+            hasLiveClass,
+            isLiveVideo,
+            hasVideoContent,
+            videoReadyState: video.readyState,
+            videoDuration: video.duration,
+            playerClasses: player.className,
+            currentUrl: window.location.href,
+            reason: isActive ? 'active-livestream-detected' : 'no-active-livestream',
+          };
+          /* eslint-enable no-undef */
+        });
+
+        if (embedCheck.hasActiveStream) {
+          // Extract video ID from the current URL or fallback to embed URL pattern
+          let videoIdMatch = embedCheck.currentUrl.match(/[?&]v=([^&]+)/);
+
+          if (!videoIdMatch) {
+            // Try to extract from embed URL pattern
+            videoIdMatch = this.embedLiveUrl.match(/embed\/([^/]+)\/live/);
+          }
+
+          if (!videoIdMatch) {
+            // Try YouTube channel ID as fallback (for live streams this might work)
+            const channelId = this.config.getRequired('YOUTUBE_CHANNEL_ID');
+            videoIdMatch = [null, channelId]; // Use channel ID as video ID
+          }
+
+          if (videoIdMatch && videoIdMatch[1]) {
+            const videoId = videoIdMatch[1];
+            const liveStream = {
+              id: videoId,
+              title: 'Live Stream (from embed)',
+              url: `https://www.youtube.com/watch?v=${videoId}`,
+              type: 'livestream',
+              platform: 'youtube',
+              publishedAt: new Date().toISOString(),
+              scrapedAt: new Date().toISOString(),
+              detectionMethod: 'embed-url-primary-detection',
+              isCurrentlyLive: true,
+              embedInfo: embedCheck,
+            };
+
+            operation.success(
+              `Active livestream detected via embed URL (primary method): ${JSON.stringify({
+                id: videoId,
+                title: liveStream.title,
+                detectionMethod: 'embed-url-primary-detection',
+                embedInfo: embedCheck,
+              })}`
+            );
+            return liveStream;
+          } else {
+            operation.progress('Active stream detected but could not extract video ID from URL patterns');
+          }
+        }
+
+        // Fallback: Try the regular live page approach (with consent handling)
+        operation.progress('Embed check found no active stream, falling back to regular live page');
         await this.browserService.goto(this.liveStreamUrl, {
           waitUntil: 'networkidle',
           timeout: this.timeoutMs,
         });
 
-        operation.progress('Extracting live stream information');
+        operation.progress('Handling consent page redirects');
+        await this.authManager.handleConsentPageRedirect();
 
-        let liveStream = await this.browserService.evaluate(
+        operation.progress('Extracting live stream information from regular live page');
+
+        const liveStream = await this.browserService.evaluate(
           ({ monitoredUser, embedLiveUrl }) => {
             /* eslint-disable no-undef */
 
@@ -875,84 +968,7 @@ export class YouTubeScraperService {
           }
         );
 
-        // Check embed URL if no livestream found but flag is set
-        if ((!liveStream || !liveStream.id) && liveStream?.debugInfo?.shouldCheckEmbed) {
-          operation.progress('Checking embed URL for active livestream');
-
-          try {
-            await this.browserService.goto(this.embedLiveUrl, {
-              waitUntil: 'networkidle',
-              timeout: 15000,
-            });
-
-            const embedInfo = await this.browserService.evaluate(() => {
-              /* eslint-disable no-undef */
-              const player = document.querySelector('#movie_player');
-              const video = document.querySelector('video');
-
-              if (!player || !video) {
-                return { hasActiveStream: false, reason: 'no-player-or-video' };
-              }
-
-              // Check for live indicators in the embed player
-              const hasLiveBadge = !!player.querySelector('.ytp-live, .ytp-live-badge');
-              const hasLiveClass = player.className.includes('live') || player.className.includes('ytp-live');
-
-              // Check video state - live streams typically have no defined duration
-              const isLiveVideo = video.duration === null || isNaN(video.duration) || video.duration === Infinity;
-
-              // Check for active video (not paused, has video source)
-              const hasVideoContent = video.readyState >= 2 && !video.ended;
-
-              const isActive = (hasLiveBadge || hasLiveClass) && isLiveVideo && hasVideoContent;
-
-              return {
-                hasActiveStream: isActive,
-                hasLiveBadge,
-                hasLiveClass,
-                isLiveVideo,
-                hasVideoContent,
-                videoReadyState: video.readyState,
-                videoDuration: video.duration,
-                playerClasses: player.className,
-                currentUrl: window.location.href,
-                reason: isActive ? 'active-livestream-detected' : 'no-active-livestream',
-              };
-              /* eslint-enable no-undef */
-            });
-
-            if (embedInfo.hasActiveStream) {
-              // Extract video ID from the URL
-              const videoIdMatch =
-                embedInfo.currentUrl.match(/[?&]v=([^&]+)/) || this.embedLiveUrl.match(/embed\/([^/]+)\/live/);
-
-              if (videoIdMatch) {
-                const videoId = videoIdMatch[1];
-                liveStream = {
-                  id: videoId,
-                  title: 'Live Stream (from embed)',
-                  url: `https://www.youtube.com/watch?v=${videoId}`,
-                  type: 'livestream',
-                  platform: 'youtube',
-                  publishedAt: new Date().toISOString(),
-                  scrapedAt: new Date().toISOString(),
-                  detectionMethod: 'embed-url-active-stream',
-                  embedInfo,
-                };
-
-                operation.progress(`Active livestream detected via embed URL: ${videoId}`);
-              }
-            }
-
-            // Navigate back to live page for consistency
-            await this.browserService.goto(this.liveStreamUrl, {
-              waitUntil: 'networkidle',
-              timeout: 15000,
-            });
-          } catch (embedError) {
-            operation.progress(`Embed URL check failed: ${embedError.message}`);
-          }
-        }
+        // Note: Embed URL check is now done as primary method above
 
         if (liveStream && liveStream.id) {
           // Use structured data when available, fallback to parsed text

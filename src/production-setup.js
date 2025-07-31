@@ -313,6 +313,7 @@ async function setupApplicationServices(container, _config) {
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
       browserService: c.resolve('youtubeBrowserService'),
+      youtubeAuthManager: c.resolve('youtubeAuthManager'),
     });
   });
 }
