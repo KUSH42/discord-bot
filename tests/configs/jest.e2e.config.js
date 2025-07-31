@@ -7,6 +7,8 @@ import baseConfig from '../../jest.config.js';
 export default {
   testEnvironment: 'node',
 
+  rootDir: '../../', // Set root to project root
+
   // Transform configuration
   transform: {
     '^.+.js$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],

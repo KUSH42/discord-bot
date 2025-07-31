@@ -6,7 +6,6 @@ import baseConfig from '../../jest.config.js';
  */
 export default {
   ...baseConfig,
-
   // Set correct root directory
   rootDir: '../../',
 
