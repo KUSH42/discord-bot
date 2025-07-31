@@ -1,5 +1,5 @@
 export default {
-  rootDir: '../../', // Set root to project root
+  rootDir: './', // Set root to project root
   testEnvironment: 'node',
   transform: {
     '^.+.js$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],
@@ -29,19 +29,20 @@ export default {
   // Test result reporters for CI integration
   reporters: [
     'default',
-    [
-      'jest-junit',
-      {
-        outputDirectory: 'test-results',
-        outputName: 'all-tests.xml',
-        classNameTemplate: '{classname}',
-        titleTemplate: '{title}',
-        ancestorSeparator: ' › ',
-        usePathForSuiteName: true,
-        addFileAttribute: true,
-        includeConsoleOutput: true,
-      },
-    ],
+    // Temporarily disabled jest-junit reporter
+    // [
+    //   'jest-junit',
+    //   {
+    //     outputDirectory: 'test-results',
+    //     outputName: 'all-tests.xml',
+    //     classNameTemplate: '{classname}',
+    //     titleTemplate: '{title}',
+    //     ancestorSeparator: ' › ',
+    //     usePathForSuiteName: true,
+    //     addFileAttribute: true,
+    //     includeConsoleOutput: true,
+    //   },
+    // ],
   ],
   // Re-enabled coverage thresholds after fixing hanging tests
   coverageThreshold: {

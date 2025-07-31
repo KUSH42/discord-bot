@@ -4,7 +4,7 @@ import baseConfig from './jest.config.js';
 // This prevents individual test suites from failing on partial coverage
 export default {
   ...baseConfig,
-  rootDir: '../../', // Set root to project root
+  rootDir: './', // Set root to project root
   // Remove coverage thresholds for CI - we'll validate merged coverage instead
   coverageThreshold: undefined,
   // CI-specific optimizations
