@@ -399,6 +399,39 @@ npm run test:integration --testPathPatterns="browser|scraper" -- --verbose
 npm run test:unit --testPathPatterns="enhanced-logger|metrics-manager|debug-flag"
 ```
 
+### Regression Testing Guidelines
+**CRITICAL**: Always create permanent tests for bugs we encounter to prevent regressions.
+
+#### When to Create Regression Tests
+- **Every bug fix** - Test the specific failure scenario that caused the bug
+- **Error handling improvements** - Test edge cases that previously caused crashes
+- **Data validation fixes** - Test invalid inputs that previously passed through
+- **Race condition fixes** - Test timing scenarios that caused intermittent failures
+
+#### Regression Test Patterns
+```javascript
+describe('Error Handling Regression Tests', () => {
+  it('should handle [specific error case] without crashing (prevents "[original error message]")', async () => {
+    // REGRESSION TEST: Explain what bug this prevents
+    const problematicInput = { /* exact scenario that caused original bug */ };
+    
+    // This should NOT throw the original error
+    await expect(service.handleInput(problematicInput)).resolves.not.toThrow();
+    
+    // Verify correct behavior instead
+    expect(result).toMatchExpectedBehavior();
+  });
+});
+```
+
+#### Examples in Codebase
+- **Livestream Error Handling** (`tests/unit/youtube-scraper-service-livestream.test.js:366-429`): 
+  - Prevents "Content ID must be a non-empty string" crashes when detection returns error objects
+- **Timer Coordination** (`tests/fixtures/timer-test-utils.js`): 
+  - Prevents test timeouts from complex `setInterval` + async callback patterns
+
+**Rule**: Never delete regression tests - they are permanent safeguards against known failure modes.
+
 ### Memory Leak Prevention
 Always ensure tests don't call `main()` functions - these start infinite processes and will cause test hangs.
 

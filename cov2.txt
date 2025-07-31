@@ -1,0 +1,143 @@
+
+> discord-content-announcement-bot@0.2.0 test:coverage
+> NODE_OPTIONS="--experimental-vm-modules" jest --coverage --verbose=true
+
+
+✘ node v22.17.1, and jest v30.0.5 are not yet supported in the Community edition of Console Ninja.
+We are working hard on it for you https://tinyurl.com/3h9mtwra.
+
+Estimated release dates:
+  - Community users: around 16th October, 2025 (subject to team availability)
+  - PRO users:       priority access is available now
+
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940606
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940644
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940662
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940678
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940689
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940700
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940728
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[ScraperApplication] [ERROR]: Failed to initialize browser
+TypeError: Cannot read properties of undefined (reading 'newPage')
+    at PlaywrightBrowserService.newPage [as launch] (/home/xush/Documents/prog/discord-bot/src/services/implementations/playwright-browser-service.js:33:36)
+    at ScraperApplication.initializeBrowser (/home/xush/Documents/prog/discord-bot/src/application/scraper-application.js:385:7)
+    at ScraperApplication.start (/home/xush/Documents/prog/discord-bot/src/application/scraper-application.js:102:7)
+    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/integration/production-setup-validation.test.js:295:7)
+[ScraperApplication] [ERROR]: Failed to start scraper application
+TypeError: Cannot read properties of undefined (reading 'newPage')
+    at PlaywrightBrowserService.newPage [as launch] (/home/xush/Documents/prog/discord-bot/src/services/implementations/playwright-browser-service.js:33:36)
+    at ScraperApplication.initializeBrowser (/home/xush/Documents/prog/discord-bot/src/application/scraper-application.js:385:7)
+    at ScraperApplication.start (/home/xush/Documents/prog/discord-bot/src/application/scraper-application.js:102:7)
+    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/integration/production-setup-validation.test.js:295:7)
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940777
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940799
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753923940809
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+[DiscordClientService] [WARN]: Discord client is not available for destruction
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[ContentStateManager] [INFO]: Content state manager initialized
+[DiscordClientService] [INFO]: Creating new Discord client instance
+[DiscordClientService] [INFO]: Discord client created with instance ID: 1753924029769
+[DebugFlagManager] [INFO]: DebugFlagManager initialized
+[DuplicateDetector] [INFO]: PersistentStorage disabled - using only in-memory caches and Discord history
+ [INFO]: Test log message
+[ContentStateManager] [INFO]: Content state manager initialized
+---------------------------------------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+File                                         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                                                                                                                                                                          
+---------------------------------------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+All files                                    |   79.65 |    87.33 |   85.57 |   79.65 |                                                                                                                                                                                                                                                                            
+ src                                         |   63.39 |    84.87 |   80.89 |   63.39 |                                                                                                                                                                                                                                                                            
+  config-validator.js                        |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+  discord-utils.js                           |   98.33 |    92.85 |     100 |   98.33 | 68-69                                                                                                                                                                                                                                                                      
+  duplicate-detector.js                      |   90.23 |    87.59 |   90.62 |   90.23 | 52-53,74-76,85-86,89-91,134-135,175-176,339-356,362-376,480-481,521-522,535-539,582-583                                                                                                                                                                                    
+  logger-utils.js                            |   76.74 |    74.13 |      75 |   76.74 | 38-43,49,61,76-77,82-83,94-96,103-107,114-118,126-127,132-133,142-143,147-148,156-157,166-167,182-187,191-201,211-212,226-227,233-234,239-240,286-309,329-330,347-350,356-359,377-385,389-397,408-409,433-434,444-445                                                      
+  production-setup.js                        |       0 |        0 |       0 |       0 | 1-579                                                                                                                                                                                                                                                                      
+  rate-limiter.js                            |   78.99 |      100 |   57.14 |   78.99 | 68-73,81-92,112-113,119-120,127-128,188-209                                                                                                                                                                                                                                
+ src/application                             |   82.95 |    85.94 |   91.73 |   82.95 |                                                                                                                                                                                                                                                                            
+  auth-manager.js                            |   94.45 |    88.75 |     100 |   94.45 | 63-64,115-121,137,139,299-307,342-343                                                                                                                                                                                                                                      
+  bot-application.js                         |   82.82 |    73.55 |   85.29 |   82.82 | 214-219,230-235,257-261,265,270,275,291,369-375,379-383,393-396,400-401,440-447,451-457,491-492,497-502,510-513,522-524,539-543,545-546,740-741,860-861,912-921,950-953,1001-1002,1044-1155                                                                                
+  monitor-application.js                     |   96.32 |    89.63 |   96.87 |   96.32 | 163-165,463-484,756-758,833-834,866-873,905-906                                                                                                                                                                                                                            
+  scraper-application.js                     |      73 |    92.82 |   90.69 |      73 | 367-368,440-442,512-521,531-547,616-617,767-1128,1149-1150,1152,1217-1219,1538-1540,1563-1564,1603-1612,1635-1640,1800-1859,1866-1895                                                                                                                                      
+ src/config                                  |       0 |        0 |       0 |       0 |                                                                                                                                                                                                                                                                            
+  content-detection.js                       |       0 |        0 |       0 |       0 | 1-242                                                                                                                                                                                                                                                                      
+ src/core                                    |   93.89 |    92.65 |   96.99 |   93.89 |                                                                                                                                                                                                                                                                            
+  command-processor.js                       |   92.65 |     87.6 |     100 |   92.65 | 107-108,185-189,217-221,238-243,249-250,259-260,266-267,275-276,282-283,369-377,382-383,732-737,770-771,790-795,828-833,841-846,885-890,929-930,950-955,989-994                                                                                                            
+  content-announcer.js                       |      87 |    94.36 |      85 |      87 | 99-106,201,203-204,333-335,540-542,569-583,590-598,607-651                                                                                                                                                                                                                 
+  content-classifier.js                      |   98.92 |    97.15 |     100 |   98.92 | 332-337,361                                                                                                                                                                                                                                                                
+  content-coordinator.js                     |   96.18 |    91.66 |     100 |   96.18 | 510-531,705-706,735-738,740-741,756-758                                                                                                                                                                                                                                    
+  content-state-manager.js                   |   94.41 |    97.22 |   94.73 |   94.41 | 67-74,238-254                                                                                                                                                                                                                                                              
+  livestream-state-machine.js                |   94.91 |    93.54 |     100 |   94.91 | 194-216                                                                                                                                                                                                                                                                    
+ src/infrastructure                          |   95.06 |    93.54 |   95.23 |   95.06 |                                                                                                                                                                                                                                                                            
+  configuration.js                           |    72.8 |    77.52 |   66.66 |    72.8 | 103-104,108-109,113-114,123-124,138-139,143-144,154-155,162-163,166-167,172-173,178-179,183-184,194-195,199-201,206-207,211-213,217-218,223-224,228-230,238-253,260-266,273-283,290-298,305-312,357-363                                                                    
+  debug-flag-manager.js                      |   99.47 |    93.24 |     100 |   99.47 | 294-295                                                                                                                                                                                                                                                                    
+  dependency-container.js                    |    99.1 |    98.33 |     100 |    99.1 | 86-87                                                                                                                                                                                                                                                                      
+  event-bus.js                               |   99.26 |    98.43 |     100 |   99.26 | 239-240                                                                                                                                                                                                                                                                    
+  metrics-manager.js                         |   98.93 |    95.65 |     100 |   98.93 | 154-155,287-288,467-468                                                                                                                                                                                                                                                    
+  persistent-storage.js                      |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+  state-manager.js                           |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+ src/services/implementations                |   57.18 |    77.98 |   59.04 |   57.18 |                                                                                                                                                                                                                                                                            
+  discord-client-service.js                  |   92.96 |    80.76 |   85.71 |   92.96 | 20-22,62-64,247-249,255-262,268-269                                                                                                                                                                                                                                        
+  fetch-http-service.js                      |   62.13 |    57.14 |   36.84 |   62.13 | 36-37,43-44,50-51,57-58,81,83,85-88,99-100,120-121,123-124,128-129,134-135,144-164,170-203,209-210,216-217,223-224,230-239,245-254,260-265,274-278,293                                                                                                                     
+  playwright-browser-service.js              |   61.17 |    53.57 |      20 |   61.17 | 23-24,28-30,37-38,41-42,45-46,54-59,71-72,76-77,81-82,93-94,113-117,125-129,138-156,166-170,179-183,191-195,204-208,216-220,228-232,240-244,252-258,266-270,278-282,289-293,300-304,312-321,329-333,340-344,358-365,376-383,401-406                                        
+  youtube-api-service.js                     |   99.17 |    92.43 |     100 |   99.17 | 64-65,149-150                                                                                                                                                                                                                                                              
+  youtube-scraper-service.js                 |   37.38 |       72 |   63.63 |   37.38 | 58-59,88-111,113-126,128-134,210-222,275-276,284-346,387-389,419-421,454-456,485-486,494-717,753-1155,1165-1240,1245-1246,1248-1251,1273-1281,1307-1308,1340-1344,1356-1360,1373-1374,1378-1383,1392-1445,1455-1464,1473,1508-1556,1572-1583,1610-1620,1628-1657,1665-1668 
+ src/services/implementations/message-sender |    79.6 |    76.61 |   77.22 |    79.6 |                                                                                                                                                                                                                                                                            
+  discord-message-sender.js                  |   69.42 |    55.93 |   66.66 |   69.42 | 57-58,97-99,111-131,138-140,143-145,184-192,199-208,214-228,235-236,246-247,275-282,296-297,323-337,339-343,359-372,389-395,402-403,415,420,448-449,469-479,488-493,515-534,541-542                                                                                        
+  message-processor.js                       |   67.77 |    36.11 |   72.72 |   67.77 | 96-115,119-132,165-170,186-187,190-191,194-195,198-199,202-203,213-214,218-219,225-226,237-238,258-268,277-282,305-321,327-339,349-359                                                                                                                                     
+  message-queue.js                           |     100 |       92 |     100 |     100 | 31,128                                                                                                                                                                                                                                                                     
+  message.js                                 |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+  processing-scheduler.js                    |   61.04 |       50 |   33.33 |   61.04 | 39-40,50-51,59-60,76-77,93-107,116-133,142-154,163-164,183-192,200-208,228-231,239-240,246-249,256-264,271-280,287-298,304-312,335-343                                                                                                                                     
+  rate-limiter.js                            |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+  retry-handler.js                           |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+ src/utilities                               |   97.75 |    88.32 |   98.03 |   97.75 |                                                                                                                                                                                                                                                                            
+  async-mutex.js                             |   83.33 |       75 |   83.33 |   83.33 | 19-26,49-50,70-71                                                                                                                                                                                                                                                          
+  browser-config.js                          |     100 |    90.47 |     100 |     100 | 63,90                                                                                                                                                                                                                                                                      
+  enhanced-logger.js                         |   99.48 |    86.76 |     100 |   99.48 | 263-264                                                                                                                                                                                                                                                                    
+  time-parser.js                             |   96.09 |       88 |     100 |   96.09 | 51-52,90,115-116                                                                                                                                                                                                                                                           
+  utc-time.js                                |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+ src/utils                                   |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+  delay.js                                   |     100 |      100 |     100 |     100 |                                                                                                                                                                                                                                                                            
+---------------------------------------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

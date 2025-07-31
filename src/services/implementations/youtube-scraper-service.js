@@ -752,6 +752,39 @@ export class YouTubeScraperService {
           ({ monitoredUser, embedLiveUrl }) => {
             /* eslint-disable no-undef */
 
+            // ENHANCED: Check for YouTube metadata first for more accurate results
+            let metadataExtracted = false;
+            let youtubeMetadata = null;
+
+            // Try to extract from YouTube's page data (most reliable)
+            try {
+              const scriptTags = document.querySelectorAll('script');
+              for (const script of scriptTags) {
+                if (script.textContent && script.textContent.includes('ytInitialData')) {
+                  const match = script.textContent.match(/var ytInitialData = ({.+?});/);
+                  if (match) {
+                    const data = JSON.parse(match[1]);
+                    // Extract video info from YouTube's structured data
+                    const videoDetails =
+                      data?.contents?.twoColumnWatchNextResults?.results?.results?.contents?.[0]
+                        ?.videoPrimaryInfoRenderer;
+                    if (videoDetails) {
+                      youtubeMetadata = {
+                        title: videoDetails.title?.runs?.[0]?.text,
+                        videoId: videoDetails.videoId,
+                        isLive: videoDetails.viewCount?.videoViewCountRenderer?.isLive,
+                        badges: videoDetails.badges?.map(b => b.metadataBadgeRenderer?.label) || [],
+                      };
+                      metadataExtracted = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              // Continue with DOM parsing if metadata extraction fails
+            }
+
             /**
              * Check if a video element has indicators that it's currently live RIGHT NOW
              * @param {Element} element - Video element or its container
@@ -857,6 +890,8 @@ export class YouTubeScraperService {
             debugInfo.currentUrl = currentUrl;
             debugInfo.expectedChannelPattern = expectedChannelPattern;
             debugInfo.isOnCorrectChannelPage = isOnCorrectChannelPage;
+            debugInfo.metadataExtracted = metadataExtracted;
+            debugInfo.youtubeMetadata = youtubeMetadata;
 
             if (!isOnCorrectChannelPage) {
               debugInfo.strategiesAttempted.push('page-validation-failed');
@@ -867,6 +902,30 @@ export class YouTubeScraperService {
                 currentUrl,
                 expectedPattern: expectedChannelPattern,
               };
+            }
+
+            // ENHANCED: Use YouTube metadata if available (most accurate)
+            if (metadataExtracted && youtubeMetadata && youtubeMetadata.videoId) {
+              debugInfo.strategiesAttempted.push('youtube-metadata-extraction');
+
+              if (
+                youtubeMetadata.isLive ||
+                youtubeMetadata.badges.some(badge => badge && badge.toLowerCase().includes('live'))
+              ) {
+                return {
+                  id: youtubeMetadata.videoId,
+                  title: youtubeMetadata.title || 'Live Stream',
+                  url: `https://www.youtube.com/watch?v=${youtubeMetadata.videoId}`,
+                  type: 'livestream',
+                  platform: 'youtube',
+                  isCurrentlyLive: true,
+                  publishedAt: new Date().toISOString(),
+                  scrapedAt: new Date().toISOString(),
+                  detectionMethod: 'youtube-metadata-live',
+                  debugInfo,
+                  badges: youtubeMetadata.badges,
+                };
+              }
             }
 
             // Strategy 1: Look for the primary live stream on channel's /live page
@@ -1326,7 +1385,7 @@ export class YouTubeScraperService {
       let contentProcessed = 0;
       const contentResults = [];
 
-      if (activeLiveStream) {
+      if (activeLiveStream && activeLiveStream.id) {
         operation.progress(
           `Processing detected livestream: ${activeLiveStream.id} (${activeLiveStream.detectionMethod})`
         );
@@ -1342,6 +1401,15 @@ export class YouTubeScraperService {
             detectionMethod: activeLiveStream.detectionMethod,
           });
         }
+      } else if (activeLiveStream && !activeLiveStream.id) {
+        // Log when we detected a livestream object but it has no ID (likely an error case)
+        operation.progress(
+          `Livestream detection returned error: ${JSON.stringify({
+            error: activeLiveStream.error,
+            debugInfo: activeLiveStream.debugInfo,
+            hasId: !!activeLiveStream.id,
+          })}`
+        );
       }
 
       if (latestVideo && latestVideo.success) {

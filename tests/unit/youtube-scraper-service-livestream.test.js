@@ -362,4 +362,70 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       expect(scraperService.metrics.livestreamsDetected).toBe(initialLivestreams + 1);
     });
   });
+
+  describe('Error Handling Regression Tests', () => {
+    it('should handle livestream error objects without crashing (prevents "Content ID must be a non-empty string")', async () => {
+      // REGRESSION TEST: This specific bug was causing crashes when fetchActiveLiveStream
+      // returned error objects (truthy but no 'id' field) that scanForContent tried to process
+
+      const errorLivestreamObject = {
+        error: 'Not on monitored channel page',
+        debugInfo: {
+          currentUrl: 'https://www.youtube.com/@TestChannel/live',
+          expectedChannelPattern: '@TestChannel/live',
+          isOnCorrectChannelPage: false,
+          strategiesAttempted: ['page-validation-failed'],
+        },
+        // CRITICAL: No 'id' field - this was causing the original "Content ID must be a non-empty string" error
+      };
+
+      // Mock fetchActiveLiveStream to return error object
+      jest.spyOn(scraperService, 'fetchActiveLiveStream').mockResolvedValue(errorLivestreamObject);
+      jest.spyOn(scraperService, 'fetchLatestVideo').mockResolvedValue(null);
+
+      // This should NOT throw "Content ID must be a non-empty string" error
+      await expect(scraperService.scanForContent()).resolves.not.toThrow();
+
+      // Should log the error appropriately
+      expect(scraperService.logger.startOperation).toHaveBeenCalledWith('scanForContent', expect.any(Object));
+
+      // Should NOT try to process the error object as content
+      expect(mockContentCoordinator.processContent).not.toHaveBeenCalled();
+
+      // Should NOT increment livestream detection metrics for error cases
+      expect(scraperService.metrics.livestreamsDetected).toBe(0);
+    });
+
+    it('should handle null/undefined livestream responses gracefully', async () => {
+      // Test other falsy values that could be returned
+      jest.spyOn(scraperService, 'fetchActiveLiveStream').mockResolvedValue(null);
+      jest.spyOn(scraperService, 'fetchLatestVideo').mockResolvedValue(null);
+
+      await expect(scraperService.scanForContent()).resolves.not.toThrow();
+      expect(mockContentCoordinator.processContent).not.toHaveBeenCalled();
+    });
+
+    it('should log debug information when livestream detection fails', async () => {
+      const errorObject = {
+        error: 'No live element found',
+        debugInfo: {
+          strategiesAttempted: ['primary-detection', 'now-playing-detection'],
+          elementsFound: 0,
+          currentUrl: 'https://www.youtube.com/@TestChannel/live',
+        },
+      };
+
+      jest.spyOn(scraperService, 'fetchActiveLiveStream').mockResolvedValue(errorObject);
+      jest.spyOn(scraperService, 'fetchLatestVideo').mockResolvedValue(null);
+
+      // This test verifies that error objects are handled gracefully
+      await expect(scraperService.scanForContent()).resolves.not.toThrow();
+
+      // Should start operation properly
+      expect(scraperService.logger.startOperation).toHaveBeenCalledWith('scanForContent', expect.any(Object));
+
+      // Should not process invalid content
+      expect(mockContentCoordinator.processContent).not.toHaveBeenCalled();
+    });
+  });
 });
