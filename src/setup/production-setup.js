@@ -172,8 +172,13 @@ async function setupExternalServices(container, config) {
     return app;
   });
 
-  // Browser Service - Create separate instances for each scraper to prevent conflicts
-  container.registerTransient('browserService', () => {
+  // Browser Service - Use singleton so ScraperApplication and AuthManager share the same browser
+  container.registerSingleton('browserService', () => {
+    return new PlaywrightBrowserService();
+  });
+
+  // Separate browser service for YouTube scraper to prevent conflicts
+  container.registerSingleton('youtubeBrowserService', () => {
     return new PlaywrightBrowserService();
   });
 }

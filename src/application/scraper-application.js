@@ -378,7 +378,7 @@ export class ScraperApplication {
 
     try {
       const browserOptions = getXScrapingBrowserConfig({
-        headless: false,
+        headless: true,
       });
 
       operation.progress('Launching browser with X scraping configuration');

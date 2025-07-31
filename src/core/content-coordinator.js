@@ -816,7 +816,7 @@ export class ContentCoordinator {
       // For general URL-based content, check URLs
       if (contentData.url) {
         operation.progress('Checking for URL in duplicate detector');
-        const urlExists = this.duplicateDetector.hasUrl(contentData.url);
+        const urlExists = await this.duplicateDetector.isDuplicateByUrl(contentData.url);
 
         if (urlExists) {
           const result = {
