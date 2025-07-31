@@ -253,6 +253,7 @@ jobs:
           npm run test:unit -- \
             --config=tests/configs/jest.unit.config.js \
             --coverage \
+            --coverageReporters=json \
             --coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }} \
             --maxWorkers=1 \
             --testTimeout=10000 \
@@ -502,6 +503,7 @@ jobs:
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --coverage \
+            --coverageReporters=json \
             --coverageDirectory=coverage/integration-tests \
             --testTimeout=15000 \
             --forceExit \
@@ -609,6 +611,7 @@ jobs:
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
             --coverage \
+            --coverageReporters=json \
             --coverageDirectory=coverage/e2e-tests \
             --testTimeout=30000 \
             --forceExit \
@@ -690,6 +693,7 @@ jobs:
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
+            --coverageReporters=json \
             --coverageDirectory=coverage/performance-tests \
             --maxWorkers=1 \
             --testTimeout=60000 \
@@ -817,6 +821,7 @@ jobs:
             --maxWorkers=1 \
             --testTimeout=20000 \
             --coverage \
+            --coverageReporters=json \
             --coverageDirectory=coverage/security-tests \
             --forceExit \
             --detectOpenHandles \
