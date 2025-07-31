@@ -39,7 +39,7 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 
   coverageDirectory: `coverage/unit-tests-node${process.env.NODE_VERSION}`,
-  coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageReporters: ['text', 'json', 'html'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
   // Unit test reporters

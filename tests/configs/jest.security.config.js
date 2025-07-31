@@ -42,7 +42,7 @@ export default {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 
   coverageDirectory: 'coverage/security-tests',
-  coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageReporters: ['text', 'json', 'html'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
   // Integration test reporters

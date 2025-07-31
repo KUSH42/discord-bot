@@ -261,6 +261,8 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee logs/unit-tests-node${{ matrix.node-version }}.log
+            mv ./coverage/unit-tests-node${{ matrix.node-version }}/coverage-final.json ./coverage/unit-tests-node${{ matrix.node-version }}-coverage-final.json
+            rm -r ./coverage/unit-tests-node${{ matrix.node-version }}
 
       - name: Store unit test results
         uses: actions/upload-artifact@v4
@@ -511,6 +513,8 @@ jobs:
             --passWithNoTests \
             --coverageThreshold='{}' \
             2>&1 | tee logs/integration-tests-output.log
+            mv ./coverage/integration-tests/coverage-final.json ./coverage/integration-tests-coverage-final.json
+            rm -r ./coverage/integration-tests 
 
       - name: Store integration test results
         uses: actions/upload-artifact@v4
@@ -615,6 +619,8 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee logs/e2e-tests-output.log
+            mv ./coverage/e2e-tests/coverage-final.json ./coverage/e2e-tests-coverage-final.json
+            rm -r ./coverage/e2e-tests 
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -697,6 +703,9 @@ jobs:
             --passWithNoTests \
             --verbose=true \
             2>&1 | tee logs/performance-tests-output.log
+            mv ./coverage/performance-tests/coverage-final.json ./coverage/performance-tests-coverage-final.json
+            rm -r ./coverage/performance-tests 
+
 
       - name: Generate performance report
         run: |
@@ -814,6 +823,8 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             2>&1 | tee logs/security-tests-output.log
+            mv ./coverage/security-tests/coverage-final.json ./coverage/security-tests-coverage-final.json
+            rm -r ./coverage/security-tests 
 
       - name: Run security audit
         run: |
@@ -896,9 +907,6 @@ jobs:
         run: |
           echo "Current working directory: $(pwd)"
 
-          sudo apt-get update && sudo apt-get install -y lcov || \
-          echo "lcov install failed"
-
           # Install with retry logic for corrupted tarball handling
           # Configure npm settings for better reliability
           npm config set fetch-retries 5
@@ -908,6 +916,7 @@ jobs:
           
           for i in {1..3}; do
             echo "Attempt $i to install dependencies..."
+            npm i -D nyc
             if npm ci --prefer-offline --no-audit; then
               echo "Dependencies installed successfully on attempt $i"
               break
@@ -938,7 +947,8 @@ jobs:
       - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-          node scripts/ci/ci-coverage-merger.js
+          nyc merge ./coverage ./coverage/coverage-final.json
+          nyc report --reporter=lcov --temp-dir=coverage
 
 
       - name: Generate comprehensive test report
