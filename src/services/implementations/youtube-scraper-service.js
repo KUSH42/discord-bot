@@ -178,7 +178,7 @@ export class YouTubeScraperService {
         operation.progress('Handling consent page redirects');
 
         // Handle consent page if redirected
-        await this.handleConsentPageRedirect();
+        await this.youtubeAuthManager.handleConsentPageRedirect();
 
         // Wait for the page to load and videos to appear
         await this.browserService.waitFor(2000);
