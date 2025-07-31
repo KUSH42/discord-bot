@@ -18,7 +18,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
 
     // Extract mocks from dependencies
     mockBrowserService = mockDependencies.browserService;
-    mockAuthManager = mockDependencies.authManager;
+    mockAuthManager = mockDependencies.xAuthManager;
     mockContentClassifier = mockDependencies.contentClassifier;
     mockLogger = mockDependencies.logger;
 

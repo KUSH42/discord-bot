@@ -77,7 +77,7 @@ describe('ScraperApplication Restart Functionality', () => {
     mockDependencies = createMockDependenciesWithEnhancedLogging({
       config: mockConfig,
       browserService: mockBrowserService,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       contentAnnouncer: mockContentAnnouncer,
       contentClassifier: mockContentClassifier,
       contentCoordinator: mockContentCoordinator,
@@ -117,7 +117,7 @@ describe('ScraperApplication Restart Functionality', () => {
     const dependencies = {
       config: mockConfig,
       browserService: mockBrowserService,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       contentCoordinator: { announceContent: jest.fn() },
       contentClassifier: mockContentClassifier,
       logger: mockDependencies.logger,

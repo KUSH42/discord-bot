@@ -116,7 +116,7 @@ describe('Search and Retweet Logic', () => {
       debugManager: enhancedLoggingMocks.debugManager,
       metricsManager: enhancedLoggingMocks.metricsManager,
       discord: mockDiscordService,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       delay: mockDelay,
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
@@ -132,7 +132,6 @@ describe('Search and Retweet Logic', () => {
 
     // Mock methods that pollXProfile depends on
     jest.spyOn(scraperApp, 'extractTweets').mockResolvedValue([]);
-    jest.spyOn(scraperApp, 'filterNewTweets').mockReturnValue([]);
     jest.spyOn(scraperApp, 'processNewTweet').mockResolvedValue();
     jest.spyOn(scraperApp, 'getNextInterval').mockReturnValue(300000);
     jest.spyOn(scraperApp, 'verifyAuthentication').mockResolvedValue();
@@ -246,12 +245,10 @@ describe('Search and Retweet Logic', () => {
     jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
     jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     scraperApp.extractTweets.mockResolvedValue(mockTweets);
-    scraperApp.filterNewTweets.mockReturnValue(mockTweets);
 
     await scraperApp.pollXProfile();
 
     expect(scraperApp.extractTweets).toHaveBeenCalled();
-    expect(scraperApp.filterNewTweets).toHaveBeenCalledWith(mockTweets);
     expect(scraperApp.processNewTweet).toHaveBeenCalledWith(mockTweets[0]);
   });
 
@@ -263,7 +260,6 @@ describe('Search and Retweet Logic', () => {
     jest.spyOn(scraperApp, 'generateSearchUrl').mockReturnValue('https://x.com/search?q=(from%3Atestuser)');
     jest.spyOn(scraperApp, 'performEnhancedRetweetDetection').mockResolvedValue();
     scraperApp.extractTweets.mockResolvedValue(mockTweets);
-    scraperApp.filterNewTweets.mockReturnValue(newTweets);
 
     await scraperApp.pollXProfile();
 

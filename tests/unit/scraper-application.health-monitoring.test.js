@@ -143,7 +143,7 @@ describe('ScraperApplication Health Monitoring', () => {
     mockDependencies = {
       browserService: mockBrowserService,
       config: mockConfig,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       eventBus: mockEventBus,
       logger: mockLogger,
       contentCoordinator: mockContentCoordinator,

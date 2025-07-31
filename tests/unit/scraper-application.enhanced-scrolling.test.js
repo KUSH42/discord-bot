@@ -107,7 +107,7 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),

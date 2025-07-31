@@ -28,7 +28,7 @@ describe('System Recovery Flow E2E', () => {
   let monitorApp;
   let scraperApp;
   let contentCoordinator;
-  let authManager;
+  let xAuthManager;
   let browserService;
 
   beforeEach(async () => {
@@ -81,7 +81,7 @@ describe('System Recovery Flow E2E', () => {
     monitorApp = container.resolve('monitorApplication');
     scraperApp = container.resolve('scraperApplication');
     contentCoordinator = container.resolve('contentCoordinator');
-    authManager = container.resolve('authManager');
+    xAuthManager = container.resolve('xAuthManager');
     browserService = container.resolve('browserService');
   });
 
@@ -467,7 +467,7 @@ describe('System Recovery Flow E2E', () => {
       await scraperApp.start();
 
       // Establish authentication
-      const initialAuth = await authManager.ensureAuthenticated();
+      const initialAuth = await xAuthManager.ensureAuthenticated();
       expect(initialAuth).toBe(true);
 
       // Simulate browser restart
@@ -479,7 +479,7 @@ describe('System Recovery Flow E2E', () => {
       mockBrowserService.simulateBrowserRecovery();
 
       // Verify authentication state recovered
-      const recoveredAuth = await authManager.ensureAuthenticated();
+      const recoveredAuth = await xAuthManager.ensureAuthenticated();
       expect(recoveredAuth).toBe(true);
 
       // Verify: Authentication state recovery metrics

@@ -161,7 +161,7 @@ operation.error(error, 'Operation failed', { context });
 - ✅ **ScraperApplication** (`scraper`) - X scraping operations and browser interactions
 - ✅ **MonitorApplication** (`youtube`) - YouTube API validation and webhook handling
 - ✅ **BotApplication** (`api`) - Discord message processing and command handling
-- ✅ **AuthManager** (`auth`) - Authentication flows and session management
+- ✅ **XAuthManager** (`auth`) - Authentication flows and session management
 
 #### Testing Integration
 - ✅ **Unit Test Integration** - All migrated modules have updated test coverage

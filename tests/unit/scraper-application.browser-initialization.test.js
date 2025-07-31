@@ -112,7 +112,7 @@ describe('Browser Initialization', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: mockPersistentStorage,
     });
   });

@@ -9,7 +9,15 @@ import { createEnhancedLogger } from '../../utilities/enhanced-logger.js';
  * Provides an alternative to API polling for faster notifications
  */
 export class YouTubeScraperService {
-  constructor({ logger, config, contentCoordinator, debugManager, metricsManager, browserService }) {
+  constructor({
+    logger,
+    config,
+    contentCoordinator,
+    debugManager,
+    metricsManager,
+    browserService,
+    youtubeAuthManager,
+  }) {
     // Create enhanced logger for YouTube module
     this.logger = createEnhancedLogger('youtube', logger, debugManager, metricsManager);
     this.config = config;
@@ -33,8 +41,7 @@ export class YouTubeScraperService {
 
     // Authentication configuration
     this.authEnabled = config.getBoolean('YOUTUBE_AUTHENTICATION_ENABLED', false);
-    this.youtubeUsername = config.get('YOUTUBE_USERNAME');
-    this.youtubePassword = config.get('YOUTUBE_PASSWORD');
+    this.authManager = youtubeAuthManager;
 
     // Metrics
     this.metrics = {
@@ -100,9 +107,10 @@ export class YouTubeScraperService {
       this.isInitialized = true;
 
       // Perform authentication if enabled
-      if (this.authEnabled) {
+      if (this.authEnabled && this.authManager) {
         operation.progress('Performing YouTube authentication');
-        await this.authenticateWithYouTube();
+        await this.authManager.authenticateWithYouTube();
+        this.isAuthenticated = this.authManager.isAuthenticated;
       }
 
       operation.progress('Fetching initial content to establish baseline');
@@ -131,358 +139,6 @@ export class YouTubeScraperService {
         authEnabled: this.authEnabled,
       });
       throw error;
-    }
-  }
-
-  /**
-   * Authenticate with YouTube using credentials
-   * @returns {Promise<void>}
-   */
-  async authenticateWithYouTube() {
-    if (!this.authEnabled) {
-      this.logger.debug('YouTube authentication is disabled');
-      return;
-    }
-
-    if (!this.youtubeUsername || !this.youtubePassword) {
-      this.logger.warn('YouTube authentication enabled but credentials not provided');
-      return;
-    }
-
-    try {
-      this.logger.info('Starting YouTube authentication...');
-
-      // Navigate to YouTube sign-in page
-      await this.browserService.goto('https://accounts.google.com/signin/v2/identifier?service=youtube');
-
-      // Handle cookie consent if present
-      await this.handleCookieConsent();
-
-      // Wait for email input
-      await this.browserService.waitForSelector('input[type="email"]', { timeout: 10000 });
-
-      // Enter email/username
-      await this.browserService.type('input[type="email"]', this.youtubeUsername);
-
-      // Click Next
-      await this.browserService.click('#identifierNext');
-      await this.browserService.waitFor(3000);
-
-      // Check for account security challenges
-      const challengeHandled = await this.handleAccountChallenges();
-      if (!challengeHandled) {
-        return;
-      }
-
-      // Wait for password input
-      await this.browserService.waitForSelector('input[type="password"]', { timeout: 10000 });
-
-      // Enter password
-      await this.browserService.type('input[type="password"]', this.youtubePassword);
-
-      // Click Next/Sign In
-      await this.browserService.click('#passwordNext');
-
-      // Wait for navigation to complete and handle any post-login challenges
-      await this.browserService.waitFor(5000);
-
-      // Handle 2FA if present
-      const twoFAHandled = await this.handle2FA();
-      if (!twoFAHandled) {
-        return;
-      }
-
-      // Check for CAPTCHA challenges
-      const captchaHandled = await this.handleCaptcha();
-      if (!captchaHandled) {
-        return;
-      }
-
-      // Handle device verification if present
-      await this.handleDeviceVerification();
-
-      // Check if we're successfully logged in by navigating to YouTube and looking for signed-in indicators
-      await this.browserService.goto('https://www.youtube.com');
-      await this.browserService.waitFor(3000);
-
-      // Check for signed-in user avatar/menu
-      const signedIn = await this.browserService.evaluate(() => {
-        /* eslint-disable no-undef */
-        // Look for signed-in indicators
-        return (
-          document.querySelector('button[aria-label*="Google Account"]') ||
-          document.querySelector('#avatar-btn') ||
-          document.querySelector('ytd-topbar-menu-button-renderer') ||
-          document.querySelector('[id="guide-section-3"]') ||
-          // Additional selectors for signed-in state
-          document.querySelector('[data-uia="user-menu-toggle"]') ||
-          document.querySelector('.ytp-chrome-top .ytp-user-avatar') ||
-          document.querySelector('yt-img-shadow#avatar')
-        );
-        /* eslint-enable no-undef */
-      });
-
-      if (signedIn) {
-        this.isAuthenticated = true;
-        this.logger.info('✅ Successfully authenticated with YouTube');
-      } else {
-        this.logger.warn('⚠️ YouTube authentication may have failed - proceeding without authentication');
-      }
-    } catch (error) {
-      this.logger.error('⚠️Failed to authenticate with YouTube:', {
-        error: error.message,
-        stack: error.stack,
-      });
-      this.logger.warn('Continuing without YouTube authentication');
-    }
-  }
-
-  /**
-   * Handle cookie consent banners
-   * @returns {Promise<void>}
-   */
-  async handleCookieConsent() {
-    try {
-      // Wait a moment for cookie banners to appear
-      await this.browserService.waitFor(2000);
-
-      // Common cookie consent selectors
-      const consentSelectors = [
-        'button:has-text("Accept all")',
-        'button:has-text("I agree")',
-        'button:has-text("Accept")',
-        '[data-testid="accept-all-button"]',
-        '[data-testid="consent-accept-all"]',
-        'button[aria-label*="Accept"]',
-        '#L2AGLb', // Google's "I agree" button
-        'button:has-text("Reject all")', // Fallback - reject if accept not found
-      ];
-
-      for (const selector of consentSelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
-          await this.browserService.click(selector);
-          this.logger.debug(`Clicked cookie consent button: ${selector}`);
-          await this.browserService.waitFor(1000);
-          return;
-        } catch {
-          // Continue to next selector
-        }
-      }
-
-      this.logger.info('No cookie consent banner found');
-    } catch (error) {
-      this.logger.warn('Error handling cookie consent:', error.message);
-    }
-  }
-
-  /**
-   * Handle YouTube consent page redirects
-   * @returns {Promise<void>}
-   */
-  async handleConsentPageRedirect() {
-    try {
-      const currentUrl = await this.browserService.evaluate(() => {
-        // eslint-disable-next-line no-undef
-        return window.location.href;
-      });
-
-      if (currentUrl.includes('consent.youtube.com')) {
-        this.logger.info('Detected YouTube consent page redirect, attempting to handle');
-
-        // Wait for consent page to load
-        await this.browserService.waitFor(2000);
-
-        // YouTube consent page specific selectors
-        const consentSelectors = [
-          'button:has-text("Alle akzeptieren")', // German "Accept all"
-          'button:has-text("Accept all")', // English
-          'button:has-text("I agree")',
-          'button:has-text("Einverstanden")', // German "Agree"
-          'form[action*="consent"] button[type="submit"]', // Generic consent form
-          '[data-value="1"]', // YouTube consent accept button
-          'button[jsname]:has-text("Akzeptieren")', // German accept with jsname
-          'button[jsname]:has-text("Accept")', // English accept with jsname
-        ];
-
-        let consentHandled = false;
-        for (const selector of consentSelectors) {
-          try {
-            await this.browserService.waitForSelector(selector, { timeout: 5000 });
-            await this.browserService.click(selector);
-            this.logger.info(`Clicked YouTube consent button: ${selector}`);
-
-            // Wait for redirect back to YouTube
-            await this.browserService.waitFor(3000);
-
-            // Check if we're back on YouTube proper
-            const newUrl = await this.browserService.evaluate(() => {
-              // eslint-disable-next-line no-undef
-              return window.location.href;
-            });
-            if (!newUrl.includes('consent.youtube.com')) {
-              this.logger.info('Successfully handled consent redirect, now on YouTube');
-              consentHandled = true;
-              break;
-            }
-          } catch {
-            // Continue to next selector
-            continue;
-          }
-        }
-
-        if (!consentHandled) {
-          this.logger.warn('Could not handle YouTube consent page automatically');
-          // Try to navigate directly to the videos page again
-          await this.browserService.goto(this.videosUrl, {
-            waitUntil: 'networkidle',
-            timeout: this.timeoutMs,
-          });
-        }
-      }
-    } catch (error) {
-      this.logger.debug('Error handling consent page redirect:', error.message);
-    }
-  }
-
-  /**
-   * Handle account security challenges (email verification, etc.)
-   * @returns {Promise<boolean>} True if challenge was handled or no challenge present
-   */
-  async handleAccountChallenges() {
-    try {
-      // Check for email verification challenge
-      const emailChallengeSelectors = [
-        'input[type="email"][placeholder*="verification"]',
-        'input[name="knowledgePreregisteredEmailResponse"]',
-        'input[data-initial-value][type="email"]',
-      ];
-
-      for (const selector of emailChallengeSelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
-          this.logger.warn('Email verification challenge detected - requires manual intervention');
-          this.logger.info('Please check your email and complete verification manually');
-          return false;
-        } catch {
-          // Continue to next selector
-        }
-      }
-
-      // Check for phone verification challenge
-      const phoneSelectors = ['input[type="tel"]', 'input[name="phoneNumberId"]'];
-
-      for (const selector of phoneSelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
-          this.logger.warn('Phone verification challenge detected - requires manual intervention');
-          return false;
-        } catch {
-          // Continue to next selector
-        }
-      }
-
-      return true; // No challenges detected
-    } catch (error) {
-      this.logger.debug('Error checking account challenges:', error.message);
-      return true;
-    }
-  }
-
-  /**
-   * Handle 2FA/MFA challenges
-   * @returns {Promise<boolean>} True if 2FA was handled or not present
-   */
-  async handle2FA() {
-    try {
-      // Check for 2FA code input
-      const twoFASelectors = [
-        'input[name="totpPin"]',
-        'input[type="tel"][maxlength="6"]',
-        'input[placeholder*="code"]',
-        'input[aria-label*="verification code"]',
-      ];
-
-      for (const selector of twoFASelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
-          this.logger.warn('2FA challenge detected - authentication cannot proceed automatically');
-          this.logger.info('Please disable 2FA for this account or handle authentication manually');
-          return false;
-        } catch {
-          // Continue to next selector
-        }
-      }
-
-      return true; // No 2FA challenge
-    } catch (error) {
-      this.logger.debug('Error checking 2FA:', error.message);
-      return true;
-    }
-  }
-
-  /**
-   * Handle CAPTCHA challenges
-   * @returns {Promise<boolean>} True if no CAPTCHA present, false if CAPTCHA detected
-   */
-  async handleCaptcha() {
-    try {
-      // Common CAPTCHA selectors
-      const captchaSelectors = [
-        '[data-sitekey]', // reCAPTCHA
-        '.g-recaptcha', // reCAPTCHA v2
-        '#recaptcha', // Generic reCAPTCHA
-        '[src*="captcha"]', // Image CAPTCHA
-        'iframe[src*="recaptcha"]', // reCAPTCHA iframe
-        '[aria-label*="captcha"]', // Accessibility CAPTCHA
-        'canvas[width][height]', // Canvas-based CAPTCHA (some bot detection)
-      ];
-
-      for (const selector of captchaSelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 2000 });
-          this.logger.warn('CAPTCHA challenge detected - authentication cannot proceed automatically');
-          this.logger.info('Manual intervention required to complete CAPTCHA verification');
-          return false;
-        } catch {
-          // Continue to next selector
-        }
-      }
-
-      return true; // No CAPTCHA detected
-    } catch (error) {
-      this.logger.debug('Error checking for CAPTCHA:', error.message);
-      return true;
-    }
-  }
-
-  /**
-   * Handle device verification prompts
-   * @returns {Promise<void>}
-   */
-  async handleDeviceVerification() {
-    try {
-      // Look for "Continue" or "Not now" buttons on device verification screens
-      const deviceVerificationSelectors = [
-        'button:has-text("Not now")',
-        'button:has-text("Continue")',
-        '[data-action-button-secondary]',
-        'button[jsname="b3VHJd"]', // Google's "Not now" button
-      ];
-
-      for (const selector of deviceVerificationSelectors) {
-        try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
-          await this.browserService.click(selector);
-          this.logger.debug(`Handled device verification: ${selector}`);
-          await this.browserService.waitFor(2000);
-          return;
-        } catch {
-          // Continue to next selector
-        }
-      }
-    } catch (error) {
-      this.logger.debug('Error handling device verification:', error.message);
     }
   }
 

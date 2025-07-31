@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { AuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/auth-manager.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 
 /**
  * Simple Authentication Check Integration Test
  *
- * Basic test to verify AuthManager integration without complex flows
+ * Basic test to verify XAuthManager integration without complex flows
  */
 describe('Simple Authentication Check Integration', () => {
-  let authManager;
+  let xAuthManager;
   let mockConfig;
   let mockBrowserService;
   let loggerMocks;
@@ -45,8 +45,8 @@ describe('Simple Authentication Check Integration', () => {
       waitForNavigation: jest.fn().mockResolvedValue(),
     };
 
-    // Create AuthManager
-    authManager = new AuthManager({
+    // Create XAuthManager
+    xAuthManager = new XAuthManager({
       config: mockConfig,
       browserService: mockBrowserService,
       stateManager: {
@@ -61,21 +61,21 @@ describe('Simple Authentication Check Integration', () => {
   });
 
   describe('Basic Integration', () => {
-    it('should initialize AuthManager with dependencies', () => {
-      expect(authManager).toBeDefined();
-      expect(authManager.browser).toBe(mockBrowserService);
-      expect(authManager.config).toBe(mockConfig);
-      expect(authManager.twitterUsername).toBe('testuser');
-      expect(authManager.twitterPassword).toBe('testpass');
-      expect(authManager.logger).toBeDefined();
+    it('should initialize XAuthManager with dependencies', () => {
+      expect(xAuthManager).toBeDefined();
+      expect(xAuthManager.browser).toBe(mockBrowserService);
+      expect(xAuthManager.config).toBe(mockConfig);
+      expect(xAuthManager.twitterUsername).toBe('testuser');
+      expect(xAuthManager.twitterPassword).toBe('testpass');
+      expect(xAuthManager.logger).toBeDefined();
     });
 
     it('should handle authentication dependency integration', async () => {
       // Mock the entire authentication flow to succeed immediately
-      const mockEnsureAuthenticated = jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue();
+      const mockEnsureAuthenticated = jest.spyOn(xAuthManager, 'ensureAuthenticated').mockResolvedValue();
 
       // Test that we can call the authentication method
-      await authManager.ensureAuthenticated();
+      await xAuthManager.ensureAuthenticated();
 
       // Verify the method was called
       expect(mockEnsureAuthenticated).toHaveBeenCalled();
@@ -99,7 +99,7 @@ describe('Simple Authentication Check Integration', () => {
     });
 
     it('should have enhanced logger with correct module name', () => {
-      expect(authManager.logger).toBeDefined();
+      expect(xAuthManager.logger).toBeDefined();
       // The enhanced logger should have been created with 'auth' module name
       expect(loggerMocks.debugManager.isEnabled).toBeDefined();
       expect(loggerMocks.metricsManager.recordMetric).toBeDefined();

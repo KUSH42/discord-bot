@@ -5,7 +5,7 @@
 **Discord Content Announcement Bot** - Monitors YouTube/X content, announces to Discord channels.
 
 ### Key Components
-- **Application Layer**: `src/application/` - MonitorApplication, ScraperApplication, AuthManager
+- **Application Layer**: `src/application/` - MonitorApplication, ScraperApplication, XAuthManager
 - **Core Layer**: `src/core/` - CommandProcessor, ContentAnnouncer, ContentClassifier  
 - **Infrastructure**: `src/infrastructure/` - DependencyContainer, EventBus, StateManager, DebugFlagManager, MetricsManager
 - **Services**: `src/services/` - YouTube API, browser automation, external integrations
@@ -14,7 +14,7 @@
 ### Data Flow
 - **Commands**: Discord → CommandProcessor → StateManager → Response
 - **YouTube**: PubSubHubbub webhook → MonitorApplication → ContentAnnouncer → Discord
-- **X Monitoring**: ScraperApplication → AuthManager → Browser → ContentClassifier → Discord
+- **X Monitoring**: ScraperApplication → XAuthManager → Browser → ContentClassifier → Discord
 
 ## Development Standards
 
@@ -237,7 +237,7 @@ const parentLogger = this.logger.forOperation('parentOperation', correlationId);
 - **ScraperApplication** (`scraper`): X scraping operations with browser automation debugging
 - **MonitorApplication** (`youtube`): YouTube webhook processing with API fallback monitoring  
 - **BotApplication** (`api`): Discord message processing with command tracking
-- **AuthManager** (`auth`): Authentication flows with login attempt monitoring
+- **XAuthManager** (`auth`): Authentication flows with login attempt monitoring
 - **YouTubeScraperService** (`youtube`): YouTube monitoring with better "Failed to scrape" error context
 
 #### 🚧 Pending Integrations (Low Priority)

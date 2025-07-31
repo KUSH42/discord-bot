@@ -92,7 +92,7 @@ describe('ScraperApplication Process Tweet', () => {
       discordService: { login: jest.fn() },
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: {
+      xAuthManager: {
         login: jest.fn(),
         clickNextButton: jest.fn(),
         clickLoginButton: jest.fn(),

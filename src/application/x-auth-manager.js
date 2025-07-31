@@ -1,9 +1,9 @@
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
- * Manages authentication for the scraper, handling cookies and login flows.
+ * Manages authentication for X (Twitter) scraper, handling cookies and login flows.
  */
-export class AuthManager {
+export class XAuthManager {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
     this.config = dependencies.config;

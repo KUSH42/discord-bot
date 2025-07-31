@@ -129,7 +129,7 @@ describe('ScraperApplication Core Operations', () => {
       discordService: mockDiscordService,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       duplicateDetector: mockDuplicateDetector,
       persistentStorage: mockPersistentStorage,
       debugManager: enhancedLoggingMocks.debugManager,
@@ -155,7 +155,7 @@ describe('ScraperApplication Core Operations', () => {
       expect(scraperApp.discord).toBe(mockDiscordService);
       expect(scraperApp.eventBus).toBe(mockEventBus);
       expect(scraperApp.logger).toEqual(expect.objectContaining({ moduleName: 'scraper' }));
-      expect(scraperApp.authManager).toBe(mockAuthManager);
+      expect(scraperApp.xAuthManager).toBe(mockAuthManager);
     });
 
     it('should initialize with provided duplicate detector', () => {

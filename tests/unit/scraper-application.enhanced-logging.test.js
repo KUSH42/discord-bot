@@ -86,7 +86,7 @@ describe('ScraperApplication Enhanced Logging Integration', () => {
     scraperApp = new ScraperApplication({
       config: mockConfig,
       browserService: mockBrowserService,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       contentAnnouncer: mockContentAnnouncer,
       contentClassifier: mockContentClassifier,
       logger: mockLogger, // Use the enhanced logger mock

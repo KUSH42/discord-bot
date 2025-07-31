@@ -58,7 +58,7 @@ describe('Login Flow', () => {
       browserService: mockBrowserService,
       config: mockConfig,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       eventBus: { emit: jest.fn() },
       stateManager: { get: jest.fn(), set: jest.fn() },
       persistentStorage: {
@@ -75,7 +75,7 @@ describe('Login Flow', () => {
   });
 
   it('should handle multi-step login flow correctly', async () => {
-    scraperApp.authManager.login.mockImplementation(async () => {
+    scraperApp.xAuthManager.login.mockImplementation(async () => {
       mockBrowserService.evaluate
         .mockResolvedValueOnce({ hasUsernameInput: true })
         .mockResolvedValueOnce({ needsEmailVerification: true })
@@ -84,7 +84,7 @@ describe('Login Flow', () => {
 
       await mockBrowserService.type('input[name="text"]', 'testuser');
       await scraperApp.clickNextButton();
-      await scraperApp.authManager.handleEmailVerification();
+      await scraperApp.xAuthManager.handleEmailVerification();
       await mockBrowserService.type('input[name="password"]', 'testpass');
       await scraperApp.clickLoginButton();
       await scraperApp.clickNextButton();
@@ -94,17 +94,17 @@ describe('Login Flow', () => {
     await scraperApp.loginToX();
 
     expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="text"]', 'testuser');
-    expect(scraperApp.authManager.clickNextButton).toHaveBeenCalledTimes(2);
-    expect(scraperApp.authManager.handleEmailVerification).toHaveBeenCalled();
+    expect(scraperApp.xAuthManager.clickNextButton).toHaveBeenCalledTimes(2);
+    expect(scraperApp.xAuthManager.handleEmailVerification).toHaveBeenCalled();
     expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="password"]', 'testpass');
-    expect(scraperApp.authManager.clickLoginButton).toHaveBeenCalled();
+    expect(scraperApp.xAuthManager.clickLoginButton).toHaveBeenCalled();
   });
 
   it('should use cookies for authentication if available', async () => {
     const mockCookies = JSON.stringify([{ name: 'auth_token', value: 'testtoken' }]);
     mockConfig.get.mockReturnValue(mockCookies);
 
-    scraperApp.authManager.login.mockImplementation(async () => {
+    scraperApp.xAuthManager.login.mockImplementation(async () => {
       await mockBrowserService.setCookies(JSON.parse(mockCookies));
       await mockBrowserService.goto('https://x.com/home');
       mockBrowserService.waitForSelector.mockResolvedValue(true);
@@ -121,14 +121,14 @@ describe('Login Flow', () => {
 
   it('should call clickNextButton and handle its failure', async () => {
     // Mock so that clickNextButton fails
-    scraperApp.authManager.clickNextButton.mockResolvedValue(false);
+    scraperApp.xAuthManager.clickNextButton.mockResolvedValue(false);
     const result = await scraperApp.clickNextButton();
     expect(result).toBe(false);
   });
 
   it('should call clickLoginButton and handle its failure', async () => {
     // Mock so that clickLoginButton fails
-    scraperApp.authManager.clickLoginButton.mockResolvedValue(false);
+    scraperApp.xAuthManager.clickLoginButton.mockResolvedValue(false);
     const result = await scraperApp.clickLoginButton();
     expect(result).toBe(false);
   });
@@ -137,7 +137,7 @@ describe('Login Flow', () => {
     const mockCookies = JSON.stringify([{ name: 'auth_token', value: 'testtoken' }]);
     mockConfig.get.mockReturnValue(mockCookies);
 
-    scraperApp.authManager.login.mockImplementation(async () => {
+    scraperApp.xAuthManager.login.mockImplementation(async () => {
       // Simulate cookie auth failure
       mockLogger.warn('Cookie authentication failed, falling back to credentials');
       mockBrowserService.waitForSelector.mockRejectedValue(new Error('Selector not found'));

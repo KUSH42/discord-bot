@@ -113,7 +113,7 @@ describe('Duplicate Detector Integration', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: mockPersistentStorage,
     });
   });

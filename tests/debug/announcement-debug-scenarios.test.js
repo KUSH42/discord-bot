@@ -191,7 +191,7 @@ describe('Announcement Debug Scenarios', () => {
         isConnected: jest.fn(() => true),
         setUserAgent: jest.fn(() => Promise.resolve()),
       },
-      authManager: {
+      xAuthManager: {
         login: jest.fn(() => Promise.resolve()),
         isAuthenticated: jest.fn(() => Promise.resolve(true)),
         ensureAuthenticated: jest.fn(() => Promise.resolve()),

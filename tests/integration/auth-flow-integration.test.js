@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { AuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/auth-manager.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 import { timerTestUtils } from '../fixtures/timer-test-utils.js';
 
@@ -15,7 +15,7 @@ import { timerTestUtils } from '../fixtures/timer-test-utils.js';
  * - Browser automation integration
  */
 describe('Authentication Flow Integration', () => {
-  let authManager;
+  let xAuthManager;
   let mockConfig;
   let mockBrowserService;
   let mockCookieStorage;
@@ -185,8 +185,8 @@ describe('Authentication Flow Integration', () => {
       hasCookies: jest.fn(() => mockCookieStorage.cookies.size > 0),
     };
 
-    // Create AuthManager with proper dependencies object
-    authManager = new AuthManager({
+    // Create XAuthManager with proper dependencies object
+    xAuthManager = new XAuthManager({
       config: mockConfig,
       browserService: mockBrowserService,
       stateManager: { get: jest.fn(), set: jest.fn() },
@@ -196,7 +196,7 @@ describe('Authentication Flow Integration', () => {
     });
 
     // Inject cookie storage (normally done by dependency injection)
-    authManager.cookieStorage = mockCookieStorage;
+    xAuthManager.cookieStorage = mockCookieStorage;
   });
 
   afterEach(() => {
@@ -213,23 +213,23 @@ describe('Authentication Flow Integration', () => {
       mockBrowserService.type = jest.fn();
 
       // Mock no saved cookies (fresh login)
-      authManager.state.get.mockReturnValue(null); // No saved cookies
+      xAuthManager.state.get.mockReturnValue(null); // No saved cookies
 
       // Mock successful authentication check
       let authCheckCount = 0;
-      const mockIsAuthenticated = jest.spyOn(authManager, 'isAuthenticated').mockImplementation(async () => {
+      const mockIsAuthenticated = jest.spyOn(xAuthManager, 'isAuthenticated').mockImplementation(async () => {
         authCheckCount++;
         // Return true after login attempt
         return authCheckCount > 1;
       });
 
       // Mock login flow methods
-      const mockClickNextButton = jest.spyOn(authManager, 'clickNextButton').mockResolvedValue();
-      const mockClickLoginButton = jest.spyOn(authManager, 'clickLoginButton').mockResolvedValue();
-      const mockClearSensitiveData = jest.spyOn(authManager, 'clearSensitiveData').mockImplementation(() => {});
+      const mockClickNextButton = jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
+      const mockClickLoginButton = jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
+      const mockClearSensitiveData = jest.spyOn(xAuthManager, 'clearSensitiveData').mockImplementation(() => {});
 
       // Execute: Complete login flow
-      await authManager.ensureAuthenticated();
+      await xAuthManager.ensureAuthenticated();
 
       // Verify: Login workflow steps
       expect(mockBrowserService.goto).toHaveBeenCalledWith('https://x.com/i/flow/login');
@@ -282,7 +282,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Login with verification
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Verification workflow steps
       expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="text"]', 'test@example.com');
@@ -313,7 +313,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Login with retries
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Retry attempts made
       expect(result).toBe(true);
@@ -327,7 +327,7 @@ describe('Authentication Flow Integration', () => {
       mockBrowserService.simulateNetworkError();
 
       // Execute: Login attempts exhaust retries
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Failure after max attempts
       expect(result).toBe(false);
@@ -359,7 +359,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Login and save session
-      const loginResult = await authManager.ensureAuthenticated();
+      const loginResult = await xAuthManager.ensureAuthenticated();
       expect(loginResult).toBe(true);
 
       // Verify: Cookies saved
@@ -370,7 +370,7 @@ describe('Authentication Flow Integration', () => {
       mockCookieStorage.hasCookies.mockReturnValue(true);
       mockCookieStorage.loadCookies.mockResolvedValue(mockCookies);
 
-      const restoreResult = await authManager.ensureAuthenticated();
+      const restoreResult = await xAuthManager.ensureAuthenticated();
 
       // Verify: Session restored without re-login
       expect(restoreResult).toBe(true);
@@ -389,7 +389,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Attempt session restore with corrupted data
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Falls back to fresh login
       expect(result).toBe(true);
@@ -412,7 +412,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Session validation and re-authentication
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Re-authentication performed
       expect(result).toBe(true);
@@ -429,9 +429,9 @@ describe('Authentication Flow Integration', () => {
 
       // Execute: Multiple authentication checks
       const results = await Promise.all([
-        authManager.ensureAuthenticated(),
-        authManager.ensureAuthenticated(),
-        authManager.ensureAuthenticated(),
+        xAuthManager.ensureAuthenticated(),
+        xAuthManager.ensureAuthenticated(),
+        xAuthManager.ensureAuthenticated(),
       ]);
 
       // Verify: All checks pass, browser launched only once
@@ -450,7 +450,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Concurrent authentication requests
-      const promises = Array.from({ length: 5 }, () => authManager.ensureAuthenticated());
+      const promises = Array.from({ length: 5 }, () => xAuthManager.ensureAuthenticated());
 
       const results = await Promise.all(promises);
 
@@ -472,11 +472,11 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Initial check (success)
-      let result = await authManager.ensureAuthenticated();
+      let result = await xAuthManager.ensureAuthenticated();
       expect(result).toBe(true);
 
       // Execute: Second check (detects session loss)
-      result = await authManager.ensureAuthenticated();
+      result = await xAuthManager.ensureAuthenticated();
       expect(result).toBe(true);
 
       // Verify: Session loss detected and recovered
@@ -496,7 +496,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Authentication attempt with browser crash
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Graceful failure handling
       expect(result).toBe(false);
@@ -519,7 +519,7 @@ describe('Authentication Flow Integration', () => {
       });
 
       // Execute: Authentication with network recovery
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Success after network recovery
       expect(result).toBe(true);
@@ -531,7 +531,7 @@ describe('Authentication Flow Integration', () => {
       mockBrowserService.waitForSelector.mockRejectedValue(new Error('Rate limit exceeded. Please try again later.'));
 
       // Execute: Authentication with rate limiting
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Rate limiting handled
       expect(result).toBe(false);

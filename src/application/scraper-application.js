@@ -17,7 +17,7 @@ export class ScraperApplication {
     this.state = dependencies.stateManager;
     this.discord = dependencies.discordService;
     this.eventBus = dependencies.eventBus;
-    this.authManager = dependencies.authManager;
+    this.xAuthManager = dependencies.xAuthManager;
     this.delay = dependencies.delay || delay;
 
     // Create enhanced logger for this module
@@ -288,7 +288,7 @@ export class ScraperApplication {
       // Check authentication status
       if (health.browserHealthy) {
         try {
-          health.authenticated = await this.authManager.isAuthenticated();
+          health.authenticated = await this.xAuthManager.isAuthenticated();
           if (!health.authenticated) {
             health.errors.push('Authentication verification failed');
           }
@@ -566,20 +566,21 @@ export class ScraperApplication {
         operation.progress(`Found ${searchTweets.length} tweets on search page`);
       }
 
-      operation.progress('Filtering search results for new tweets only');
-      const newSearchTweets = await this.filterNewTweets(searchTweets);
-
-      operation.progress(`Processing ${newSearchTweets.length} new tweets from search`);
-      if (newSearchTweets.length > 0) {
-        for (const tweet of newSearchTweets) {
+      operation.progress(
+        `Processing ${searchTweets.length} tweets from search (ContentCoordinator will handle filtering)`
+      );
+      let processedCount = 0;
+      if (searchTweets.length > 0) {
+        for (const tweet of searchTweets) {
           try {
             await this.processNewTweet(tweet);
-            this.stats.totalTweetsAnnounced++;
+            processedCount++;
           } catch (error) {
             this.logger.error(`Error processing tweet ${tweet.tweetID}:`, error);
           }
         }
       }
+      this.stats.totalTweetsAnnounced += processedCount;
 
       // STEP 2: Enhanced retweet detection (MANDATORY - DO NOT SKIP)
       operation.progress('STEP 2: Performing enhanced retweet detection from profile timeline');
@@ -591,7 +592,7 @@ export class ScraperApplication {
       this.eventBus.emit('scraper.poll.completed', {
         timestamp: nowUTC(),
         tweetsFound: searchTweets.length,
-        newTweets: newSearchTweets.length,
+        tweetsProcessed: processedCount,
         stats: this.getStats(),
       });
 
@@ -606,7 +607,7 @@ export class ScraperApplication {
 
       operation.success('X profile polling completed successfully', {
         tweetsFound: searchTweets.length,
-        newTweets: newSearchTweets.length,
+        tweetsProcessed: processedCount,
         nextRunInMs: nextInterval,
         nextRunTime: nextRunTimeFormatted,
       });
@@ -687,33 +688,24 @@ export class ScraperApplication {
       operation.progress('Extracting tweets from profile page');
       const tweets = await this.extractTweets();
 
-      operation.progress(`Filtering ${tweets.length} potential retweets from timeline`);
-      const newTweets = await this.filterNewTweets(tweets);
-
-      operation.progress(`Processing ${newTweets.length} new tweets from enhanced detection (primarily retweets)`);
+      operation.progress(
+        `Processing ${tweets.length} tweets from enhanced detection (ContentCoordinator will handle filtering)`
+      );
       let processedCount = 0;
-      let skippedCount = 0;
 
-      for (const tweet of newTweets) {
-        this.logger.debug(`Checking tweet ${tweet.tweetID}, category: ${tweet.tweetCategory}`);
-        if (await this.isNewContent(tweet)) {
-          this.logger.info(`✅ Found new tweet to process: ${tweet.url} (${tweet.tweetCategory})`);
+      for (const tweet of tweets) {
+        this.logger.debug(`Processing tweet ${tweet.tweetID}, category: ${tweet.tweetCategory || 'unknown'}`);
+        try {
           await this.processNewTweet(tweet);
-          this.stats.totalTweetsAnnounced++;
           processedCount++;
-        } else {
-          // Log filtered content with beginning of tweet text
-          const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
-          this.logger.debug(`Skipping old tweet ${tweet.tweetID} - "${contentPreview}..." (${tweet.tweetCategory})`);
-          skippedCount++;
+        } catch (error) {
+          this.logger.error(`Error processing tweet ${tweet.tweetID}:`, error);
         }
       }
 
       operation.success('Enhanced retweet detection completed', {
         totalTweetsFound: tweets.length,
-        newTweetsFound: newTweets.length,
         tweetsProcessed: processedCount,
-        tweetsSkipped: skippedCount,
       });
     } catch (error) {
       operation.error(error, 'Error during enhanced retweet detection', {
@@ -918,140 +910,6 @@ export class ScraperApplication {
   }
 
   /**
-   * Filter tweets to only include new ones
-   * @param {Array} tweets - All extracted tweets
-   * @returns {Promise<Array>} New tweets only
-   */
-  async filterNewTweets(tweets) {
-    const operation = this.logger.startOperation('filterNewTweets', {
-      totalTweets: tweets.length,
-    });
-
-    const newTweets = [];
-    let duplicateCount = 0;
-    let oldContentCount = 0;
-
-    try {
-      operation.progress(`Processing ${tweets.length} tweets for filtering`);
-
-      for (const tweet of tweets) {
-        const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
-
-        if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
-          // Mark as seen immediately to prevent future duplicates
-          this.duplicateDetector.markAsSeen(tweet.url);
-
-          // Check if tweet is new enough based on bot start time
-          if (await this.isNewContent(tweet)) {
-            newTweets.push(tweet);
-            this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${contentPreview}...`);
-          } else {
-            oldContentCount++;
-            // Log filtered content with beginning of tweet text
-            this.logger.verbose(
-              `Filtered out old tweet: ${tweet.tweetID} - "${contentPreview}..." - timestamp: ${tweet.timestamp}`
-            );
-          }
-        } else {
-          duplicateCount++;
-          // Log filtered duplicate content with beginning of tweet text
-          this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID} - "${contentPreview}..."`);
-        }
-      }
-
-      operation.success('Tweet filtering completed', {
-        newTweets: newTweets.length,
-        duplicates: duplicateCount,
-        oldContent: oldContentCount,
-        filterEfficiency: Math.round(((duplicateCount + oldContentCount) / tweets.length) * 100),
-      });
-
-      return newTweets;
-    } catch (error) {
-      operation.error(error, 'Error filtering tweets');
-      return [];
-    }
-  }
-
-  /**
-   * Check if content is new enough to announce
-   * Uses duplicate detection and reasonable time windows instead of strict bot startup time
-   * @param {Object} tweet - Tweet object
-   * @returns {Promise<boolean>} True if content is new
-   */
-  async isNewContent(tweet) {
-    const announceOldTweets = this.config.getBoolean('ANNOUNCE_OLD_TWEETS', false);
-
-    // If configured to announce old tweets, consider all tweets as new
-    if (announceOldTweets) {
-      this.logger.debug(`ANNOUNCE_OLD_TWEETS=true, considering tweet ${tweet.tweetID} as new`);
-      return true;
-    }
-
-    // Check: Have we seen this tweet before? (Primary duplicate detection)
-    if (tweet.url && (await this.duplicateDetector.isDuplicate(tweet.url))) {
-      this.logger.debug(`🔍 Tweet ${tweet.tweetID} already known (duplicate detection), not new`, {
-        tweetUrl: tweet.url,
-        duplicateDetectionMethod: 'url_based',
-        contentType: tweet.type || 'unknown',
-      });
-      return false;
-    }
-
-    // Check: Is the content too old based on MAX_CONTENT_AGE_HOURS?
-    const maxAgeHours = this.config.get('MAX_CONTENT_AGE_HOURS', '24'); // Default 24 hours
-    const maxAgeMs = parseInt(maxAgeHours) * 60 * 60 * 1000;
-    const cutoffTime = new Date(Date.now() - maxAgeMs);
-
-    if (tweet.timestamp) {
-      const tweetTime = new Date(tweet.timestamp);
-      const ageInMinutes = Math.floor((Date.now() - tweetTime.getTime()) / (1000 * 60));
-      const ageInHours = Math.floor(ageInMinutes / 60);
-
-      if (tweetTime < cutoffTime) {
-        this.logger.debug(
-          `⏰ Tweet ${tweet.tweetID} is too old - exceeds MAX_CONTENT_AGE_HOURS=${maxAgeHours}h, not new`,
-          {
-            tweetTime: tweetTime.toISOString(),
-            cutoffTime: cutoffTime.toISOString(),
-            ageInMinutes,
-            ageInHours,
-            maxAgeHours: parseInt(maxAgeHours),
-            contentType: tweet.type || 'unknown',
-            tweetUrl: tweet.url,
-          }
-        );
-        return false;
-      } else {
-        this.logger.debug(`⏰ Tweet ${tweet.tweetID} age check passed: ${ageInHours}h old (limit: ${maxAgeHours}h)`, {
-          ageInMinutes,
-          ageInHours,
-          maxAgeHours: parseInt(maxAgeHours),
-          contentType: tweet.type || 'unknown',
-        });
-      }
-    }
-
-    // If no timestamp available, assume it's new (but will be caught by duplicate detection if seen again)
-    if (!tweet.timestamp) {
-      this.logger.debug(`⚠️ No timestamp for tweet ${tweet.tweetID}, considering as new`, {
-        tweetUrl: tweet.url,
-        contentType: tweet.type || 'unknown',
-        fallbackReason: 'missing_timestamp',
-      });
-      return true;
-    }
-
-    this.logger.debug(`✅ Tweet ${tweet.tweetID} passed all checks, considering as new`, {
-      tweetUrl: tweet.url,
-      contentType: tweet.type || 'unknown',
-      timestamp: tweet.timestamp,
-      checksPerformed: ['duplicate_detection', 'age_filtering'],
-    });
-    return true;
-  }
-
-  /**
    * Check if enhanced retweet processing should be enabled
    * @returns {boolean} True if retweet processing is enabled
    */
@@ -1147,7 +1005,7 @@ export class ScraperApplication {
     });
 
     try {
-      const isAuthenticated = await this.authManager.isAuthenticated();
+      const isAuthenticated = await this.xAuthManager.isAuthenticated();
       if (!isAuthenticated) {
         operation.progress('Authentication check failed, re-authenticating');
         await this.ensureAuthenticated();
@@ -1262,7 +1120,7 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async ensureAuthenticated(options = {}) {
-    return this.authManager.ensureAuthenticated(options);
+    return this.xAuthManager.ensureAuthenticated(options);
   }
 
   /**

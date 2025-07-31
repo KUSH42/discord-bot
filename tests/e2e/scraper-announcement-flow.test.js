@@ -278,7 +278,7 @@ describe('Scraper Announcement Flow E2E', () => {
       logger: mockLogger,
       debugManager: mockDebugManager,
       metricsManager: mockMetricsManager,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: mockPersistentStorage,
       livestreamStateMachine: {
         transitionState: jest.fn(() => Promise.resolve()),

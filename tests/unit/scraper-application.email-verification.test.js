@@ -69,7 +69,7 @@ describe('ScraperApplication Email Verification', () => {
       logger: mockLogger,
       debugManager: enhancedLoggingMocks.debugManager,
       metricsManager: enhancedLoggingMocks.metricsManager,
-      authManager: {
+      xAuthManager: {
         login: jest.fn(),
         clickNextButton: jest.fn(),
         clickLoginButton: jest.fn(),

@@ -256,7 +256,7 @@ it('should log critical errors to console', async () => {
 **NEVER run full test suites to check single file fixes:**
 - **Single test file**: `npm test -- path/to/specific.test.js`
 - **Specific test name**: `npm test -- --testNamePattern="specific test name"`
-- **Pattern matching**: `npm test -- --testNamePattern="AuthManager"`
+- **Pattern matching**: `npm test -- --testNamePattern="XAuthManager"`
 - **Note**: `--testPathPattern` is often unreliable - use direct file paths instead
 
 **Development workflow:**

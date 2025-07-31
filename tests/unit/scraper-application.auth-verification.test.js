@@ -75,7 +75,7 @@ describe('ScraperApplication Authentication Verification', () => {
       logger: mockLogger,
       debugManager: enhancedLoggingMocks.debugManager,
       metricsManager: enhancedLoggingMocks.metricsManager,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       duplicateDetector: {
         isDuplicate: jest.fn().mockReturnValue(false),
         markAsSeen: jest.fn(),

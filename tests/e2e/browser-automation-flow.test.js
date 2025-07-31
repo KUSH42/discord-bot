@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
-import { AuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/auth-manager.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { PlaywrightBrowserService } from '../../src/services/implementations/playwright-browser-service.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
@@ -10,7 +10,7 @@ import { createScraperApplicationMocks } from '../fixtures/application-mocks.js'
  * End-to-End Browser Automation Flow Tests
  *
  * Tests complete X scraping workflow with realistic browser interactions:
- * - AuthManager login flow with browser automation
+ * - XAuthManager login flow with browser automation
  * - Page navigation and element detection
  * - Content extraction and classification
  * - Browser error recovery scenarios
@@ -18,7 +18,7 @@ import { createScraperApplicationMocks } from '../fixtures/application-mocks.js'
  */
 describe('Browser Automation Flow E2E', () => {
   let scraperApp;
-  let authManager;
+  let xAuthManager;
   let contentCoordinator;
   let browserService;
   let loggerMocks;
@@ -147,8 +147,8 @@ describe('Browser Automation Flow E2E', () => {
       },
     };
 
-    // Create AuthManager with proper dependencies object
-    authManager = new AuthManager({
+    // Create XAuthManager with proper dependencies object
+    xAuthManager = new XAuthManager({
       config: mockConfig,
       browserService,
       stateManager: mockStateManager,
@@ -162,7 +162,7 @@ describe('Browser Automation Flow E2E', () => {
       config: mockConfig,
       stateManager: mockStateManager,
       contentCoordinator,
-      authManager,
+      xAuthManager,
       browserService,
       logger: loggerMocks.baseLogger,
       debugManager: loggerMocks.debugManager,
@@ -226,7 +226,7 @@ describe('Browser Automation Flow E2E', () => {
         .mockResolvedValueOnce(true); // Successfully logged in after process
 
       // Execute: Complete authentication flow
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Authentication workflow steps
       expect(browserService.launch).toHaveBeenCalled();
@@ -262,7 +262,7 @@ describe('Browser Automation Flow E2E', () => {
       });
 
       // Execute: Authentication with verification
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Email verification workflow
       expect(browserService.type).toHaveBeenCalledWith('input[name="text"]', 'verification@example.com');
@@ -278,7 +278,7 @@ describe('Browser Automation Flow E2E', () => {
       browserService.waitForSelector.mockRejectedValue(new Error('Element not found'));
 
       // Execute: Authentication attempt
-      const result = await authManager.ensureAuthenticated();
+      const result = await xAuthManager.ensureAuthenticated();
 
       // Verify: Graceful failure handling
       expect(result).toBe(false);
@@ -293,7 +293,7 @@ describe('Browser Automation Flow E2E', () => {
   describe('Content Scraping Flow E2E', () => {
     beforeEach(() => {
       // Mock successful authentication
-      jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue(true);
+      jest.spyOn(xAuthManager, 'ensureAuthenticated').mockResolvedValue(true);
     });
 
     it('should perform complete scraping workflow with content detection', async () => {
@@ -323,7 +323,7 @@ describe('Browser Automation Flow E2E', () => {
       await scraperApp.runScrapingCycle();
 
       // Verify: Scraping workflow steps
-      expect(authManager.ensureAuthenticated).toHaveBeenCalled();
+      expect(xAuthManager.ensureAuthenticated).toHaveBeenCalled();
       expect(browserService.goto).toHaveBeenCalledWith(expect.stringContaining('x.com/search'));
       expect(browserService.evaluate).toHaveBeenCalled();
 
@@ -442,7 +442,7 @@ describe('Browser Automation Flow E2E', () => {
   describe('Integration with ContentCoordinator E2E', () => {
     it('should properly integrate scraped content with ContentCoordinator processing', async () => {
       // Setup: Mock successful authentication and content discovery
-      jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue(true);
+      jest.spyOn(xAuthManager, 'ensureAuthenticated').mockResolvedValue(true);
 
       const mockContent = {
         id: 'tweet123',
@@ -481,7 +481,7 @@ describe('Browser Automation Flow E2E', () => {
 
     it('should handle ContentCoordinator processing failures gracefully', async () => {
       // Setup: Mock scraping success but coordinator failure
-      jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue(true);
+      jest.spyOn(xAuthManager, 'ensureAuthenticated').mockResolvedValue(true);
       browserService.evaluate.mockResolvedValue([
         {
           id: 'tweet123',

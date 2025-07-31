@@ -60,7 +60,7 @@ export const createScraperApplicationMocks = () => {
       on: jest.fn(),
       off: jest.fn(),
     },
-    authManager: {
+    xAuthManager: {
       login: jest.fn(),
       clickNextButton: jest.fn(),
       clickLoginButton: jest.fn(),

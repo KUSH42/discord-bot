@@ -36,7 +36,8 @@ import { LivestreamStateMachine } from '../core/livestream-state-machine.js';
 import { YouTubeScraperService } from '../services/implementations/youtube-scraper-service.js';
 
 // Applications
-import { AuthManager } from '../application/auth-manager.js';
+import { XAuthManager } from '../application/x-auth-manager.js';
+import { YouTubeAuthManager } from '../application/youtube-auth-manager.js';
 import { BotApplication } from '../application/bot-application.js';
 import { ScraperApplication } from '../application/scraper-application.js';
 import { MonitorApplication } from '../application/monitor-application.js';
@@ -277,13 +278,25 @@ async function setupApplicationServices(container, _config) {
     });
   });
 
-  // Auth Manager
-  container.registerSingleton('authManager', c => {
-    return new AuthManager({
+  // X Auth Manager
+  container.registerSingleton('xAuthManager', c => {
+    return new XAuthManager({
       browserService: c.resolve('xBrowserService'),
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
-      logger: c.resolve('logger').child({ service: 'AuthManager' }),
+      logger: c.resolve('logger').child({ service: 'XAuthManager' }),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
+  });
+
+  // YouTube Auth Manager
+  container.registerSingleton('youtubeAuthManager', c => {
+    return new YouTubeAuthManager({
+      browserService: c.resolve('youtubeBrowserService'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      logger: c.resolve('logger').child({ service: 'YouTubeAuthManager' }),
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
     });
@@ -300,7 +313,7 @@ async function setupApplicationServices(container, _config) {
       stateManager: c.resolve('stateManager'),
       eventBus: c.resolve('eventBus'),
       logger: c.resolve('logger').child({ service: 'ScraperApplication' }),
-      authManager: c.resolve('authManager'),
+      xAuthManager: c.resolve('xAuthManager'),
       duplicateDetector: c.resolve('duplicateDetector'),
       persistentStorage: c.resolve('persistentStorage'),
       debugManager: c.resolve('debugFlagManager'),
