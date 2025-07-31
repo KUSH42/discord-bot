@@ -538,6 +538,17 @@ export class ScraperApplication {
       operation.progress(`Navigating to search URL: ${searchUrl}`);
       await this.browser.goto(searchUrl);
 
+      // Check if we got redirected to home page (login required)
+      const currentUrl = await this.browser.getCurrentUrl();
+      if (currentUrl.includes('/home') || currentUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Authentication failed: redirected to home page instead of search results`),
+          'Redirected to home page - search aborted',
+          { expectedUrl: searchUrl, actualUrl: currentUrl }
+        );
+        throw new Error('Authentication required: redirected to home page');
+      }
+
       operation.progress('Waiting for search results to load');
       await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
 
@@ -556,6 +567,18 @@ export class ScraperApplication {
 
       operation.progress('Extracting tweets from search results');
       const searchTweets = await this.extractTweets();
+
+      // Validate we're on the correct page before processing results
+      const finalUrl = await this.browser.getCurrentUrl();
+      if (finalUrl.includes('/home') || finalUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Invalid page detected during extraction: on home page instead of search results`),
+          'Home page detected during tweet extraction - aborting',
+          { expectedPattern: 'search?q=', actualUrl: finalUrl }
+        );
+        throw new Error('Invalid page: extracted tweets from home page instead of search');
+      }
+
       this.stats.totalTweetsFound += searchTweets.length;
 
       // Enhanced logging for debugging intermittent detection
@@ -671,6 +694,16 @@ export class ScraperApplication {
       const currentUrl = (await this.browser.getCurrentUrl?.()) || 'unknown';
       const expectedProfileUrl = `https://x.com/${this.xUser}`;
 
+      // Check for home page redirect first (authentication issue)
+      if (currentUrl.includes('/home') || currentUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Authentication failed: redirected to home page instead of user profile`),
+          'Redirected to home page during profile navigation',
+          { expectedUrl: expectedProfileUrl, actualUrl: currentUrl }
+        );
+        throw new Error('Authentication required: redirected to home page during profile access');
+      }
+
       if (!currentUrl.includes(`x.com/${this.xUser}`) && !currentUrl.includes(`twitter.com/${this.xUser}`)) {
         operation.error(
           new Error(`Navigation failed: Expected ${expectedProfileUrl}, but got ${currentUrl}`),
@@ -771,14 +804,7 @@ export class ScraperApplication {
 
         // Handle case where no articles found with debugging
         if (articles.length === 0) {
-          const _debugInfo = window.debugNoArticlesFound
-            ? window.debugNoArticlesFound()
-            : {
-                bodyText: document.body.innerText || '',
-                currentUrl: window.location.href,
-                searchIndicators: [],
-                authIssues: [],
-              };
+          window.debugNoArticlesFound && window.debugNoArticlesFound();
 
           console.log('DEBUG: No articles found - checking fallback selectors');
           const fallbackArticles = window.tryFallbackSelectors ? window.tryFallbackSelectors() : [];
@@ -813,6 +839,19 @@ export class ScraperApplication {
               : { author: 'Unknown', retweetedBy: null };
 
             const { author, retweetedBy } = authorData;
+
+            // CRITICAL: Validate author matches monitored user
+            // Skip tweets that aren't from our monitored user (posts/quotes/replies)
+            // or retweeted by our monitored user (retweets)
+            const isFromMonitoredUser = author === monitoredUser;
+            const isRetweetByMonitoredUser = retweetedBy === monitoredUser;
+
+            if (!isFromMonitoredUser && !isRetweetByMonitoredUser) {
+              console.log(
+                `SKIP: Tweet ${tweetID} - author '${author}' (retweetedBy: '${retweetedBy}') doesn't match monitored user '${monitoredUser}'`
+              );
+              continue;
+            }
 
             // Extract text content using helper function
             const text = window.extractTweetText
@@ -872,10 +911,38 @@ export class ScraperApplication {
       // Ensure we always return an array, even if browser.evaluate returns undefined
       const tweets = Array.isArray(result) ? result : [];
 
+      // Create breakdown by category for better logging
       const stats = {
         tweetsFound: tweets.length,
-        // Classification will be handled by ContentClassifier, not here
+        breakdown: {
+          posts: 0,
+          replies: 0,
+          quotes: 0,
+          retweets: 0,
+          unknown: 0,
+        },
       };
+
+      // Classify tweets for logging breakdown
+      for (const tweet of tweets) {
+        try {
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, {
+            author: tweet.author,
+            monitoredUser: this.xUser,
+            retweetedBy: tweet.retweetedBy,
+            ...tweet.rawClassificationData,
+          });
+
+          const category = classification.type || 'unknown';
+          if (stats.breakdown[category] !== undefined) {
+            stats.breakdown[category]++;
+          } else {
+            stats.breakdown.unknown++;
+          }
+        } catch (_error) {
+          stats.breakdown.unknown++;
+        }
+      }
 
       operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);
 
@@ -930,8 +997,6 @@ export class ScraperApplication {
     });
 
     try {
-      operation.progress('Preparing content for ContentCoordinator processing');
-
       // Create streamlined content object - let ContentCoordinator handle classification
       const content = {
         platform: 'x',
@@ -948,10 +1013,7 @@ export class ScraperApplication {
         xUser: this.xUser,
       };
 
-      operation.progress('Delegating to ContentCoordinator for processing and announcement');
       const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
-
-      operation.progress('Marking content as seen to prevent reprocessing');
       if (tweet.url) {
         this.duplicateDetector.markAsSeen(tweet.url);
       }
@@ -971,11 +1033,34 @@ export class ScraperApplication {
           result: result.reason || 'announced',
         });
       } else if (result.action === 'skip') {
-        operation.success(`Content skipped - ${result.reason}`, {
-          tweetId: tweet.tweetID,
-          skipReason: result.reason,
-          publishedAt: tweet.timestamp,
-        });
+        // Get tweet category for enhanced logging
+        let category = 'unknown';
+        try {
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, {
+            author: tweet.author,
+            monitoredUser: this.xUser,
+            retweetedBy: tweet.retweetedBy,
+            ...tweet.rawClassificationData,
+          });
+          category = classification.type || 'unknown';
+        } catch (_error) {
+          // Keep default category if classification fails
+        }
+
+        // Get first 50 characters of tweet text
+        const textPreview = (tweet.text || '').substring(0, 50);
+        const textSuffix = (tweet.text || '').length > 50 ? '...' : '';
+
+        operation.success(
+          `Skipping content: ${category} too old - published ${tweet.timestamp}\n${textPreview}${textSuffix}`,
+          {
+            tweetId: tweet.tweetID,
+            skipReason: result.reason,
+            publishedAt: tweet.timestamp,
+            category,
+            textPreview: `${textPreview}${textSuffix}`,
+          }
+        );
       } else if (result.action === 'failed') {
         operation.error(
           new Error(result.reason || 'ContentCoordinator processing failed'),
