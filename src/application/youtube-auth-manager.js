@@ -459,7 +459,7 @@ export class YouTubeAuthManager {
           '#avatar-btn, [aria-label*="Account menu"], button[aria-label*="Google Account"]'
         );
         // eslint-disable-next-line no-undef
-        const signInButton = document.querySelector('a[aria-label*="Sign in"], button:has-text("Sign in")');
+        const signInButton = document.querySelector('a[aria-label*="Sign in"], button[aria-label*="Sign in"]');
 
         return {
           hasAvatar: !!avatarButton,
