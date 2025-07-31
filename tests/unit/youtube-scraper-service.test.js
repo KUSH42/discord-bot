@@ -28,8 +28,18 @@ describe('YouTubeScraperService', () => {
           YOUTUBE_AUTHENTICATION_ENABLED: 'false',
           YOUTUBE_USERNAME: '',
           YOUTUBE_PASSWORD: '',
+          YOUTUBE_CHANNEL_ID: 'UC_test_channel_id',
         };
         return config[key] || defaultValue;
+      }),
+      getRequired: jest.fn(key => {
+        const config = {
+          YOUTUBE_CHANNEL_ID: 'UC_test_channel_id',
+        };
+        if (config[key] === undefined) {
+          throw new Error(`Required configuration key '${key}' is not set`);
+        }
+        return config[key];
       }),
       getBoolean: jest.fn((key, defaultValue) => {
         const config = {
@@ -121,6 +131,11 @@ describe('YouTubeScraperService', () => {
         args: expect.arrayContaining([
           '--no-sandbox',
           '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
           '--disable-images',
           '--disable-plugins',
           '--mute-audio',
@@ -210,8 +225,7 @@ describe('YouTubeScraperService', () => {
         title: 'Latest Video',
       };
 
-      mockBrowserService.evaluate.mockReset();
-      // Mock the sequence: debug info, consent check, video extraction
+      // Initialize the scraper first
       mockBrowserService.evaluate
         .mockResolvedValueOnce({
           title: 'Test Channel',
@@ -222,14 +236,28 @@ describe('YouTubeScraperService', () => {
           videoTitleLinkById: 1,
           genericVideoLinks: 1,
           shortsLinks: 0,
-        }) // Debug info call
-        .mockResolvedValueOnce('https://www.youtube.com/@testchannel/videos') // handleConsentPageRedirect call
-        .mockResolvedValueOnce(mockVideo); // Video extraction call
+        }) // Debug info call during initialization
+        .mockResolvedValueOnce('https://www.youtube.com/@testchannel/videos') // handleConsentPageRedirect call during initialization
+        .mockResolvedValueOnce(mockVideo) // Video extraction call during initialization
+        .mockResolvedValueOnce({
+          title: 'Test Channel',
+          url: 'https://www.youtube.com/@testchannel/videos',
+          ytdRichGridMedia: 1,
+          ytdRichItemRenderer: 0,
+          videoTitleById: 1,
+          videoTitleLinkById: 1,
+          genericVideoLinks: 1,
+          shortsLinks: 0,
+        }) // Debug info call during fetchLatestVideo
+        .mockResolvedValueOnce('https://www.youtube.com/@testchannel/videos') // handleConsentPageRedirect call during fetchLatestVideo
+        .mockResolvedValueOnce(mockVideo); // Video extraction call during fetchLatestVideo
+
+      await scraperService.initialize('testchannel');
 
       const result = await scraperService.fetchLatestVideo();
       expect(result).not.toBeNull();
       expect(result.id).toBe(mockVideo.id);
-      expect(scraperService.metrics.successfulScrapes).toBe(1);
+      expect(scraperService.metrics.successfulScrapes).toBe(2); // One during initialize, one during fetchLatestVideo
     });
 
     it('should handle scraping failures gracefully', async () => {

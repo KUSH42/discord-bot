@@ -350,12 +350,12 @@ export class ScraperApplication {
    */
   async initializeBrowser() {
     const operation = this.logger.startOperation('initializeBrowser', {
-      headless: false,
+      headless: true,
     });
 
     try {
       const browserOptions = getXScrapingBrowserConfig({
-        headless: false,
+        headless: true,
       });
 
       operation.progress('Launching browser with X scraping configuration');
