@@ -29,9 +29,6 @@ export class ScraperApplication {
 
     // Scraper configuration
     this.xUser = this.config.getRequired('X_USER_HANDLE');
-    this.xUsername = this.config.getRequired('X_USER_HANDLE');
-    this.twitterUsername = this.config.getRequired('TWITTER_USERNAME');
-    this.twitterPassword = this.config.getRequired('TWITTER_PASSWORD');
 
     // Polling configuration
     this.minInterval = parseInt(this.config.get('X_QUERY_INTERVAL_MIN', '300000'), 10);
@@ -307,9 +304,8 @@ export class ScraperApplication {
       // Check authentication status
       if (health.browserHealthy) {
         try {
-          const authStatus = await this.authManager.isAuthenticated();
-          health.authenticated = authStatus;
-          if (!authStatus) {
+          health.authenticated = await this.authManager.isAuthenticated();
+          if (!health.authenticated) {
             health.errors.push('Authentication verification failed');
           }
         } catch (error) {
@@ -375,7 +371,7 @@ export class ScraperApplication {
 
     try {
       const browserOptions = getXScrapingBrowserConfig({
-        headless: true,
+        headless: false,
       });
 
       operation.progress('Launching browser with X scraping configuration');
@@ -415,26 +411,6 @@ export class ScraperApplication {
       }
     } catch (error) {
       operation.error(error, 'Failed to close browser');
-      throw error;
-    }
-  }
-
-  /**
-   * Login to X (Twitter)
-   * @returns {Promise<void>}
-   */
-  async loginToX() {
-    const operation = this.logger.startOperation('loginToX', {
-      xUser: this.xUser,
-    });
-
-    try {
-      operation.progress('Delegating to AuthManager for X login');
-      const result = await this.authManager.login();
-      operation.success('X login completed via AuthManager');
-      return result;
-    } catch (error) {
-      operation.error(error, 'X login failed');
       throw error;
     }
   }
@@ -1181,30 +1157,15 @@ export class ScraperApplication {
     });
 
     try {
-      operation.progress('Checking authentication status with AuthManager');
       const isAuthenticated = await this.authManager.isAuthenticated();
-
-      if (isAuthenticated) {
-        operation.success('Authentication verified successfully', {
-          authStatus: 'valid',
-        });
-        return;
-      }
-
-      operation.progress('Authentication check failed, re-authenticating');
-      await this.ensureAuthenticated();
-      operation.success('Re-authentication completed after verification failure');
-    } catch (error) {
-      operation.error(error, 'Authentication verification failed, attempting recovery');
-
-      try {
-        operation.progress('Attempting recovery authentication after verification failure');
+      if (!isAuthenticated) {
+        operation.progress('Authentication check failed, re-authenticating');
         await this.ensureAuthenticated();
-        operation.success('Recovery authentication successful');
-      } catch (recoveryError) {
-        operation.error(recoveryError, 'Recovery authentication also failed');
-        throw recoveryError;
       }
+      operation.success('Authentication verification completed');
+    } catch (error) {
+      operation.error(error, 'Authentication verification failed');
+      throw error;
     }
   }
 
@@ -1307,39 +1268,11 @@ export class ScraperApplication {
   }
 
   /**
-   * Ensure user is authenticated (alias for loginToX)
+   * Ensure user is authenticated
    * @returns {Promise<void>}
    */
   async ensureAuthenticated(options = {}) {
-    const defaultOptions = {
-      maxRetries: 3,
-      baseDelay: 2000,
-      ...options,
-    };
-
-    try {
-      await this.authManager.ensureAuthenticated(defaultOptions);
-    } catch (err) {
-      this.logger.error('Authentication failed after all retry attempts:', err);
-      throw err;
-    }
-  }
-
-  /**
-   * Validate cookie format
-   * @param {Array} cookies - Array of cookie objects
-   * @returns {boolean} True if cookies are valid
-   */
-  validateCookieFormat(cookies) {
-    if (!cookies || !Array.isArray(cookies) || cookies.length === 0) {
-      return false;
-    }
-
-    return cookies.every(cookie => {
-      return (
-        cookie && typeof cookie === 'object' && typeof cookie.name === 'string' && typeof cookie.value === 'string'
-      );
-    });
+    return this.authManager.ensureAuthenticated(options);
   }
 
   /**

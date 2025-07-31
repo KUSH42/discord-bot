@@ -95,8 +95,6 @@ describe('ScraperApplication Core Operations', () => {
     mockConfig.getRequired.mockImplementation(key => {
       const defaults = {
         X_USER_HANDLE: 'testuser',
-        TWITTER_USERNAME: 'testuser@example.com',
-        TWITTER_PASSWORD: 'testpass',
       };
       return defaults[key] || 'default-value';
     });
@@ -175,8 +173,6 @@ describe('ScraperApplication Core Operations', () => {
 
     it('should initialize configuration values', () => {
       expect(scraperApp.xUser).toBe('testuser');
-      expect(scraperApp.twitterUsername).toBe('testuser@example.com');
-      expect(scraperApp.twitterPassword).toBe('testpass');
       expect(scraperApp.minInterval).toBe(300000);
       expect(scraperApp.maxInterval).toBe(600000);
     });
@@ -504,27 +500,9 @@ describe('ScraperApplication Core Operations', () => {
   });
 
   describe('Authentication Methods', () => {
-    it('should delegate login to auth manager', async () => {
-      await scraperApp.loginToX();
-      expect(mockAuthManager.login).toHaveBeenCalled();
-    });
-
     it('should delegate ensure authenticated to auth manager', async () => {
       await scraperApp.ensureAuthenticated();
       expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
-    });
-
-    it('should handle authentication errors', async () => {
-      const authError = new Error('Auth failed');
-      mockAuthManager.ensureAuthenticated.mockRejectedValue(authError);
-
-      await expect(scraperApp.ensureAuthenticated()).rejects.toThrow('Auth failed');
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Authentication failed after all retry attempts:',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
     });
   });
 
@@ -578,26 +556,6 @@ describe('ScraperApplication Core Operations', () => {
 
       expect(url).toBe('https://x.com/search?q=(from%3Atestuser)&f=live&pf=on&src=typed_query');
       expect(url).not.toContain('since%3A');
-    });
-  });
-
-  describe('Cookie Validation', () => {
-    it('should validate correct cookie format', () => {
-      const validCookies = [
-        { name: 'session', value: 'abc123', domain: 'x.com' },
-        { name: 'auth_token', value: 'def456', domain: 'x.com' },
-      ];
-
-      expect(scraperApp.validateCookieFormat(validCookies)).toBe(true);
-    });
-
-    it('should reject invalid cookie formats', () => {
-      expect(scraperApp.validateCookieFormat(null)).toBe(false);
-      expect(scraperApp.validateCookieFormat([])).toBe(false);
-      expect(scraperApp.validateCookieFormat('not-array')).toBe(false);
-      expect(scraperApp.validateCookieFormat([{ name: 'test' }])).toBe(false); // Missing value
-      expect(scraperApp.validateCookieFormat([{ value: 'test' }])).toBe(false); // Missing name
-      expect(scraperApp.validateCookieFormat([{ name: 123, value: 'test' }])).toBe(false); // Invalid name type
     });
   });
 
