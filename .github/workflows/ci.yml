@@ -254,7 +254,6 @@ jobs:
             --config=tests/configs/jest.unit.config.js \
             --coverage \
             --coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }} \
-            --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=10000 \
             --forceExit \
@@ -505,7 +504,6 @@ jobs:
           npm run test:integration -- \
             --coverage \
             --coverageDirectory=coverage/integration-tests \
-            --coverageReporters=lcov \
             --testTimeout=15000 \
             --forceExit \
             --detectOpenHandles \
@@ -613,7 +611,6 @@ jobs:
           npm run test:e2e -- \
             --coverage \
             --coverageDirectory=coverage/e2e-tests \
-            --coverageReporters=lcov \
             --testTimeout=30000 \
             --forceExit \
             --detectOpenHandles \
@@ -695,7 +692,6 @@ jobs:
           npm run test:performance -- \
             --coverage \
             --coverageDirectory=coverage/performance-tests \
-            --coverageReporters=lcov \
             --maxWorkers=1 \
             --testTimeout=60000 \
             --forceExit \
@@ -820,6 +816,8 @@ jobs:
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
             --testTimeout=20000 \
+            --coverage \
+            --coverageDirectory=coverage/security-tests \
             --forceExit \
             --detectOpenHandles \
             2>&1 | tee logs/security-tests-output.log
