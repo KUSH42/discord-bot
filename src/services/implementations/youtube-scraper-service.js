@@ -88,7 +88,7 @@ export class YouTubeScraperService {
 
       // Launch browser with optimized settings for scraping
       const browserOptions = getYouTubeScrapingBrowserConfig({
-        headless: true,
+        headless: false,
       });
 
       await this.browserService.launch(browserOptions);
@@ -178,7 +178,7 @@ export class YouTubeScraperService {
         operation.progress('Handling consent page redirects');
 
         // Handle consent page if redirected
-        await this.youtubeAuthManager.handleConsentPageRedirect();
+        await this.authManager.handleConsentPageRedirect();
 
         // Wait for the page to load and videos to appear
         await this.browserService.waitFor(2000);

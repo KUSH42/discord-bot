@@ -116,7 +116,7 @@ export function getBrowserTweetHelperFunctions() {
       const timeElement = article.querySelector('time');
       if (timeElement) {
         const datetime = timeElement.getAttribute('datetime');
-        if (datetime && /^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}/.test(datetime)) {
+        if (datetime && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/.test(datetime)) {
           return datetime;
         }
       }
