@@ -261,8 +261,7 @@ jobs:
             --verbose=true \
             2>&1 | tee logs/unit-tests-node${{ matrix.node-version }}.log
             mv ./coverage/unit-tests-node${{ matrix.node-version }}/coverage-final.json ./coverage/unit-tests-node${{ matrix.node-version }}-coverage-final.json
-            rm -r ./coverage/unit-tests-node${{ matrix.node-version }}
-
+            
       - name: Store unit test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -699,6 +698,7 @@ jobs:
             --passWithNoTests \
             --verbose=true \
             2>&1 | tee logs/performance-tests-output.log
+
             mv ./coverage/performance-tests/coverage-final.json ./coverage/performance-tests-coverage-final.json
             rm -r ./coverage/performance-tests 
 
