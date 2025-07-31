@@ -14,7 +14,7 @@ export class YouTubeAuthManager {
 
     // Create enhanced logger for this module
     this.logger = createEnhancedLogger(
-      'youtube-auth',
+      'auth',
       dependencies.logger,
       dependencies.debugManager,
       dependencies.metricsManager
@@ -431,6 +431,7 @@ export class YouTubeAuthManager {
 
   /**
    * Checks if the current session is authenticated with YouTube.
+   * Uses multiple verification methods for robust authentication detection.
    * @returns {Promise<boolean>} True if authenticated
    */
   async isAuthenticated() {
@@ -450,33 +451,118 @@ export class YouTubeAuthManager {
 
       // Try to navigate to YouTube and check if we're logged in
       operation.progress('Checking authentication by navigating to YouTube');
-      await this.browserService.goto('https://www.youtube.com', { timeout: 10000, waitUntil: 'domcontentloaded' });
+      await this.browserService.goto('https://www.youtube.com', { timeout: 15000, waitUntil: 'domcontentloaded' });
 
-      // Check for signs of being logged in
+      // Wait for page to fully load
+      await this.browserService.waitFor(3000);
+
+      // Check for signs of being logged in using multiple indicators
       const authIndicators = await this.browserService.evaluate(() => {
+        // Multiple selectors for avatar/account buttons (YouTube UI changes frequently)
+
+        const avatarSelectors = [
+          '#avatar-btn',
+          '[aria-label*="Account menu"]',
+          'button[aria-label*="Google Account"]',
+          'button[aria-label*="account"]',
+          'yt-img-shadow[id="avatar"]',
+          '.ytd-topbar-menu-button-renderer button',
+          '#img',
+        ];
+
+        let avatarButton = null;
+        for (const selector of avatarSelectors) {
+          // eslint-disable-next-line no-undef
+          avatarButton = document.querySelector(selector);
+          if (avatarButton) {
+            break;
+          }
+        }
+
+        // Multiple selectors for sign-in buttons
+
+        const signInSelectors = [
+          'a[aria-label*="Sign in"]',
+          'button[aria-label*="Sign in"]',
+          '.sign-in-link',
+          '[href*="accounts.google.com"]',
+          'tp-yt-paper-button:has-text("Sign in")',
+        ];
+
+        let signInButton = null;
+        for (const selector of signInSelectors) {
+          // eslint-disable-next-line no-undef
+          signInButton = document.querySelector(selector);
+          if (signInButton) {
+            break;
+          }
+        }
+
+        // Check for authentication cookies as additional indicator
         // eslint-disable-next-line no-undef
-        const avatarButton = document.querySelector(
-          '#avatar-btn, [aria-label*="Account menu"], button[aria-label*="Google Account"]'
-        );
+        const hasAuthCookies = document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
+
+        // Check for authenticated user-specific elements
         // eslint-disable-next-line no-undef
-        const signInButton = document.querySelector('a[aria-label*="Sign in"], button[aria-label*="Sign in"]');
+        const hasUserMenu = !!document.querySelector('[aria-label*="menu"], [data-target-id="topbar-menu-button"]');
+
+        // Check if we're on login/error pages (bad indicators)
+
+        const onLoginPage =
+          // eslint-disable-next-line no-undef
+          window.location.href.includes('accounts.google.com') ||
+          // eslint-disable-next-line no-undef
+          window.location.href.includes('login') ||
+          // eslint-disable-next-line no-undef
+          window.location.href.includes('signin') ||
+          // eslint-disable-next-line no-undef
+          document.title.toLowerCase().includes('sign in');
 
         return {
           hasAvatar: !!avatarButton,
           hasSignIn: !!signInButton,
+          hasAuthCookies,
+          hasUserMenu,
+          onLoginPage,
           // eslint-disable-next-line no-undef
           currentUrl: window.location.href,
+          // eslint-disable-next-line no-undef
+          pageTitle: document.title,
         };
       });
 
-      const isAuthenticated = authIndicators.hasAvatar && !authIndicators.hasSignIn;
+      // Multiple authentication indicators - use a scoring system
+      let authScore = 0;
 
-      operation.success('Authentication check completed', {
+      if (authIndicators.hasAvatar) {
+        authScore += 3;
+      } // Strong positive indicator
+      if (!authIndicators.hasSignIn) {
+        authScore += 2;
+      } // Good positive indicator
+      if (authIndicators.hasAuthCookies) {
+        authScore += 2;
+      } // Good positive indicator
+      if (authIndicators.hasUserMenu) {
+        authScore += 1;
+      } // Weak positive indicator
+      if (authIndicators.onLoginPage) {
+        authScore -= 5;
+      } // Strong negative indicator
+
+      const isAuthenticated = authScore >= 3; // Require strong evidence
+
+      operation.success(`Authentication check completed with score ${authScore}`, {
         authenticated: isAuthenticated,
-        method: 'youtube_navigation_test',
+        method: 'multi_indicator_scoring',
+        authScore,
         hasAvatar: authIndicators.hasAvatar,
         hasSignIn: authIndicators.hasSignIn,
+        hasAuthCookies: authIndicators.hasAuthCookies,
+        hasUserMenu: authIndicators.hasUserMenu,
+        onLoginPage: authIndicators.onLoginPage,
         currentUrl: authIndicators.currentUrl.substring(0, 50),
+        pageTitle: authIndicators.pageTitle.substring(0, 30),
       });
 
       return isAuthenticated;
