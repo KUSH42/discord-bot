@@ -2,6 +2,7 @@ import { delay } from '../utils/delay.js';
 import { nowUTC, toISOStringUTC, daysAgoUTC } from '../utilities/utc-time.js';
 import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+import { getBrowserTweetHelperFunctions } from '../utilities/browser-tweet-helpers.js';
 
 /**
  * X (Twitter) scraping application orchestrator
@@ -54,26 +55,6 @@ export class ScraperApplication {
       lastError: null,
     };
     this.nextPollTimestamp = null;
-
-    // Debug logging sampling configuration to prevent Discord spam
-    this.debugSamplingRate = parseFloat(this.config.get('X_DEBUG_SAMPLING_RATE', '0.1')); // 10% default
-    this.verboseLogSamplingRate = parseFloat(this.config.get('X_VERBOSE_LOG_SAMPLING_RATE', '0.05')); // 5% default
-  }
-
-  /**
-   * Check if debug logging should be sampled to reduce Discord spam
-   * @returns {boolean} True if debug logging should occur
-   */
-  shouldLogDebug() {
-    return Math.random() < this.debugSamplingRate;
-  }
-
-  /**
-   * Check if verbose logging should be sampled to reduce Discord spam
-   * @returns {boolean} True if verbose logging should occur
-   */
-  shouldLogVerbose() {
-    return Math.random() < this.verboseLogSamplingRate;
   }
 
   /**
@@ -92,6 +73,9 @@ export class ScraperApplication {
     });
 
     try {
+      // Test enhanced logging is working
+      operation.progress('Enhanced logging system is operational - you should see this message');
+
       operation.progress('Initializing browser for X scraping');
       await this.initializeBrowser();
 
@@ -682,6 +666,21 @@ export class ScraperApplication {
       operation.progress('Navigating to user profile timeline for retweet detection');
       await this.navigateToProfileTimeline(this.xUser);
 
+      // Verify we're on the correct user profile page
+      const currentUrl = (await this.browser.getCurrentUrl?.()) || 'unknown';
+      const expectedProfileUrl = `https://x.com/${this.xUser}`;
+
+      if (!currentUrl.includes(`x.com/${this.xUser}`) && !currentUrl.includes(`twitter.com/${this.xUser}`)) {
+        operation.error(
+          new Error(`Navigation failed: Expected ${expectedProfileUrl}, but got ${currentUrl}`),
+          'URL verification failed - not on correct user profile',
+          { expectedUrl: expectedProfileUrl, actualUrl: currentUrl }
+        );
+        return;
+      }
+
+      operation.progress(`URL verification passed: on ${this.xUser} profile (${currentUrl})`);
+
       operation.progress('Performing enhanced scrolling to load more timeline content');
       await this.performEnhancedScrolling();
 
@@ -696,10 +695,7 @@ export class ScraperApplication {
       let skippedCount = 0;
 
       for (const tweet of newTweets) {
-        // Reduce debug frequency for tweet checking
-        if (this.shouldLogDebug()) {
-          this.logger.debug(`Checking tweet ${tweet.tweetID}, category: ${tweet.tweetCategory}`);
-        }
+        this.logger.debug(`Checking tweet ${tweet.tweetID}, category: ${tweet.tweetCategory}`);
         if (await this.isNewContent(tweet)) {
           this.logger.info(`✅ Found new tweet to process: ${tweet.url} (${tweet.tweetCategory})`);
           await this.processNewTweet(tweet);
@@ -707,10 +703,8 @@ export class ScraperApplication {
           processedCount++;
         } else {
           // Log filtered content with beginning of tweet text
-          if (this.shouldLogVerbose()) {
-            const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
-            this.logger.debug(`Skipping old tweet ${tweet.tweetID} - "${contentPreview}..." (${tweet.tweetCategory})`);
-          }
+          const contentPreview = tweet.text ? tweet.text.substring(0, 80) : 'No content';
+          this.logger.debug(`Skipping old tweet ${tweet.tweetID} - "${contentPreview}..." (${tweet.tweetCategory})`);
           skippedCount++;
         }
       }
@@ -745,7 +739,7 @@ export class ScraperApplication {
     const monitoredUser = this.xUser; // Pass the monitored user to browser context
     try {
       operation.progress('Injecting helper functions into browser context');
-      await this.browser.evaluate(this.getBrowserHelperFunctions());
+      await this.browser.evaluate(getBrowserTweetHelperFunctions());
 
       operation.progress('Executing streamlined tweet extraction script');
       const result = await this.browser.evaluate(monitoredUser => {
@@ -1492,129 +1486,5 @@ export class ScraperApplication {
 
   async dispose() {
     await this.stop();
-  }
-
-  /**
-   * Get browser helper functions for tweet extraction
-   * These can be injected into browser context to reduce code duplication
-   * @returns {string} JavaScript code to inject into browser
-   */
-  getBrowserHelperFunctions() {
-    /* eslint-disable no-useless-escape */
-    return `
-      // Helper function to find tweet articles
-      window.findTweetArticles = function() {
-        function robustQuerySelector(selectors, context = document) {
-          for (const selector of selectors) {
-            try {
-              const elements = context.querySelectorAll(selector);
-              if (elements.length > 0) {
-                console.log('SUCCESS: Using selector "' + selector + '" found ' + elements.length + ' elements');
-                return elements;
-              }
-            } catch (error) {
-              console.log('FAILED: Selector "' + selector + '" error:', error.message);
-            }
-          }
-          return [];
-        }
-        
-        const articleSelectors = [
-          'article[data-testid="tweet"]',
-          'div[data-testid="cellInnerDiv"] article',
-          'article[role="article"]',
-          'article[tabindex="-1"]',
-          'article',
-        ];
-        
-        const articles = robustQuerySelector(articleSelectors);
-        return { articles, workingSelector: articles.length > 0 ? 'robust-selection' : null };
-      };
-      
-      // Helper function to extract tweet URL from article
-      window.extractTweetUrl = function(article) {
-        const linkSelectors = [
-          'a[href*="/status/"]',
-          'time[datetime] ~ a[href*="/status/"]',
-          'time[datetime]',
-          '[data-testid="User-Name"] ~ * a[href*="/status/"]',
-        ];
-        
-        for (const selector of linkSelectors) {
-          const element = article.querySelector(selector);
-          if (element) {
-            if (element.href && element.href.includes('/status/')) {
-              return element.href;
-            } else if (element.tagName === 'TIME' && element.parentElement && element.parentElement.href) {
-              return element.parentElement.href;
-            }
-          }
-        }
-        
-        // Fallback
-        const allLinks = article.querySelectorAll('a[href*="/status/"]');
-        return allLinks.length > 0 ? allLinks[0].href : null;
-      };
-      
-      // Helper function to extract author information
-      window.extractAuthorInfo = function(article, url) {
-        let author = 'Unknown';
-        let retweetedBy = null;
-        
-        // Method 1: Extract from URL (most reliable)
-        if (url) {
-          const usernameMatch = url.match(/\/([^/]+)\/status/);
-          if (usernameMatch && usernameMatch[1]) {
-            author = usernameMatch[1];
-          }
-        }
-        
-        // Method 2: Check for social context (retweets)
-        const socialContext = article.querySelector('[data-testid="socialContext"]');
-        if (socialContext && socialContext.innerText.includes('reposted')) {
-          const retweetUserLink = socialContext.querySelector('a[href^="/"]');
-          if (retweetUserLink) {
-            const retweetUser = retweetUserLink.href.match(/\/([^/?]+)/)?.[1];
-            if (retweetUser) {
-              retweetedBy = retweetUser;
-            }
-          }
-        }
-        
-        return { author, retweetedBy };
-      };
-      
-      // Helper function to extract tweet text
-      window.extractTweetText = function(article) {
-        const textSelectors = [
-          '[data-testid="tweetText"]',
-          '[data-testid="tweetText"] span',
-          'div[lang] span',
-          'div[dir="ltr"] span',
-        ];
-        
-        for (const selector of textSelectors) {
-          const textElement = article.querySelector(selector);
-          if (textElement && textElement.innerText && textElement.innerText.trim()) {
-            return textElement.innerText.trim();
-          }
-        }
-        
-        return '';
-      };
-      
-      // Helper function to extract timestamp
-      window.extractTimestamp = function(article) {
-        const timeElement = article.querySelector('time');
-        if (timeElement) {
-          const datetime = timeElement.getAttribute('datetime');
-          if (datetime && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/.test(datetime)) {
-            return datetime;
-          }
-        }
-        return null;
-      };
-    `;
-    /* eslint-enable no-useless-escape */
   }
 }
