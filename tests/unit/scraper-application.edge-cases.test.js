@@ -45,6 +45,10 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
     mockBrowserService.setUserAgent = jest.fn().mockResolvedValue(undefined);
     mockBrowserService.close = jest.fn().mockResolvedValue(undefined);
     mockBrowserService.isRunning = jest.fn(() => true);
+    mockBrowserService.getCurrentUrl = jest.fn().mockResolvedValue('https://x.com/test');
+    mockBrowserService.getUrl = jest.fn().mockResolvedValue('https://x.com/test');
+    mockBrowserService.getConsoleLogs = jest.fn().mockResolvedValue([]);
+    mockBrowserService.page = { isClosed: jest.fn().mockReturnValue(false) };
 
     mockAuthManager.ensureAuthenticated = jest.fn().mockResolvedValue(undefined);
     mockAuthManager.isAuthenticated = jest.fn().mockResolvedValue(true);
@@ -159,14 +163,14 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
       // Act
       await scraperApp.pollXProfile();
 
-      // Assert - Should process the tweet successfully
-      expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+      // Assert - Should process the tweet successfully through ContentCoordinator
+      // Note: Classification now happens inside ContentCoordinator, not directly in ScraperApplication
       expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
         validTweet.tweetID,
         'scraper',
         expect.objectContaining({
           platform: 'x',
-          type: 'post',
+          type: 'post', // Default type - ContentClassifier will refine this
           id: validTweet.tweetID,
           url: validTweet.url,
         })

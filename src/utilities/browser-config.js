@@ -34,12 +34,13 @@ const DANGEROUS_BROWSER_ARGS = ['--disable-web-security', '--disable-extensions'
  */
 export function getXScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? false,
+    headless: options.headless ?? false, // Back to false - use proper display server
     args: [...SAFE_BROWSER_ARGS],
   };
 
   // Add display if running in headless environment
-  if (process.env.DISPLAY) {
+  // Skip display argument for true headless mode
+  if (process.env.DISPLAY && !config.headless) {
     config.args.push(`--display=${process.env.DISPLAY}`);
   }
 
@@ -60,12 +61,13 @@ export function getXScrapingBrowserConfig(options = {}) {
  */
 export function getYouTubeScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? false,
+    headless: options.headless ?? false, // Back to false - use proper display server
     args: [...SAFE_BROWSER_ARGS],
   };
 
   // Add display if running in headless environment
-  if (process.env.DISPLAY) {
+  // Skip display argument for true headless mode
+  if (process.env.DISPLAY && !config.headless) {
     config.args.push(`--display=${process.env.DISPLAY}`);
   }
 
@@ -80,7 +82,7 @@ export function getYouTubeScrapingBrowserConfig(options = {}) {
 /**
  * Get browser configuration for profile management (can be more permissive)
  * @param {Object} options - Additional options
- * @param {boolean} options.headless - Whether to run headless (default: true)
+ * @param {boolean} options.headless - Whether to run headless (default: false)
  * @param {string} options.userDataDir - User data directory for profile
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
@@ -96,7 +98,8 @@ export function getProfileBrowserConfig(options = {}) {
   }
 
   // Add display if running in headless environment
-  if (process.env.DISPLAY) {
+  // Skip display argument for true headless mode
+  if (process.env.DISPLAY && !config.headless) {
     config.args.push(`--display=${process.env.DISPLAY}`);
   }
 

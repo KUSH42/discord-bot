@@ -172,12 +172,12 @@ async function setupExternalServices(container, config) {
     return app;
   });
 
-  // Browser Service - Use singleton so ScraperApplication and AuthManager share the same browser
-  container.registerSingleton('browserService', () => {
+  // X scraper browser service - dedicated singleton for X scraping
+  container.registerSingleton('xBrowserService', () => {
     return new PlaywrightBrowserService();
   });
 
-  // Separate browser service for YouTube scraper to prevent conflicts
+  // YouTube scraper browser service - dedicated singleton for YouTube scraping
   container.registerSingleton('youtubeBrowserService', () => {
     return new PlaywrightBrowserService();
   });
@@ -280,7 +280,7 @@ async function setupApplicationServices(container, _config) {
   // Auth Manager
   container.registerSingleton('authManager', c => {
     return new AuthManager({
-      browserService: c.resolve('browserService'),
+      browserService: c.resolve('xBrowserService'),
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
       logger: c.resolve('logger').child({ service: 'AuthManager' }),
@@ -292,7 +292,7 @@ async function setupApplicationServices(container, _config) {
   // Scraper Application (X/Twitter monitoring)
   container.registerSingleton('scraperApplication', c => {
     return new ScraperApplication({
-      browserService: c.resolve('browserService'),
+      browserService: c.resolve('xBrowserService'),
       contentCoordinator: c.resolve('contentCoordinator'),
       contentClassifier: c.resolve('contentClassifier'),
       discordService: c.resolve('discordService'),
@@ -337,7 +337,7 @@ async function setupApplicationServices(container, _config) {
       contentCoordinator: c.resolve('contentCoordinator'),
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
-      browserService: c.resolve('browserService'),
+      browserService: c.resolve('youtubeBrowserService'),
     });
   });
 }

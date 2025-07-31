@@ -29,11 +29,16 @@ export class PlaywrightBrowserService extends BrowserService {
       this.page = null;
     }
 
+    console.log('🔍 Launching browser with options:', JSON.stringify(options, null, 2));
     this.browser = await chromium.launch(options);
+    console.log('🔍 Browser launched:', !!this.browser, 'Connected:', this.browser?.isConnected());
+
     this.page = await this.browser.newPage();
+    console.log('🔍 Page created:', !!this.page, 'Closed:', this.page?.isClosed());
 
     // Verify browser and page are ready
     if (!this.browser || !this.page) {
+      console.error('❌ Browser or page is null after launch:', { browser: !!this.browser, page: !!this.page });
       throw new Error('Failed to initialize browser or page after launch');
     }
 
@@ -65,9 +70,18 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<Object>} Response object
    */
   async goto(url, options = {}, retries = 3) {
+    console.log('🔍 goto() called with URL:', url);
+    console.log('🔍 Browser state:', {
+      browser: !!this.browser,
+      page: !!this.page,
+      browserConnected: this.browser?.isConnected?.(),
+      pageClosed: this.page?.isClosed?.(),
+    });
+
     for (let i = 0; i < retries; i++) {
       // Validate browser state before each attempt
       if (!this.browser || !this.page) {
+        console.error('❌ Browser or page not available at goto()');
         throw new Error(`Browser or page not available: browser=${!!this.browser}, page=${!!this.page}`);
       }
 
@@ -249,12 +263,16 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async setUserAgent(userAgent) {
+    console.log('🔍 Setting user agent:', userAgent);
     if (!this.page) {
+      console.error('❌ No page available for setUserAgent');
       throw new Error('No page available');
     }
+    console.log('🔍 Page available, setting headers...');
     await this.page.setExtraHTTPHeaders({
       'User-Agent': userAgent,
     });
+    console.log('✅ User agent set successfully');
   }
 
   /**

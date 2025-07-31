@@ -1,4 +1,3 @@
-import { DuplicateDetector } from '../duplicate-detector.js';
 import { delay } from '../utils/delay.js';
 import { nowUTC, toISOStringUTC, daysAgoUTC } from '../utilities/utc-time.js';
 import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
@@ -38,13 +37,11 @@ export class ScraperApplication {
     this.minInterval = parseInt(this.config.get('X_QUERY_INTERVAL_MIN', '300000'), 10);
     this.maxInterval = parseInt(this.config.get('X_QUERY_INTERVAL_MAX', '600000'), 10);
 
-    // State management - accept duplicateDetector dependency
-    this.duplicateDetector =
-      dependencies.duplicateDetector ||
-      new DuplicateDetector(
-        null, // Disable persistent storage - rely only on Discord history and in-memory caches
-        dependencies.logger?.child({ service: 'DuplicateDetector' })
-      );
+    // Use injected duplicate detector service
+    this.duplicateDetector = dependencies.duplicateDetector;
+    if (!this.duplicateDetector) {
+      throw new Error('DuplicateDetector dependency is required but not provided');
+    }
     this.isRunning = false;
     this.timerId = null;
     this.currentSession = null;
@@ -443,22 +440,6 @@ export class ScraperApplication {
   }
 
   /**
-   * Clicks the "Next" button during login
-   * @returns {Promise<boolean>}
-   */
-  async clickNextButton() {
-    return this.authManager.clickNextButton();
-  }
-
-  /**
-   * Clicks the "Log in" button
-   * @returns {Promise<boolean>}
-   */
-  async clickLoginButton() {
-    return this.authManager.clickLoginButton();
-  }
-
-  /**
    * Start polling for new content
    */
   startPolling() {
@@ -594,14 +575,36 @@ export class ScraperApplication {
 
       operation.progress('STEP 1: Using advanced search for user-authored posts');
       const searchUrl = this.generateSearchUrl(true);
+      operation.progress(`Navigating to search URL: ${searchUrl}`);
       await this.browser.goto(searchUrl);
 
       operation.progress('Waiting for search results to load');
       await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
 
+      // Additional wait for tweet content to load dynamically
+      operation.progress('Waiting for tweet content to load');
+      try {
+        // Wait for either articles to appear or "No results" message
+        await Promise.race([
+          this.browser.waitForSelector('article[data-testid="tweet"]', { timeout: 5000 }),
+          this.browser.waitForSelector('[data-testid="emptyState"]', { timeout: 5000 }),
+          new Promise(resolve => setTimeout(resolve, 3000)), // 3s fallback timeout
+        ]);
+      } catch (_waitError) {
+        operation.progress('Content wait timeout, proceeding with extraction');
+      }
+
       operation.progress('Extracting tweets from search results');
       const searchTweets = await this.extractTweets();
       this.stats.totalTweetsFound += searchTweets.length;
+
+      // Enhanced logging for debugging intermittent detection
+      if (searchTweets.length === 0) {
+        const currentUrl = (await this.browser.getUrl?.()) || 'unknown';
+        operation.progress(`No tweets found on search page. URL: ${currentUrl}`);
+      } else {
+        operation.progress(`Found ${searchTweets.length} tweets on search page`);
+      }
 
       operation.progress('Filtering search results for new tweets only');
       const newSearchTweets = await this.filterNewTweets(searchTweets);
@@ -751,23 +754,29 @@ export class ScraperApplication {
   }
 
   /**
-   * Extract tweets from current page
+   * Extract tweets from current page (streamlined)
    * @returns {Promise<Array>} Array of tweet objects
    */
   async extractTweets() {
+    const currentUrl = (await this.browser.getCurrentUrl?.()) || 'unknown';
     const operation = this.logger.startOperation('extractTweets', {
       xUser: this.xUser,
-      pageUrl: 'current_page',
+      pageUrl: currentUrl,
     });
+
+    this.logger.info(`Extracting tweets from URL: ${currentUrl} (expected user: ${this.xUser})`);
 
     const monitoredUser = this.xUser; // Pass the monitored user to browser context
     try {
-      operation.progress('Executing tweet extraction script in browser context');
+      operation.progress('Injecting helper functions into browser context');
+      await this.browser.evaluate(this.getBrowserHelperFunctions());
+
+      operation.progress('Executing streamlined tweet extraction script');
       const result = await this.browser.evaluate(monitoredUser => {
         /* eslint-disable no-undef, no-console */
         const tweets = [];
 
-        // Enhanced error handling for selector evolution
+        // Enhanced error handling for selector evolution (moved to helper function)
         function robustQuerySelector(selectors, context = document) {
           for (const selector of selectors) {
             try {
@@ -783,327 +792,98 @@ export class ScraperApplication {
           return [];
         }
 
-        // Try multiple selectors for tweet articles (X keeps changing these)
-        // Updated priority order based on reliability analysis
-        const articleSelectors = [
-          'article[data-testid="tweet"]', // Highest priority - very reliable
-          'div[data-testid="cellInnerDiv"] article', // Second priority - good for search
-          'article[role="article"]', // Third priority - generic fallback
-          'article[tabindex="-1"]', // Fourth priority - new layout support
-          'article', // Last resort - catch all
-        ];
+        // Use helper function to find articles
+        let { articles, workingSelector } = window.findTweetArticles
+          ? window.findTweetArticles()
+          : (() => {
+              const articleSelectors = [
+                'article[data-testid="tweet"]',
+                'div[data-testid="cellInnerDiv"] article',
+                'article[role="article"]',
+                'article[tabindex="-1"]',
+                'article',
+              ];
+              const foundArticles = robustQuerySelector(articleSelectors);
+              return { articles: foundArticles, workingSelector: foundArticles.length > 0 ? 'robust-selection' : null };
+            })();
 
-        // Use robust selector function for article detection
-        let articles = robustQuerySelector(articleSelectors);
-        let workingSelector = articles.length > 0 ? 'robust-selection' : null;
-
+        // Handle case where no articles found with debugging
         if (articles.length === 0) {
-          // Enhanced debugging for search results page issues
-          const bodyText = document.body.innerText || '';
-          const currentUrl = window.location.href;
+          const _debugInfo = window.debugNoArticlesFound
+            ? window.debugNoArticlesFound()
+            : {
+                bodyText: document.body.innerText || '',
+                currentUrl: window.location.href,
+                searchIndicators: [],
+                authIssues: [],
+              };
 
-          console.log('DEBUG: No articles found with any selector');
-          console.log(`DEBUG: Current URL: ${currentUrl}`);
-          console.log(`DEBUG: Page contains ${bodyText.length} characters of text`);
+          console.log('DEBUG: No articles found - checking fallback selectors');
+          const fallbackArticles = window.tryFallbackSelectors ? window.tryFallbackSelectors() : [];
 
-          // Check for specific search page indicators
-          const searchIndicators = ['Search results', 'Latest', 'Top', 'People', 'Photos', 'Videos'];
-          const foundIndicators = searchIndicators.filter(indicator => bodyText.includes(indicator));
-          if (foundIndicators.length > 0) {
-            console.log(`DEBUG: Found search page indicators: ${foundIndicators.join(', ')}`);
-          }
-
-          // Check for authentication issues
-          const authIndicators = ['Sign up', 'Log in', 'Try again', 'Something went wrong'];
-          const foundAuthIssues = authIndicators.filter(indicator => bodyText.includes(indicator));
-          if (foundAuthIssues.length > 0) {
-            console.log(`DEBUG: Possible auth issues: ${foundAuthIssues.join(', ')}`);
-          }
-
-          // Try some alternative selectors specific to search results
-          const searchSpecificSelectors = [
-            '[data-testid="SearchTimeline"] article',
-            '[aria-label="Timeline: Search timeline"] article',
-            'section[role="region"] article',
-            'div[aria-label="Timeline"] article',
-            '[data-testid="cellInnerDiv"] > div > div > article',
-          ];
-
-          for (const selector of searchSpecificSelectors) {
-            const searchArticles = document.querySelectorAll(selector);
-            console.log(`Search-specific selector "${selector}" found ${searchArticles.length} articles`);
-            if (searchArticles.length > 0) {
-              articles = searchArticles;
-              workingSelector = selector;
-              console.log(`Using search-specific selector: ${selector}`);
-              break;
-            }
-          }
-
-          if (articles.length === 0) {
-            // Final fallback: log page structure for debugging
-            const mainElement = document.querySelector('main');
-            if (mainElement) {
-              console.log('DEBUG: Main element HTML structure (first 500 chars):');
-              console.log(mainElement.innerHTML.substring(0, 500));
-            }
+          if (fallbackArticles.length > 0) {
+            articles = fallbackArticles;
+            workingSelector = 'fallback';
+          } else {
             return tweets;
           }
         }
 
-        // Processing articles for tweet extraction
-
+        // Process each article to extract basic tweet data
         for (const article of articles) {
           try {
-            // Extract tweet URL with multiple selectors
-            // Updated priority order for better reliability
-            const linkSelectors = [
-              'a[href*="/status/"]', // Most direct and reliable
-              'time[datetime] ~ a[href*="/status/"]', // Time element siblings
-              'time[datetime]', // Time elements (parent may be link)
-              '[data-testid="User-Name"] ~ * a[href*="/status/"]', // User area siblings
-              'div a[href*="/status/"]', // Fallback within divs
-            ];
-
-            let tweetLink = null;
-            let url = null;
-
-            for (const selector of linkSelectors) {
-              const element = article.querySelector(selector);
-              if (element) {
-                if (element.href && element.href.includes('/status/')) {
-                  tweetLink = element;
-                  url = element.href;
-                  break;
-                } else if (element.tagName === 'TIME' && element.parentElement && element.parentElement.href) {
-                  // Handle time elements that are wrapped in links
-                  tweetLink = element.parentElement;
-                  url = element.parentElement.href;
-                  break;
-                }
-              }
-            }
-
-            // Fallback: search for any link with /status/ in the article
-            if (!tweetLink) {
-              const allLinks = article.querySelectorAll('a[href*="/status/"]');
-              if (allLinks.length > 0) {
-                tweetLink = allLinks[0];
-                url = tweetLink.href;
-              }
-            }
-
-            if (!tweetLink || !url) {
-              // No tweet link found in article
+            // Extract basic tweet information using helper functions
+            const tweetUrl = window.extractTweetUrl ? window.extractTweetUrl(article) : null;
+            if (!tweetUrl) {
               continue;
             }
 
-            const tweetIdMatch = url.match(/status\/(\d+)/);
+            const tweetIdMatch = tweetUrl.match(/status\/(\d+)/);
             if (!tweetIdMatch) {
               continue;
             }
 
             const tweetID = tweetIdMatch[1];
 
-            // Extract author username (not display name) - prioritize username extraction
-            let author = 'Unknown';
-            let retweetedBy = null;
+            // Extract author and social context using helper functions
+            const authorData = window.extractAuthorInfo
+              ? window.extractAuthorInfo(article, tweetUrl)
+              : { author: 'Unknown', retweetedBy: null };
 
-            // Method 1: Extract from URL (most reliable, especially for retweets)
-            if (url) {
-              const usernameMatch = url.match(/\/([^/]+)\/status/);
-              if (usernameMatch && usernameMatch[1]) {
-                author = usernameMatch[1];
-              }
-            }
+            const { author, retweetedBy } = authorData;
 
-            // Method 2: Check for social context to identify retweets
+            // Extract text content using helper function
+            const text = window.extractTweetText
+              ? window.extractTweetText(article)
+              : (article.querySelector('[data-testid="tweetText"]')?.innerText || '').trim();
+
+            // Extract timestamp using helper function
+            const timestamp = window.extractTimestamp
+              ? window.extractTimestamp(article)
+              : article.querySelector('time')?.getAttribute('datetime') || null;
+
+            // Store raw data for ContentClassifier processing
             const socialContext = article.querySelector('[data-testid="socialContext"]');
-            if (socialContext && socialContext.innerText.includes('reposted')) {
-              const retweetUserLink = socialContext.querySelector('a[href^="/"]');
-              if (retweetUserLink) {
-                const retweetUser = retweetUserLink.href.match(/\/([^/?]+)/)?.[1];
-                if (retweetUser) {
-                  retweetedBy = retweetUser;
-                  // Keep original author from URL, but note who retweeted it
-                }
-              }
-            }
-
-            // Method 3: Try to extract username from href attribute (fallback)
-            if (author === 'Unknown') {
-              const userLinkSelectors = [
-                '[data-testid="User-Name"] a[href^="/"]',
-                '[data-testid="User-Names"] a[href^="/"]',
-                'a[role="link"][href^="/"][href*="status"]',
-                'a[href^="/"][href*="status"]',
-              ];
-
-              for (const selector of userLinkSelectors) {
-                const linkElement = article.querySelector(selector);
-                if (linkElement && linkElement.href) {
-                  const usernameMatch = linkElement.href.match(/\/([^/]+)\/status/);
-                  if (usernameMatch && usernameMatch[1]) {
-                    author = usernameMatch[1];
-                    break;
-                  }
-                }
-              }
-            }
-
-            // Method 4: Try to extract username from profile links (without status)
-            if (author === 'Unknown') {
-              const profileLinkSelectors = [
-                '[data-testid="User-Name"] a[href^="/"]',
-                '[data-testid="User-Names"] a[href^="/"]',
-                'a[role="link"][href^="/"]',
-              ];
-
-              for (const selector of profileLinkSelectors) {
-                const linkElement = article.querySelector(selector);
-                if (linkElement && linkElement.href) {
-                  // Extract username from profile link like /username
-                  const profileMatch = linkElement.href.match(/\/([^/?]+)(?:\?|$)/);
-                  if (profileMatch && profileMatch[1] && !profileMatch[1].includes('status')) {
-                    author = profileMatch[1];
-                    break;
-                  }
-                }
-              }
-            }
-
-            // Method 5: Only use display name as absolute last resort and log warning
-            if (author === 'Unknown') {
-              const displayNameSelectors = [
-                '[data-testid="User-Name"] span',
-                '[data-testid="User-Names"] span',
-                'div[dir="ltr"] span',
-              ];
-
-              for (const selector of displayNameSelectors) {
-                const authorElement = article.querySelector(selector);
-                if (authorElement && authorElement.textContent.trim()) {
-                  author = authorElement.textContent.trim();
-                  // Log warning since this might cause retweet detection issues
-                  this.logger.warn('⚠️ Using display name as fallback for author extraction', {
-                    url,
-                    displayName: author,
-                    tweetId: tweetID,
-                  });
-                  break;
-                }
-              }
-            }
-
-            // Extract text content with multiple selectors
-            // Enhanced hierarchy for better text extraction
-            const textSelectors = [
-              '[data-testid="tweetText"]', // Primary - most reliable
-              '[data-testid="tweetText"] span', // Child spans within tweet text
-              'div[lang] span', // Language-specific content
-              'div[dir="ltr"] span', // Direction-specific content
-              'span[dir="ltr"]', // Direct direction spans
-            ];
-
-            let text = '';
-            for (const selector of textSelectors) {
-              const textElement = article.querySelector(selector);
-              if (textElement && textElement.innerText && textElement.innerText.trim()) {
-                text = textElement.innerText.trim();
-                break;
-              }
-            }
-
-            // If no text found with specific selectors, try to extract from article text
-            if (!text) {
-              const articleText = article.innerText || '';
-              // Extract meaningful text (skip user names, timestamps, etc.)
-              const lines = articleText.split('\n').filter(line => {
-                const trimmed = line.trim();
-                return (
-                  trimmed &&
-                  !trimmed.match(/^\d+[hms]$/) && // timestamps like "2h", "5m"
-                  !trimmed.match(/^@\w+$/) && // usernames
-                  !trimmed.startsWith('·') && // separator dots
-                  trimmed.length > 3
-                ); // meaningful text
-              });
-              if (lines.length > 0) {
-                text = lines[0]; // Take first meaningful line
-              }
-            }
-
-            // Extract timestamp with validation
-            const timeElement = article.querySelector('time');
-            let timestamp = null;
-            if (timeElement) {
-              const datetime = timeElement.getAttribute('datetime');
-              // Validate timestamp format before using
-              if (datetime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(datetime)) {
-                timestamp = datetime;
-              }
-            }
-
-            // Determine tweet category
-            let tweetCategory = 'Post';
-
-            // Check for reply indicators
-            let isReply = text.startsWith('@');
-            if (!isReply) {
-              // Check for "Replying to" text content in the article
-              const allText = article.innerText || '';
-              isReply = allText.includes('Replying to') || allText.includes('Show this thread');
-            }
-
-            if (isReply) {
-              tweetCategory = 'Reply';
-            }
-
-            // Check for quote tweet
             const quoteTweetBlock = article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]');
-            if (quoteTweetBlock && quoteTweetBlock.href !== url) {
-              tweetCategory = 'Quote';
-            }
-
-            // Check for retweet - only when monitored user retweets someone else's content
-            let isRetweet = false;
-
-            // Method 1: Social context with user verification (MOST RELIABLE)
-            if (socialContext) {
-              const socialText = socialContext.innerText || '';
-              const hasReposted = socialText.includes('reposted');
-              const monitoredUserLink = socialContext.querySelector(`a[href="/${monitoredUser}"]`);
-
-              if (hasReposted && monitoredUserLink) {
-                isRetweet = true;
-              }
-            }
-
-            // Method 2: Classic RT pattern (still valid)
-            if (!isRetweet && text.startsWith('RT @')) {
-              isRetweet = true;
-            }
-
-            // Method 3: Use retweetedBy info from earlier extraction
-            if (!isRetweet && retweetedBy === monitoredUser) {
-              isRetweet = true;
-            }
-
-            if (isRetweet) {
-              tweetCategory = 'Retweet';
-            }
 
             const tweetData = {
               tweetID,
-              url,
+              url: tweetUrl,
               author,
               text,
               timestamp,
-              tweetCategory,
+              tweetCategory: 'Post', // Default - will be refined by ContentClassifier
+              rawClassificationData: {
+                socialContext: socialContext ? socialContext.innerText : null,
+                quoteTweetBlock: !!quoteTweetBlock,
+                retweetedBy,
+                monitoredUser,
+                allText: article.innerText || '',
+              },
             };
 
-            // For retweets, add retweetedBy property to track who did the retweet
-            if (isRetweet) {
+            // Add retweetedBy if detected
+            if (retweetedBy === monitoredUser) {
               tweetData.retweetedBy = monitoredUser;
             }
 
@@ -1140,6 +920,14 @@ export class ScraperApplication {
       };
 
       operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);
+
+      // Enhanced logging for debugging intermittent detection in both Step 1 and Step 2
+      if (tweets.length === 0) {
+        const currentUrl = (await this.browser.getUrl?.()) || 'unknown';
+        operation.progress(`No tweets extracted from page. URL: ${currentUrl}`);
+      } else {
+        operation.progress(`Successfully extracted ${tweets.length} tweets from page`);
+      }
 
       // Log browser console messages for debugging selector issues
       try {
@@ -1306,88 +1094,71 @@ export class ScraperApplication {
   }
 
   /**
-   * Process a new tweet
-   * @param {Object} tweet - Tweet object
+   * Process a new tweet (streamlined to delegate to ContentCoordinator)
+   * @param {Object} tweet - Tweet object with raw classification data
    * @returns {Promise<void>}
    */
   async processNewTweet(tweet) {
     const operation = this.logger.startOperation('processNewTweet', {
       tweetId: tweet.tweetID,
       author: tweet.author,
-      category: tweet.tweetCategory,
       monitoredUser: this.xUser,
     });
 
     try {
-      // Prepare metadata for classification
-      const metadata = {
-        timestamp: tweet.timestamp,
-        author: tweet.author,
-        monitoredUser: this.xUser,
-      };
+      operation.progress('Preparing content for ContentCoordinator processing');
 
-      // Add retweet metadata if available from enhanced detection
-      if (tweet.retweetMetadata) {
-        metadata.isRetweet = tweet.tweetCategory === 'Retweet';
-        metadata.retweetDetection = tweet.retweetMetadata;
-      }
-
-      operation.progress('Classifying tweet content');
-      const classification = this.classifier.classifyXContent(tweet.url, tweet.text, metadata);
-
-      operation.progress('Creating content object for announcement');
+      // Create streamlined content object - let ContentCoordinator handle classification
       const content = {
         platform: 'x',
-        type: classification.type || 'post', // Use classification result
+        type: 'post', // ContentClassifier will determine actual type
         id: tweet.tweetID,
         url: tweet.url,
-        author: tweet.author, // Always use the actual author (username)
-        retweetedBy: tweet.retweetedBy, // Track who did the retweet (if applicable)
+        author: tweet.author,
+        retweetedBy: tweet.retweetedBy,
         text: tweet.text,
         timestamp: tweet.timestamp,
-        publishedAt: tweet.timestamp, // ContentCoordinator expects publishedAt field
-        tweetCategory: tweet.tweetCategory, // Pass category for classification
-        xUser: this.xUser, // Pass monitored user for retweet detection
-        isOld: !(await this.isNewContent(tweet)),
+        publishedAt: tweet.timestamp,
+        // Pass raw classification data for ContentClassifier
+        rawClassificationData: tweet.rawClassificationData,
+        xUser: this.xUser,
       };
 
-      operation.progress('Processing content through ContentCoordinator');
+      operation.progress('Delegating to ContentCoordinator for processing and announcement');
       const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
 
-      operation.progress('Marking tweet as seen to prevent reprocessing');
+      operation.progress('Marking content as seen to prevent reprocessing');
       if (tweet.url) {
         this.duplicateDetector.markAsSeen(tweet.url);
       }
 
-      // Emit tweet processed event
+      // Emit processing event for monitoring
       this.eventBus.emit('scraper.tweet.processed', {
         tweet: content,
-        classification,
         result,
         timestamp: nowUTC(),
       });
 
+      // Log result based on ContentCoordinator response
       if (result.success) {
         const authorInfo = tweet.retweetedBy ? `@${tweet.retweetedBy}` : `@${tweet.author}`;
-        operation.success(`Announced ${classification.type} from ${authorInfo}`, {
+        operation.success(`Successfully processed content from ${authorInfo}`, {
           tweetId: tweet.tweetID,
-          classificationType: classification.type,
-          announcementResult: result,
+          result: result.reason || 'announced',
         });
       } else if (result.skipped) {
-        operation.success(`Skipped ${classification.type} - ${result.reason}`, {
+        operation.success(`Content skipped - ${result.reason}`, {
           tweetId: tweet.tweetID,
           skipReason: result.reason,
         });
       } else {
         operation.error(
-          new Error(result.reason || 'Unknown announcement failure'),
-          `Failed to announce ${classification.type}`,
+          new Error(result.reason || 'ContentCoordinator processing failed'),
+          'Content processing failed',
           {
             tweetId: tweet.tweetID,
             author: tweet.author,
-            retweetedBy: tweet.retweetedBy,
-            classificationType: classification.type,
+            reason: result.reason,
           }
         );
       }
@@ -1395,90 +1166,7 @@ export class ScraperApplication {
       operation.error(error, `Error processing tweet ${tweet.tweetID}`, {
         tweetId: tweet.tweetID,
         author: tweet.author,
-        category: tweet.tweetCategory,
       });
-      throw error;
-    }
-  }
-
-  /**
-   * Handle email verification screen
-   * @returns {Promise<void>}
-   */
-  async handleEmailVerification() {
-    try {
-      this.logger.info('Handling email verification screen...');
-
-      // Get email from configuration
-      const email = this.config.get('TWITTER_EMAIL') || this.config.get('TWITTER_USERNAME');
-      if (!email || !email.includes('@')) {
-        this.logger.warn('No valid email found in configuration for email verification');
-        throw new Error('Email verification required but no email configured');
-      }
-
-      // Look for email input field - X uses a generic text input for email/phone
-      const emailInputSelectors = [
-        'input[data-testid="ocfEnterTextTextInput"]', // X's email verification input
-        'input[name="text"]', // Fallback generic text input
-        'input[name="email"]',
-        'input[type="email"]',
-        'input[placeholder*="email" i]',
-      ];
-
-      let emailInput = null;
-      for (const selector of emailInputSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          emailInput = selector;
-          this.logger.debug(`Found email input with selector: ${selector}`);
-          break;
-        } catch {
-          this.logger.debug(`Email input selector failed: ${selector}`);
-          continue;
-        }
-      }
-
-      if (!emailInput) {
-        this.logger.warn('Could not find email input field, proceeding anyway');
-        return;
-      }
-
-      // Enter email
-      await this.browser.type(emailInput, email);
-      this.logger.info(`Entered email: ${email}`);
-
-      // Look for and click continue/next button
-      const continueButtonSelectors = [
-        'div[role="button"]:has-text("Next")',
-        'button:has-text("Next")',
-        'div[role="button"]:has-text("Continue")',
-        'button:has-text("Continue")',
-        '[data-testid="ocf_submit_button"]',
-        'button[type="submit"]',
-      ];
-
-      let continueClicked = false;
-      for (const selector of continueButtonSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          await this.browser.click(selector);
-          this.logger.info(`Clicked continue button using selector: ${selector}`);
-          continueClicked = true;
-          break;
-        } catch {
-          this.logger.debug(`Continue button selector failed: ${selector}`);
-          continue;
-        }
-      }
-
-      if (!continueClicked) {
-        this.logger.warn('Could not find continue button after email entry');
-      }
-
-      // Wait a bit for the next screen to load
-      await this.delay(3000);
-    } catch (error) {
-      this.logger.error('Error handling email verification:', error.message);
       throw error;
     }
   }
@@ -1517,41 +1205,6 @@ export class ScraperApplication {
         operation.error(recoveryError, 'Recovery authentication also failed');
         throw recoveryError;
       }
-    }
-  }
-
-  /**
-   * Refresh authentication cookies
-   * @returns {Promise<void>}
-   */
-  async refreshAuth() {
-    const operation = this.logger.startOperation('refreshAuth', {
-      currentUrl: 'unknown',
-    });
-
-    try {
-      operation.progress('Navigating to X home page for session refresh');
-      await this.browser.goto('https://x.com/home');
-
-      operation.progress('Checking if user is still logged in');
-      const isLoggedIn = await this.browser.evaluate(() => {
-        /* eslint-disable no-undef */
-        return !document.querySelector('[data-testid="login"]');
-        /* eslint-enable no-undef */
-      });
-
-      if (!isLoggedIn) {
-        operation.progress('Authentication expired, performing full login');
-        await this.loginToX();
-      }
-
-      operation.success('Authentication refreshed successfully', {
-        wasLoggedIn: isLoggedIn,
-        actionTaken: isLoggedIn ? 'session_refresh' : 'full_login',
-      });
-    } catch (error) {
-      operation.error(error, 'Failed to refresh authentication');
-      throw error;
     }
   }
 
@@ -1620,10 +1273,23 @@ export class ScraperApplication {
    */
   async navigateToProfileTimeline(username) {
     const profileUrl = `https://x.com/${username}`;
+    this.logger.info(`Navigating to profile timeline: ${profileUrl} (username: ${username})`);
     await this.browser.goto(profileUrl);
 
     // Wait for timeline to load
     await this.browser.waitForSelector('[data-testid="primaryColumn"]');
+
+    // Additional wait for tweet content to load dynamically on profile page
+    try {
+      // Wait for either articles to appear or profile content to load
+      await Promise.race([
+        this.browser.waitForSelector('article[data-testid="tweet"]', { timeout: 5000 }),
+        this.browser.waitForSelector('[aria-label*="Timeline"]', { timeout: 5000 }),
+        new Promise(resolve => setTimeout(resolve, 3000)), // 3s fallback timeout
+      ]);
+    } catch (_waitError) {
+      // Continue even if wait fails - some profiles may be empty
+    }
 
     // Brief delay to ensure page is fully stabilized before scrolling
     await this.delay(500);
@@ -1677,9 +1343,10 @@ export class ScraperApplication {
   }
 
   /**
-   * Dispose of resources
-   * @returns {Promise<void>}
+   * Helper functions for tweet extraction (to be moved to browser context if needed)
+   * These functions can be injected into the browser context for cleaner extraction
    */
+
   /**
    * Generate X search URL
    * @param {boolean} includeDate - Whether to include the since date parameter
@@ -1896,5 +1563,129 @@ export class ScraperApplication {
 
   async dispose() {
     await this.stop();
+  }
+
+  /**
+   * Get browser helper functions for tweet extraction
+   * These can be injected into browser context to reduce code duplication
+   * @returns {string} JavaScript code to inject into browser
+   */
+  getBrowserHelperFunctions() {
+    /* eslint-disable no-useless-escape */
+    return `
+      // Helper function to find tweet articles
+      window.findTweetArticles = function() {
+        function robustQuerySelector(selectors, context = document) {
+          for (const selector of selectors) {
+            try {
+              const elements = context.querySelectorAll(selector);
+              if (elements.length > 0) {
+                console.log('SUCCESS: Using selector "' + selector + '" found ' + elements.length + ' elements');
+                return elements;
+              }
+            } catch (error) {
+              console.log('FAILED: Selector "' + selector + '" error:', error.message);
+            }
+          }
+          return [];
+        }
+        
+        const articleSelectors = [
+          'article[data-testid="tweet"]',
+          'div[data-testid="cellInnerDiv"] article',
+          'article[role="article"]',
+          'article[tabindex="-1"]',
+          'article',
+        ];
+        
+        const articles = robustQuerySelector(articleSelectors);
+        return { articles, workingSelector: articles.length > 0 ? 'robust-selection' : null };
+      };
+      
+      // Helper function to extract tweet URL from article
+      window.extractTweetUrl = function(article) {
+        const linkSelectors = [
+          'a[href*="/status/"]',
+          'time[datetime] ~ a[href*="/status/"]',
+          'time[datetime]',
+          '[data-testid="User-Name"] ~ * a[href*="/status/"]',
+        ];
+        
+        for (const selector of linkSelectors) {
+          const element = article.querySelector(selector);
+          if (element) {
+            if (element.href && element.href.includes('/status/')) {
+              return element.href;
+            } else if (element.tagName === 'TIME' && element.parentElement && element.parentElement.href) {
+              return element.parentElement.href;
+            }
+          }
+        }
+        
+        // Fallback
+        const allLinks = article.querySelectorAll('a[href*="/status/"]');
+        return allLinks.length > 0 ? allLinks[0].href : null;
+      };
+      
+      // Helper function to extract author information
+      window.extractAuthorInfo = function(article, url) {
+        let author = 'Unknown';
+        let retweetedBy = null;
+        
+        // Method 1: Extract from URL (most reliable)
+        if (url) {
+          const usernameMatch = url.match(/\/([^/]+)\/status/);
+          if (usernameMatch && usernameMatch[1]) {
+            author = usernameMatch[1];
+          }
+        }
+        
+        // Method 2: Check for social context (retweets)
+        const socialContext = article.querySelector('[data-testid="socialContext"]');
+        if (socialContext && socialContext.innerText.includes('reposted')) {
+          const retweetUserLink = socialContext.querySelector('a[href^="/"]');
+          if (retweetUserLink) {
+            const retweetUser = retweetUserLink.href.match(/\/([^/?]+)/)?.[1];
+            if (retweetUser) {
+              retweetedBy = retweetUser;
+            }
+          }
+        }
+        
+        return { author, retweetedBy };
+      };
+      
+      // Helper function to extract tweet text
+      window.extractTweetText = function(article) {
+        const textSelectors = [
+          '[data-testid="tweetText"]',
+          '[data-testid="tweetText"] span',
+          'div[lang] span',
+          'div[dir="ltr"] span',
+        ];
+        
+        for (const selector of textSelectors) {
+          const textElement = article.querySelector(selector);
+          if (textElement && textElement.innerText && textElement.innerText.trim()) {
+            return textElement.innerText.trim();
+          }
+        }
+        
+        return '';
+      };
+      
+      // Helper function to extract timestamp
+      window.extractTimestamp = function(article) {
+        const timeElement = article.querySelector('time');
+        if (timeElement) {
+          const datetime = timeElement.getAttribute('datetime');
+          if (datetime && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/.test(datetime)) {
+            return datetime;
+          }
+        }
+        return null;
+      };
+    `;
+    /* eslint-enable no-useless-escape */
   }
 }

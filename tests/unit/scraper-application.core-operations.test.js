@@ -40,8 +40,13 @@ describe('ScraperApplication Core Operations', () => {
       evaluate: jest.fn(),
       setUserAgent: jest.fn(),
       isRunning: jest.fn().mockReturnValue(false),
+      isHealthy: jest.fn().mockReturnValue(true),
       type: jest.fn(),
       click: jest.fn(),
+      getCurrentUrl: jest.fn().mockResolvedValue('https://x.com/test'),
+      getUrl: jest.fn().mockResolvedValue('https://x.com/test'),
+      getConsoleLogs: jest.fn().mockResolvedValue([]),
+      page: { isClosed: jest.fn().mockReturnValue(false) },
     };
 
     mockClassifier = {
@@ -61,8 +66,6 @@ describe('ScraperApplication Core Operations', () => {
 
     mockAuthManager = {
       login: jest.fn(),
-      clickNextButton: jest.fn(),
-      clickLoginButton: jest.fn(),
       isAuthenticated: jest.fn(),
       ensureAuthenticated: jest.fn(),
     };
@@ -161,13 +164,13 @@ describe('ScraperApplication Core Operations', () => {
       expect(scraperApp.duplicateDetector).toBe(mockDuplicateDetector);
     });
 
-    it('should create duplicate detector if not provided', () => {
+    it('should throw error if duplicate detector not provided', () => {
       const depsWithoutDetector = { ...mockDependencies };
       delete depsWithoutDetector.duplicateDetector;
 
-      const app = new ScraperApplication(depsWithoutDetector);
-      expect(app.duplicateDetector).toBeDefined();
-      expect(app.duplicateDetector).not.toBe(mockDuplicateDetector);
+      expect(() => new ScraperApplication(depsWithoutDetector)).toThrow(
+        'DuplicateDetector dependency is required but not provided'
+      );
     });
 
     it('should initialize configuration values', () => {
@@ -504,24 +507,6 @@ describe('ScraperApplication Core Operations', () => {
     it('should delegate login to auth manager', async () => {
       await scraperApp.loginToX();
       expect(mockAuthManager.login).toHaveBeenCalled();
-    });
-
-    it('should delegate click next button to auth manager', async () => {
-      mockAuthManager.clickNextButton.mockResolvedValue(true);
-
-      const result = await scraperApp.clickNextButton();
-
-      expect(mockAuthManager.clickNextButton).toHaveBeenCalled();
-      expect(result).toBe(true);
-    });
-
-    it('should delegate click login button to auth manager', async () => {
-      mockAuthManager.clickLoginButton.mockResolvedValue(true);
-
-      const result = await scraperApp.clickLoginButton();
-
-      expect(mockAuthManager.clickLoginButton).toHaveBeenCalled();
-      expect(result).toBe(true);
     });
 
     it('should delegate ensure authenticated to auth manager', async () => {
