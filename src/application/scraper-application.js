@@ -838,23 +838,22 @@ export class ScraperApplication {
               ? window.extractTimestamp(article)
               : article.querySelector('time')?.getAttribute('datetime') || null;
 
-            // Store raw data for ContentClassifier processing
-            const socialContext = article.querySelector('[data-testid="socialContext"]');
-            const quoteTweetBlock = article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]');
-
+            // Store raw data for ContentClassifier processing - no inline classification
             const tweetData = {
               tweetID,
               url: tweetUrl,
               author,
               text,
               timestamp,
-              tweetCategory: 'Post', // Default - will be refined by ContentClassifier
+              // Remove inline classification - let ContentClassifier handle this
               rawClassificationData: {
-                socialContext: socialContext ? socialContext.innerText : null,
-                quoteTweetBlock: !!quoteTweetBlock,
+                socialContext: article.querySelector('[data-testid="socialContext"]')?.innerText || null,
+                quoteTweetBlock: !!article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]'),
                 retweetedBy,
                 monitoredUser,
                 allText: article.innerText || '',
+                // Provide raw DOM data for ContentClassifier
+                articleHtml: article.outerHTML,
               },
             };
 
@@ -889,10 +888,7 @@ export class ScraperApplication {
 
       const stats = {
         tweetsFound: tweets.length,
-        categories: tweets.reduce((acc, tweet) => {
-          acc[tweet.tweetCategory] = (acc[tweet.tweetCategory] || 0) + 1;
-          return acc;
-        }, {}),
+        // Classification will be handled by ContentClassifier, not here
       };
 
       operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);

@@ -102,6 +102,18 @@ describe('Tweet Processing and Duplicate Detection', () => {
       processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
     };
 
+    // Mock duplicate detector (required dependency)
+    const mockDuplicateDetector = {
+      isDuplicate: jest.fn().mockResolvedValue(false),
+      markAsSeen: jest.fn().mockResolvedValue(),
+      getStats: jest.fn().mockReturnValue({ totalSeen: 0, duplicatesBlocked: 0 }),
+      scanDiscordChannelForTweets: jest.fn().mockResolvedValue({
+        tweetIdsFound: [],
+        tweetIdsAdded: 0,
+        errors: [],
+      }),
+    };
+
     // Create scraper application instance
     scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
@@ -113,6 +125,9 @@ describe('Tweet Processing and Duplicate Detection', () => {
       eventBus: mockEventBus,
       logger: mockLogger,
       authManager: mockAuthManager,
+      duplicateDetector: mockDuplicateDetector,
+      debugManager: { isEnabled: jest.fn(() => false), getLevel: jest.fn(() => 1) },
+      metricsManager: { recordMetric: jest.fn(), startTimer: jest.fn(() => ({ end: jest.fn() })) },
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
@@ -342,6 +357,18 @@ describe('Tweet Processing Pipeline', () => {
       processContent: jest.fn(() => Promise.resolve({ success: true, skipped: false })),
     };
 
+    // Mock duplicate detector (required dependency)
+    const mockDuplicateDetector = {
+      isDuplicate: jest.fn().mockResolvedValue(false),
+      markAsSeen: jest.fn().mockResolvedValue(),
+      getStats: jest.fn().mockReturnValue({ totalSeen: 0, duplicatesBlocked: 0 }),
+      scanDiscordChannelForTweets: jest.fn().mockResolvedValue({
+        tweetIdsFound: [],
+        tweetIdsAdded: 0,
+        errors: [],
+      }),
+    };
+
     // Create scraper application instance
     scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
@@ -353,6 +380,9 @@ describe('Tweet Processing Pipeline', () => {
       eventBus: mockEventBus,
       logger: mockLogger,
       authManager: mockAuthManager,
+      duplicateDetector: mockDuplicateDetector,
+      debugManager: { isEnabled: jest.fn(() => false), getLevel: jest.fn(() => 1) },
+      metricsManager: { recordMetric: jest.fn(), startTimer: jest.fn(() => ({ end: jest.fn() })) },
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
@@ -385,17 +415,8 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockTweet);
 
-    // Should classify the tweet
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalledWith(
-      mockTweet.url,
-      mockTweet.text,
-      expect.objectContaining({
-        timestamp: mockTweet.timestamp,
-        author: mockTweet.author,
-      })
-    );
-
-    // Should process content through coordinator (not announce directly)
+    // Should process content through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator, not directly by ScraperApplication
     expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
       mockTweet.tweetID,
       'scraper',
@@ -407,7 +428,8 @@ describe('Tweet Processing Pipeline', () => {
         author: mockTweet.author,
         text: mockTweet.text,
         timestamp: mockTweet.timestamp,
-        isOld: false,
+        publishedAt: mockTweet.timestamp,
+        xUser: 'testuser',
       })
     );
 
@@ -416,7 +438,6 @@ describe('Tweet Processing Pipeline', () => {
       'scraper.tweet.processed',
       expect.objectContaining({
         tweet: expect.any(Object),
-        classification: expect.any(Object),
         result: expect.any(Object),
         timestamp: expect.any(Date),
       })
@@ -441,7 +462,7 @@ describe('Tweet Processing Pipeline', () => {
     await scraperApp.processNewTweet(mockTweet);
 
     // Should still complete processing despite announcement failure
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+    // ContentClassifier is called internally by ContentCoordinator, not directly
     expect(mockContentCoordinator.processContent).toHaveBeenCalled();
     expect(mockEventBus.emit).toHaveBeenCalledWith('scraper.tweet.processed', expect.any(Object));
   });
@@ -462,24 +483,14 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockRetweet);
 
-    // Should call the classifier for retweets in current implementation
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalledWith(
-      mockRetweet.url,
-      mockRetweet.text,
-      expect.objectContaining({
-        timestamp: mockRetweet.timestamp,
-        author: mockRetweet.author,
-        monitoredUser: 'testuser',
-      })
-    );
-
-    // Should process through coordinator
+    // Should process through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator
     expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
       mockRetweet.tweetID,
       'scraper',
       expect.objectContaining({
         platform: 'x',
-        type: 'retweet',
+        type: 'post', // ContentCoordinator will determine actual type through classification
         id: mockRetweet.tweetID,
         url: mockRetweet.url,
         author: mockRetweet.author,
@@ -502,19 +513,9 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockTweet);
 
-    // Should call the classifier since author matches xUser
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+    // Should process through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator, not directly
     expect(mockContentCoordinator.processContent).toHaveBeenCalled();
-
-    // Verify classifier was called with correct metadata
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalledWith(
-      'https://x.com/testuser/status/1234567890',
-      'Some tweet content',
-      expect.objectContaining({
-        author: 'testuser',
-        monitoredUser: 'testuser',
-      })
-    );
 
     // Should process as a 'post' (based on our mock classifier returning { type: 'post' })
     expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
@@ -543,15 +544,15 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockQuote);
 
-    // Should call the classifier since author matches xUser
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+    // Should process through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator, not directly
 
-    // Should process as a 'quote', not 'retweet'
+    // Should process as 'post' initially (ContentCoordinator will handle classification)
     expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
       mockQuote.tweetID,
       'scraper',
       expect.objectContaining({
-        type: 'quote',
+        type: 'post', // ContentCoordinator will determine actual type through classification
         author: 'testuser',
         platform: 'x',
       })
@@ -573,15 +574,15 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockReply);
 
-    // Should call the classifier since author matches xUser
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+    // Should process through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator, not directly
 
-    // Should process as a 'reply', not 'retweet'
+    // Should process as 'post' initially (ContentCoordinator will handle classification)
     expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
       mockReply.tweetID,
       'scraper',
       expect.objectContaining({
-        type: 'reply',
+        type: 'post', // ContentCoordinator will determine actual type through classification
         author: 'testuser',
         platform: 'x',
       })
@@ -600,8 +601,8 @@ describe('Tweet Processing Pipeline', () => {
 
     await scraperApp.processNewTweet(mockTweet);
 
-    // Should call the classifier since author is Unknown
-    expect(mockContentClassifier.classifyXContent).toHaveBeenCalled();
+    // Should process through coordinator (classification handled internally)
+    // ContentClassifier is called internally by ContentCoordinator, not directly
     expect(mockContentCoordinator.processContent).toHaveBeenCalled();
   });
 
