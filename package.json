@@ -101,6 +101,7 @@
     "jest-json-reporter": "^1.2.2",
     "jest-junit": "^16.0.0",
     "lint-staged": "^16.1.2",
+    "nyc": "^17.1.0",
     "prettier": "^3.6.2",
     "test-exclude": "^7.0.1",
     "xml2js": "^0.6.2"
