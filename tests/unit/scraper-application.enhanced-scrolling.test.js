@@ -1,19 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
-import { DuplicateDetector } from '../../src/duplicate-detector.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('Enhanced Scrolling and Profile Navigation', () => {
   let scraperApp;
+  let mockDependencies;
   let mockBrowserService;
-  let mockContentClassifier;
-  let mockContentAnnouncer;
-  let mockConfig;
-  let mockStateManager;
-  let mockEventBus;
-  let mockLogger;
-  let mockAuthManager;
 
   beforeEach(() => {
+    // Create comprehensive mock dependencies with enhanced logging
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+
     // Mock browser service
     mockBrowserService = {
       launch: jest.fn(),
@@ -32,89 +29,69 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       },
     };
 
-    // Mock content classifier
-    mockContentClassifier = {
-      classifyXContent: jest.fn(() => ({ type: 'post' })),
-    };
-
-    // Mock content announcer
-    mockContentAnnouncer = {
-      announceContent: jest.fn(() => Promise.resolve({ success: true })),
-    };
-
-    // Mock config
-    mockConfig = {
-      getRequired: jest.fn(key => {
-        const values = {
-          X_USER_HANDLE: 'testuser',
-          TWITTER_USERNAME: 'testuser',
-          TWITTER_PASSWORD: 'testpass',
-        };
-        return values[key] || `mock-${key}`;
-      }),
-      get: jest.fn((key, defaultValue) => {
-        const values = {
-          X_QUERY_INTERVAL_MIN: '300000',
-          X_QUERY_INTERVAL_MAX: '600000',
-        };
-        return values[key] || defaultValue;
-      }),
-      getBoolean: jest.fn((key, defaultValue) => {
-        const values = {
-          ANNOUNCE_OLD_TWEETS: false,
-        };
-        return values[key] !== undefined ? values[key] : defaultValue;
-      }),
-    };
-
-    // Mock state manager
-    mockStateManager = {
-      get: jest.fn(key => {
-        const values = {
-          botStartTime: new Date('2024-01-01T00:00:00Z'),
-        };
-        return values[key];
-      }),
-      set: jest.fn(),
-    };
-
-    // Mock event bus
-    mockEventBus = {
-      emit: jest.fn(),
-    };
-
-    // Mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
-
-    // Mock auth manager
-    mockAuthManager = {
-      ensureAuthenticated: jest.fn(),
-      isAuthenticated: jest.fn().mockResolvedValue(true),
-    };
-
-    // Create scraper application instance
-    scraperApp = new ScraperApplication({
+    mockDependencies = {
+      ...enhancedLoggingMocks,
       browserService: mockBrowserService,
-      contentClassifier: mockContentClassifier,
-      contentAnnouncer: mockContentAnnouncer,
-      config: mockConfig,
-      stateManager: mockStateManager,
-      eventBus: mockEventBus,
-      logger: mockLogger,
-      xAuthManager: mockAuthManager,
+      contentClassifier: {
+        classifyXContent: jest.fn(() => ({ type: 'post' })),
+      },
+      contentCoordinator: {
+        processContent: jest.fn(() => Promise.resolve({ success: true })),
+      },
+      config: {
+        getRequired: jest.fn(key => {
+          const values = {
+            X_USER_HANDLE: 'testuser',
+            TWITTER_USERNAME: 'testuser',
+            TWITTER_PASSWORD: 'testpass',
+          };
+          return values[key] || `mock-${key}`;
+        }),
+        get: jest.fn((key, defaultValue) => {
+          const values = {
+            X_QUERY_INTERVAL_MIN: '300000',
+            X_QUERY_INTERVAL_MAX: '600000',
+          };
+          return values[key] || defaultValue;
+        }),
+        getBoolean: jest.fn((key, defaultValue) => {
+          const values = {
+            ANNOUNCE_OLD_TWEETS: false,
+          };
+          return values[key] !== undefined ? values[key] : defaultValue;
+        }),
+      },
+      stateManager: {
+        get: jest.fn(key => {
+          const values = {
+            botStartTime: new Date('2024-01-01T00:00:00Z'),
+          };
+          return values[key];
+        }),
+        set: jest.fn(),
+      },
+      eventBus: {
+        emit: jest.fn(),
+      },
+      xAuthManager: {
+        ensureAuthenticated: jest.fn(),
+        isAuthenticated: jest.fn().mockResolvedValue(true),
+      },
+      duplicateDetector: {
+        isDuplicate: jest.fn(() => false),
+        addContent: jest.fn(),
+        getStats: jest.fn(() => ({ total: 0, duplicates: 0 })),
+      },
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
         hasUrl: jest.fn().mockResolvedValue(false),
         addUrl: jest.fn().mockResolvedValue(),
       },
-    });
+    };
+
+    // Create scraper application instance
+    scraperApp = new ScraperApplication(mockDependencies);
   });
 
   afterEach(() => {
@@ -122,16 +99,20 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
   });
 
   describe('performEnhancedScrolling', () => {
+    let setTimeoutSpy;
+
     beforeEach(() => {
       // Mock setTimeout to resolve immediately
-      jest.spyOn(global, 'setTimeout').mockImplementation(callback => {
+      setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(callback => {
         callback();
         return 123; // Return a mock timer ID
       });
     });
 
     afterEach(() => {
-      global.setTimeout.mockRestore();
+      if (setTimeoutSpy) {
+        setTimeoutSpy.mockRestore();
+      }
     });
 
     it('should perform multiple scroll operations', async () => {
