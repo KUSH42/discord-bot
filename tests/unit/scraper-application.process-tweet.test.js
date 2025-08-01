@@ -151,7 +151,7 @@ describe('ScraperApplication Process Tweet', () => {
       expect(mockDuplicateDetector.markAsSeen).toHaveBeenCalledWith(tweet.url);
     });
 
-    it('should process retweets using classifier', async () => {
+    it('should process retweets using current time for age comparison (fixes MAX_CONTENT_AGE issue)', async () => {
       const retweetTweet = {
         tweetID: '987654321',
         url: 'https://x.com/otheruser/status/987654321',
@@ -184,11 +184,17 @@ describe('ScraperApplication Process Tweet', () => {
           author: 'otheruser',
           retweetedBy: 'testuser',
           text: retweetTweet.text,
-          timestamp: retweetTweet.timestamp,
-          publishedAt: retweetTweet.timestamp,
+          timestamp: retweetTweet.timestamp, // Original tweet timestamp (preserved)
+          publishedAt: expect.any(String), // Current time for retweets (age comparison)
+          originalPublishedAt: retweetTweet.timestamp, // Original timestamp preserved
           xUser: 'testuser',
         })
       );
+
+      // Verify that for retweets, publishedAt is current time (not original timestamp)
+      const callArgs = mockDependencies.contentCoordinator.processContent.mock.calls[0][2];
+      expect(callArgs.publishedAt).not.toBe(retweetTweet.timestamp);
+      expect(callArgs.originalPublishedAt).toBe(retweetTweet.timestamp);
     });
 
     it('should handle tweets with retweet metadata', async () => {

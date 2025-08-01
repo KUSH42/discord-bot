@@ -1118,6 +1118,20 @@ export class ScraperApplication {
     });
 
     try {
+      // Determine if this is a retweet by checking retweetedBy field
+      const isRetweet = tweet.retweetedBy === this.xUser;
+
+      // For retweets, use current time as publishedAt (when the monitored user retweeted)
+      // This ensures retweets are checked against MAX_CONTENT_AGE based on retweet time, not original tweet time
+      // For original posts, use the original timestamp
+      const publishedAt = isRetweet ? nowUTC().toISOString() : tweet.timestamp;
+
+      if (isRetweet) {
+        operation.progress(
+          `Retweet detected: Using current time (${publishedAt}) instead of original timestamp (${tweet.timestamp}) for MAX_CONTENT_AGE comparison`
+        );
+      }
+
       // Create streamlined content object - let ContentCoordinator handle classification
       const content = {
         platform: 'x',
@@ -1128,8 +1142,9 @@ export class ScraperApplication {
         authorDisplayName: tweet.authorDisplayName,
         retweetedBy: tweet.retweetedBy,
         text: tweet.text,
-        timestamp: tweet.timestamp,
-        publishedAt: tweet.timestamp,
+        timestamp: tweet.timestamp, // Original tweet timestamp (preserved for reference)
+        publishedAt, // Retweet time for retweets, original time for posts
+        originalPublishedAt: tweet.timestamp, // Always preserve the original timestamp
         // Pass raw classification data for ContentClassifier
         rawClassificationData: tweet.rawClassificationData,
         xUser: this.xUser,
