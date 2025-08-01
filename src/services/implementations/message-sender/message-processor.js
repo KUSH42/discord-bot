@@ -160,7 +160,12 @@ export class MessageProcessor {
     try {
       // Send based on content type
       if (typeof message.content === 'string') {
-        return await message.channel.send(message.content);
+        // For string content, create options object with content and message options
+        const sendOptions = {
+          content: message.content,
+          ...message.options,
+        };
+        return await message.channel.send(sendOptions);
       } else if (message.content && typeof message.content === 'object') {
         // Merge content and options
         const sendOptions = { ...message.content, ...message.options };
