@@ -15,7 +15,8 @@ export class ContentCoordinator {
     logger,
     config,
     debugManager,
-    metricsManager
+    metricsManager,
+    discordService = null
   ) {
     this.contentStateManager = contentStateManager;
     this.contentAnnouncer = contentAnnouncer;
@@ -23,6 +24,7 @@ export class ContentCoordinator {
     this.classifier = classifier;
     this.logger = createEnhancedLogger('state', logger, debugManager, metricsManager);
     this.config = config;
+    this.discordService = discordService;
 
     // Processing coordination
     this.processingQueue = new Map(); // contentId -> Promise
@@ -267,14 +269,14 @@ export class ContentCoordinator {
         operation.progress('✅ Content state updated');
       }
 
-      // Before announcing, check Discord channels for recent announcements to prevent race conditions
-      operation.progress('🔍 Checking Discord channels for recent announcements to prevent race conditions');
-      const recentCheck = await this.checkDiscordForRecentAnnouncements(contentData);
+      // Before announcing, check duplicate detector for previously seen content to prevent duplicates
+      operation.progress('🔍 Checking duplicate detector for previously announced content');
+      const duplicateCheck = await this.checkForPreviouslyAnnouncedContent(contentData);
 
-      if (recentCheck.found) {
-        operation.success('⏭️ Content recently announced via Discord, skipping to prevent race condition', {
-          foundIn: recentCheck.foundIn,
-          reason: 'recent_discord_announcement',
+      if (duplicateCheck.found) {
+        operation.success('⏭️ Content already announced previously, skipping duplicate', {
+          foundIn: duplicateCheck.foundIn,
+          reason: 'previously_announced',
         });
 
         // Mark as seen in duplicate detector to prevent future processing
@@ -282,10 +284,10 @@ export class ContentCoordinator {
 
         return {
           action: 'skip',
-          reason: 'recent_discord_announcement',
+          reason: 'previously_announced',
           source,
           contentId,
-          foundIn: recentCheck.foundIn,
+          foundIn: duplicateCheck.foundIn,
         };
       }
 
@@ -767,12 +769,12 @@ export class ContentCoordinator {
   }
 
   /**
-   * Check Discord channels for recent announcements to prevent race conditions
+   * Check duplicate detector for previously announced content
    * @param {Object} contentData - Content data to check for
    * @returns {Promise<Object>} Check result with found status and location
    */
-  async checkDiscordForRecentAnnouncements(contentData) {
-    const operation = this.logger.startOperation('checkDiscordForRecentAnnouncements', {
+  async checkForPreviouslyAnnouncedContent(contentData) {
+    const operation = this.logger.startOperation('checkForPreviouslyAnnouncedContent', {
       platform: contentData.platform,
       type: contentData.type,
       contentId: contentData.id || contentData.videoId || contentData.tweetId,
@@ -780,14 +782,17 @@ export class ContentCoordinator {
 
     try {
       if (!this.duplicateDetector) {
-        operation.progress('No duplicate detector available, skipping Discord check');
+        operation.progress('No duplicate detector available, skipping duplicate check');
         const result = {
           found: false,
           reason: 'no_duplicate_detector',
         };
-        operation.success('Discord check skipped - no duplicate detector', result);
+        operation.success('Duplicate check skipped - no duplicate detector', result);
         return result;
       }
+
+      // First check the duplicate detector cache (from startup scan)
+      operation.progress('Checking duplicate detector cache');
 
       // For YouTube content, check video IDs
       if (contentData.platform === 'YouTube' && contentData.videoId) {
@@ -797,10 +802,10 @@ export class ContentCoordinator {
         if (videoExists) {
           const result = {
             found: true,
-            foundIn: 'youtube_duplicate_detector',
+            foundIn: 'youtube_duplicate_detector_cache',
             contentId: contentData.videoId,
           };
-          operation.success('YouTube video found in duplicate detector', result);
+          operation.success('YouTube video found in duplicate detector cache', result);
           return result;
         }
       }
@@ -813,10 +818,10 @@ export class ContentCoordinator {
         if (tweetExists) {
           const result = {
             found: true,
-            foundIn: 'x_duplicate_detector',
+            foundIn: 'x_duplicate_detector_cache',
             contentId: contentData.tweetId,
           };
-          operation.success('X/Twitter tweet found in duplicate detector', result);
+          operation.success('X/Twitter tweet found in duplicate detector cache', result);
           return result;
         }
       }
@@ -829,27 +834,209 @@ export class ContentCoordinator {
         if (urlExists) {
           const result = {
             found: true,
-            foundIn: 'url_duplicate_detector',
+            foundIn: 'url_duplicate_detector_cache',
             url: contentData.url,
           };
-          operation.success('URL found in duplicate detector', result);
+          operation.success('URL found in duplicate detector cache', result);
           return result;
         }
+      }
+
+      // Cache miss - now do live Discord channel scanning to catch recent messages
+      operation.progress('Cache miss - performing live Discord channel scan for recent messages');
+      const liveDiscordResult = await this.scanRecentDiscordMessages(contentData);
+
+      if (liveDiscordResult.found) {
+        // Update duplicate detector cache with found content
+        if (contentData.platform === 'YouTube' && contentData.videoId) {
+          this.duplicateDetector.addVideoId(contentData.videoId);
+        } else if (contentData.platform === 'X' && contentData.tweetId) {
+          // X content - mark URL as seen
+          await this.duplicateDetector.markAsSeenByUrl(contentData.url);
+        } else if (contentData.url) {
+          await this.duplicateDetector.markAsSeenByUrl(contentData.url);
+        }
+
+        operation.success('Content found in live Discord scan', liveDiscordResult);
+        return liveDiscordResult;
       }
 
       const result = {
         found: false,
       };
-      operation.success('No recent announcements found in Discord channels', result);
+      operation.success(
+        'Content not found in duplicate detector or recent Discord messages - proceeding with announcement',
+        result
+      );
       return result;
     } catch (error) {
-      operation.error(error, 'Failed to check Discord for recent announcements');
+      operation.error(error, 'Failed to check duplicate detector for previously announced content');
       // Return false on error to allow announcement to proceed
       return {
         found: false,
         error: error.message,
       };
     }
+  }
+
+  /**
+   * Scan recent Discord messages for content that might have been posted after startup
+   * @param {Object} contentData - Content data to check for
+   * @returns {Promise<Object>} Check result with found status and location
+   */
+  async scanRecentDiscordMessages(contentData) {
+    const operation = this.logger.startOperation('scanRecentDiscordMessages', {
+      platform: contentData.platform,
+      type: contentData.type,
+      contentId: contentData.id || contentData.videoId || contentData.tweetId,
+    });
+
+    try {
+      // Get Discord service for live scanning
+      if (!this.discordService || !this.discordService.isReady()) {
+        operation.progress('Discord service not available, skipping live scan');
+        return { found: false, reason: 'discord_not_ready' };
+      }
+
+      // Determine which channels to scan based on content platform
+      const channelsToScan = [];
+
+      if (contentData.platform === 'YouTube') {
+        const youtubeChannelId = this.config?.get('DISCORD_YOUTUBE_CHANNEL_ID');
+        if (youtubeChannelId) {
+          channelsToScan.push({ id: youtubeChannelId, name: 'YouTube', type: 'youtube' });
+        }
+      } else if (contentData.platform === 'X') {
+        // Scan all X-related channels
+        const xChannelConfigs = [
+          { id: this.config?.get('DISCORD_X_POSTS_CHANNEL_ID'), name: 'X posts', type: 'x' },
+          { id: this.config?.get('DISCORD_X_REPLIES_CHANNEL_ID'), name: 'X replies', type: 'x' },
+          { id: this.config?.get('DISCORD_X_QUOTES_CHANNEL_ID'), name: 'X quotes', type: 'x' },
+          { id: this.config?.get('DISCORD_X_RETWEETS_CHANNEL_ID'), name: 'X retweets', type: 'x' },
+        ];
+        channelsToScan.push(...xChannelConfigs.filter(ch => ch.id));
+      }
+
+      if (channelsToScan.length === 0) {
+        operation.progress('No channels configured for scanning');
+        return { found: false, reason: 'no_channels_configured' };
+      }
+
+      // Scan recent messages (last 10 minutes or since bot startup)
+      const scanSince = new Date(
+        Math.max(
+          Date.now() - 10 * 60 * 1000, // 10 minutes ago
+          this.getBotStartTime().getTime() // Bot startup time
+        )
+      );
+
+      operation.progress(`Scanning ${channelsToScan.length} channels for messages since ${scanSince.toISOString()}`);
+
+      for (const channelConfig of channelsToScan) {
+        try {
+          const channel = await this.discordService.fetchChannel(channelConfig.id);
+          if (!channel) {
+            continue;
+          }
+
+          operation.progress(`Scanning ${channelConfig.name} channel for recent messages`);
+
+          // Fetch recent messages
+          const messages = await channel.messages.fetch({ limit: 20, after: this.getSnowflakeFromDate(scanSince) });
+
+          for (const [, message] of messages) {
+            const messageContent = message.content || '';
+
+            // Check if message contains our target content
+            if (contentData.url && messageContent.includes(contentData.url)) {
+              operation.success(`Found matching URL in recent ${channelConfig.name} message`, {
+                messageId: message.id,
+                timestamp: message.createdAt.toISOString(),
+                channelName: channelConfig.name,
+              });
+              return {
+                found: true,
+                foundIn: `recent_discord_${channelConfig.type}`,
+                channelName: channelConfig.name,
+                messageId: message.id,
+                timestamp: message.createdAt.toISOString(),
+              };
+            }
+
+            // Platform-specific content matching
+            if (contentData.platform === 'YouTube' && contentData.videoId) {
+              if (
+                messageContent.includes(contentData.videoId) ||
+                messageContent.includes(`youtu.be/${contentData.videoId}`) ||
+                messageContent.includes(`watch?v=${contentData.videoId}`)
+              ) {
+                operation.success(`Found matching YouTube video in recent ${channelConfig.name} message`, {
+                  messageId: message.id,
+                  videoId: contentData.videoId,
+                });
+                return {
+                  found: true,
+                  foundIn: `recent_discord_youtube`,
+                  channelName: channelConfig.name,
+                  messageId: message.id,
+                  timestamp: message.createdAt.toISOString(),
+                };
+              }
+            } else if (contentData.platform === 'X' && contentData.tweetId) {
+              if (
+                messageContent.includes(contentData.tweetId) ||
+                messageContent.includes(`status/${contentData.tweetId}`)
+              ) {
+                operation.success(`Found matching X tweet in recent ${channelConfig.name} message`, {
+                  messageId: message.id,
+                  tweetId: contentData.tweetId,
+                });
+                return {
+                  found: true,
+                  foundIn: `recent_discord_x`,
+                  channelName: channelConfig.name,
+                  messageId: message.id,
+                  timestamp: message.createdAt.toISOString(),
+                };
+              }
+            }
+          }
+        } catch (channelError) {
+          operation.progress(`Error scanning ${channelConfig.name} channel: ${channelError.message}`);
+          // Continue with other channels
+        }
+      }
+
+      operation.success('No matching content found in recent Discord messages');
+      return { found: false };
+    } catch (error) {
+      operation.error(error, 'Failed to scan recent Discord messages');
+      return { found: false, error: error.message };
+    }
+  }
+
+  /**
+   * Convert Date to Discord snowflake for message filtering
+   * @param {Date} date - Date to convert
+   * @returns {string} Discord snowflake
+   */
+  getSnowflakeFromDate(date) {
+    // Discord snowflake epoch is January 1, 2015
+    const DISCORD_EPOCH = 1420070400000;
+    const timestamp = date.getTime() - DISCORD_EPOCH;
+    return (timestamp << 22).toString();
+  }
+
+  /**
+   * Get bot start time (helper method)
+   * @returns {Date} Bot start time
+   */
+  getBotStartTime() {
+    if (this.contentStateManager && typeof this.contentStateManager.getBotStartTime === 'function') {
+      return this.contentStateManager.getBotStartTime();
+    }
+    // Fallback to 10 minutes ago if no state manager
+    return new Date(Date.now() - 10 * 60 * 1000);
   }
 
   /**

@@ -251,7 +251,8 @@ async function setupCoreServices(container, _config) {
       c.resolve('logger').child({ service: 'ContentCoordinator' }),
       c.resolve('config'),
       c.resolve('debugFlagManager'),
-      c.resolve('metricsManager')
+      c.resolve('metricsManager'),
+      c.resolve('discordService')
     );
   });
 
