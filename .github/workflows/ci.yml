@@ -162,7 +162,7 @@ jobs:
       - name: Run ESLint
         run: |
           if [ -f eslint.config.mjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
-            npm run lint || echo "ESLint found issues but continuing with build"
+            npm run lint
           else
             echo "No ESLint configuration found, skipping lint check"
           fi
@@ -170,7 +170,7 @@ jobs:
       - name: Run Prettier check
         run: |
           if [ -f .prettierrc ] || [ -f .prettierrc.json ]; then
-            npx prettier --check "**/*.{js,json,md,yml,yaml}" || echo "Prettier found formatting issues but continuing with build"
+            npx prettier --check "**/*.{js,json,md,yml,yaml}"
           else
             echo "No Prettier configuration found, skipping format check"
           fi
@@ -249,6 +249,7 @@ jobs:
           mkdir -p test-results
           mkdir -p logs
           mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
+          set -e  # Exit on first error
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=tests/configs/jest.unit.config.js \
@@ -261,7 +262,7 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee logs/unit-tests-node${{ matrix.node-version }}.log
-            mv ./coverage/unit-tests-node${{ matrix.node-version }}/coverage-final.json ./coverage/unit-tests-node${{ matrix.node-version }}-coverage-final.json
+          mv ./coverage/unit-tests-node${{ matrix.node-version }}/coverage-final.json ./coverage/unit-tests-node${{ matrix.node-version }}-coverage-final.json
             
       - name: Store unit test results
         uses: actions/upload-artifact@v4
@@ -500,6 +501,7 @@ jobs:
           mkdir -p logs
           mkdir -p reports
           mkdir -p coverage/integration-tests
+          set -e  # Exit on first error
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --coverage \
@@ -509,11 +511,9 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             --verbose=true \
-            --passWithNoTests \
-            --coverageThreshold='{}' \
             2>&1 | tee logs/integration-tests-output.log
-            mv ./coverage/integration-tests/coverage-final.json ./coverage/integration-tests-coverage-final.json
-            rm -r ./coverage/integration-tests 
+          mv ./coverage/integration-tests/coverage-final.json ./coverage/integration-tests-coverage-final.json
+          rm -r ./coverage/integration-tests 
 
       - name: Store integration test results
         uses: actions/upload-artifact@v4
@@ -606,8 +606,9 @@ jobs:
         run: |
           mkdir -p test-results
           mkdir -p logs
-          mkdir -p reporst
+          mkdir -p reports
           mkdir -p coverage/e2e-tests
+          set -e  # Exit on first error
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
             --coverage \
@@ -618,8 +619,8 @@ jobs:
             --detectOpenHandles \
             --verbose=true \
             2>&1 | tee logs/e2e-tests-output.log
-            mv ./coverage/e2e-tests/coverage-final.json ./coverage/e2e-tests-coverage-final.json
-            rm -r ./coverage/e2e-tests 
+          mv ./coverage/e2e-tests/coverage-final.json ./coverage/e2e-tests-coverage-final.json
+          rm -r ./coverage/e2e-tests 
 
       - name: Store E2E test results
         uses: actions/upload-artifact@v4
@@ -690,6 +691,7 @@ jobs:
           mkdir -p logs
           mkdir -p reports
           mkdir -p coverage/performance-tests
+          set -e  # Exit on first error
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
@@ -699,12 +701,10 @@ jobs:
             --testTimeout=60000 \
             --forceExit \
             --detectOpenHandles \
-            --passWithNoTests \
             --verbose=true \
             2>&1 | tee logs/performance-tests-output.log
-
-            mv ./coverage/performance-tests/coverage-final.json ./coverage/performance-tests-coverage-final.json
-            rm -r ./coverage/performance-tests 
+          mv ./coverage/performance-tests/coverage-final.json ./coverage/performance-tests-coverage-final.json
+          rm -r ./coverage/performance-tests 
 
 
       - name: Generate performance report
@@ -816,6 +816,7 @@ jobs:
           mkdir -p reports
           mkdir -p coverage
           mkdir -p logs/security-tests
+          set -e  # Exit on first error
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
@@ -826,8 +827,8 @@ jobs:
             --forceExit \
             --detectOpenHandles \
             2>&1 | tee logs/security-tests-output.log
-            mv ./coverage/security-tests/coverage-final.json ./coverage/security-tests-coverage-final.json
-            rm -r ./coverage/security-tests 
+          mv ./coverage/security-tests/coverage-final.json ./coverage/security-tests-coverage-final.json
+          rm -r ./coverage/security-tests 
 
       - name: Run security audit
         run: |
@@ -1068,14 +1069,31 @@ jobs:
           echo "Performance tests: $PERFORMANCE_STATUS"
           echo "Security tests: $SECURITY_STATUS"
 
-          # Fail if any test job failed (not skipped)
-          if [[ "$UNIT_STATUS" == "failure" || "$INTEGRATION_STATUS" == "failure" || "$E2E_STATUS" == "failure" || "$PERFORMANCE_STATUS" == "failure" || "$SECURITY_STATUS" == "failure" ]]; then
-            echo "❌ One or more test suites failed"
+          # Count failures and successes
+          FAILED_COUNT=0
+          SUCCESS_COUNT=0
+          
+          # Check each test result and count failures
+          for status in "$UNIT_STATUS" "$INTEGRATION_STATUS" "$E2E_STATUS" "$PERFORMANCE_STATUS" "$SECURITY_STATUS"; do
+            if [[ "$status" == "failure" ]]; then
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+            elif [[ "$status" == "success" ]]; then
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+            fi
+          done
+
+          echo "Failed test suites: $FAILED_COUNT"
+          echo "Successful test suites: $SUCCESS_COUNT"
+
+          # Fail if ANY test job failed
+          if [[ $FAILED_COUNT -gt 0 ]]; then
+            echo "❌ $FAILED_COUNT test suite(s) failed - failing the build"
             exit 1
-          elif [[ "$UNIT_STATUS" == "success" || "$INTEGRATION_STATUS" == "success" || "$E2E_STATUS" == "success" || "$PERFORMANCE_STATUS" == "success" || "$SECURITY_STATUS" == "success" ]]; then
-            echo "✅ All executed tests completed successfully"
+          elif [[ $SUCCESS_COUNT -gt 0 ]]; then
+            echo "✅ All $SUCCESS_COUNT executed test suites completed successfully"
           else
-            echo "⚠️ All tests were skipped"
+            echo "⚠️ All tests were skipped - this might indicate a configuration issue"
+            exit 1
           fi
 
   # Cleanup job to remove old artifacts
