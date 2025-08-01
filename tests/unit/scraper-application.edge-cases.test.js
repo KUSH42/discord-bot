@@ -294,4 +294,164 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
       );
     });
   });
+
+  describe('Critical Timer Management Regression Tests', () => {
+    /**
+     * REGRESSION TEST: Prevents timer multiplication OOM bug
+     *
+     * Original Issue: scheduleRetry() created new timers without clearing old ones,
+     * leading to exponential timer accumulation and OOM kills in production.
+     *
+     * Root Cause: this.timerId = setTimeout(...) overwrote reference but didn't
+     * clear the previous timer, causing multiple concurrent retry timers.
+     */
+    describe('Timer Multiplication Prevention', () => {
+      let clearTimeoutSpy;
+      let setTimeoutSpy;
+
+      beforeEach(() => {
+        clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+        setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      });
+
+      afterEach(() => {
+        clearTimeoutSpy.mockRestore();
+        setTimeoutSpy.mockRestore();
+      });
+
+      it('should clear existing timer before creating new retry timer (prevents OOM bug)', async () => {
+        // REGRESSION TEST: This prevents the critical timer multiplication bug
+
+        // Arrange - Set up existing timer
+        scraperApp.timerId = 12345;
+
+        // Act - Call scheduleRetry (should clear existing timer first)
+        scraperApp.scheduleRetry();
+
+        // Assert - Must clear existing timer before creating new one
+        expect(clearTimeoutSpy).toHaveBeenCalledWith(12345);
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+        expect(scraperApp.timerId).not.toBe(12345); // Should be new timer ID
+      });
+
+      it('should not accumulate multiple timers during retry failures', async () => {
+        // REGRESSION TEST: Prevents exponential timer accumulation
+
+        // Arrange - Reset retry count
+        scraperApp.retryCount = 0;
+
+        // Act - Simulate multiple retry failures
+        scraperApp.scheduleRetry(); // First retry
+        const firstTimerId = scraperApp.timerId;
+
+        scraperApp.scheduleRetry(); // Second retry
+        const secondTimerId = scraperApp.timerId;
+
+        scraperApp.scheduleRetry(); // Third retry
+        const thirdTimerId = scraperApp.timerId;
+
+        // Assert - Each call should clear previous timer
+        expect(clearTimeoutSpy).toHaveBeenCalledTimes(2); // Called for 2nd and 3rd retries
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(3); // Three total timers created
+
+        // Verify timer IDs are different (not accumulating)
+        expect(firstTimerId).not.toBe(secondTimerId);
+        expect(secondTimerId).not.toBe(thirdTimerId);
+      });
+
+      it('should enforce maximum retry limit to prevent infinite recursion', async () => {
+        // REGRESSION TEST: Prevents infinite retry loops that cause resource exhaustion
+
+        // Arrange - Mock stop method to track calls
+        const stopSpy = jest.spyOn(scraperApp, 'stop').mockResolvedValue();
+
+        // Act - Exhaust all retries
+        for (let i = 0; i < 6; i++) {
+          // One more than MAX_RETRIES (5)
+          scraperApp.scheduleRetry();
+        }
+
+        // Assert - Should call stop() when max retries exceeded
+        expect(stopSpy).toHaveBeenCalled();
+        expect(scraperApp.retryCount).toBe(5); // Should not exceed MAX_RETRIES
+      });
+
+      it('should reset retry count on successful poll after failures', async () => {
+        // REGRESSION TEST: Ensures retry count resets on success
+
+        // Arrange - Set up retry scenario, start with fresh retry count
+        scraperApp.retryCount = 0;
+        scraperApp.isRunning = true; // Ensure scraper is running
+
+        // Mock pollXProfile to succeed this time
+        const pollSpy = jest.spyOn(scraperApp, 'pollXProfile').mockResolvedValueOnce();
+        const scheduleNextPollSpy = jest.spyOn(scraperApp, 'scheduleNextPoll').mockImplementation(() => {});
+
+        // Act - Schedule retry (this will increment retry count to 1)
+        scraperApp.scheduleRetry();
+        expect(scraperApp.retryCount).toBe(1); // Verify it incremented
+
+        // Simulate timer execution with successful poll
+        const timerCallback = setTimeoutSpy.mock.calls[0][0];
+        await timerCallback();
+
+        // Assert - Poll was called and retry count was reset
+        expect(pollSpy).toHaveBeenCalled();
+        expect(scheduleNextPollSpy).toHaveBeenCalled();
+        expect(scraperApp.retryCount).toBe(0);
+      });
+    });
+
+    describe('Timer Cleanup During Shutdown', () => {
+      it('should clear retry timers when stopping polling', () => {
+        // REGRESSION TEST: Ensures proper cleanup prevents resource leaks
+
+        // Arrange - Set up active timer
+        scraperApp.timerId = 12345;
+        scraperApp.retryCount = 2;
+
+        const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+        // Act - Stop polling
+        scraperApp.stopPolling();
+
+        // Assert - Should clear timer and reset state
+        expect(clearTimeoutSpy).toHaveBeenCalledWith(12345);
+        expect(scraperApp.timerId).toBe(null);
+        expect(scraperApp.retryCount).toBe(0);
+        expect(scraperApp.nextPollTimestamp).toBe(null);
+      });
+    });
+
+    describe('Exponential Backoff Implementation', () => {
+      it('should implement exponential backoff for retry intervals', () => {
+        // REGRESSION TEST: Verifies proper backoff prevents resource exhaustion
+
+        // Arrange - Reset retry count
+        scraperApp.retryCount = 0;
+        scraperApp.minInterval = 1000;
+        scraperApp.maxInterval = 10000;
+
+        const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+        // Act & Assert - Test progressive backoff
+        scraperApp.scheduleRetry(); // Retry 1
+        expect(scraperApp.retryCount).toBe(1);
+        const interval1 = setTimeoutSpy.mock.calls[0][1];
+
+        scraperApp.scheduleRetry(); // Retry 2
+        expect(scraperApp.retryCount).toBe(2);
+        const interval2 = setTimeoutSpy.mock.calls[1][1];
+
+        scraperApp.scheduleRetry(); // Retry 3
+        expect(scraperApp.retryCount).toBe(3);
+        const interval3 = setTimeoutSpy.mock.calls[2][1];
+
+        // Assert - Intervals should increase exponentially but cap at maxInterval
+        expect(interval2).toBeGreaterThan(interval1);
+        expect(interval3).toBeGreaterThan(interval2);
+        expect(interval3).toBeLessThanOrEqual(scraperApp.maxInterval);
+      });
+    });
+  });
 });

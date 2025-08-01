@@ -527,7 +527,7 @@ jobs:
             test-results/integration-tests.xml
             reports/
             logs/
-          retention-days: 7
+          retention-days: 14
 
   # End-to-end tests
   e2e-tests:
@@ -637,7 +637,7 @@ jobs:
             reports/
             screenshots/
             .env.e2e
-          retention-days: 7
+          retention-days: 14
           if-no-files-found: warn
 
   # Performance tests
@@ -765,7 +765,7 @@ jobs:
             logs/
             reports/
             performance-metrics.json
-          retention-days: 30
+          retention-days: 14
 
   # Security tests
   security-tests:
@@ -886,7 +886,7 @@ jobs:
             reports/
             security-audit.json
             security-report.json
-          retention-days: 30
+          retention-days: 14
 
   # Aggregate results and report
   test-summary:
@@ -1067,10 +1067,10 @@ jobs:
             echo "Current coverage: ${COVERAGE}%"
             
             # Set coverage quality gates
-            if (( $(echo "$COVERAGE < 25" | bc -l) )); then
+            if (( $(echo "$COVERAGE < 50" | bc -l) )); then
               echo "❌ Coverage critically low: $COVERAGE%"
               echo "coverage_status=critical" >> $GITHUB_ENV
-            elif (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            elif (( $(echo "$COVERAGE < 75" | bc -l) )); then
               echo "⚠️ Coverage below minimum: $COVERAGE%"
               echo "coverage_status=warning" >> $GITHUB_ENV
             else
@@ -1196,7 +1196,7 @@ jobs:
         with:
           script: |
             const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - 30); // Keep artifacts for 30 days
+            cutoff.setDate(cutoff.getDate() - 14); // Keep artifacts for 14 days
 
             const artifacts = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,

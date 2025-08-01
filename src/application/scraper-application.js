@@ -43,6 +43,7 @@ export class ScraperApplication {
     this.isRunning = false;
     this.timerId = null;
     this.currentSession = null;
+    this.retryCount = 0;
 
     // Statistics
     this.stats = {
@@ -441,6 +442,8 @@ export class ScraperApplication {
       this.timerId = null;
       this.nextPollTimestamp = null;
     }
+    // Reset retry count when stopping
+    this.retryCount = 0;
   }
 
   /**
@@ -469,22 +472,47 @@ export class ScraperApplication {
    * Schedule retry after error
    */
   scheduleRetry() {
-    const retryInterval = Math.min(this.maxInterval, this.minInterval * 2);
+    // ✅ FIX: Clear existing timer before creating new one to prevent timer multiplication
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+
+    // Initialize retry count if not exists
+    if (!this.retryCount) {
+      this.retryCount = 0;
+    }
+
+    // ✅ FIX: Add retry limit to prevent infinite recursion and OOM
+    const MAX_RETRIES = 5;
+    if (this.retryCount >= MAX_RETRIES) {
+      this.logger.error(`Max retries (${MAX_RETRIES}) exceeded, stopping scraper to prevent resource exhaustion`);
+      this.stop().catch(error => {
+        this.logger.error('Error stopping scraper after max retries:', error);
+      });
+      return;
+    }
+
+    this.retryCount++;
+    const retryInterval = Math.min(this.maxInterval, this.minInterval * Math.pow(2, this.retryCount - 1));
     this.nextPollTimestamp = Date.now() + retryInterval;
+
     this.timerId = setTimeout(async () => {
       if (!this.isRunning) {
         return;
       }
       try {
         await this.pollXProfile();
-        this.scheduleNextPoll(); // Resume normal scheduling on success
+        // ✅ Success: Reset retry count and resume normal scheduling
+        this.retryCount = 0;
+        this.scheduleNextPoll();
       } catch (error) {
-        this.logger.error('Unhandled error in scheduled retry, rescheduling:', error);
-        this.scheduleRetry(); // Continue retry on failure
+        this.logger.error(`Retry attempt ${this.retryCount}/${MAX_RETRIES} failed:`, error);
+        this.scheduleRetry(); // Continue retry with incremented counter
       }
     }, retryInterval);
 
-    this.logger.info(`Retry scheduled in ${retryInterval}ms`);
+    this.logger.info(`Retry ${this.retryCount}/${MAX_RETRIES} scheduled in ${retryInterval}ms`);
   }
 
   /**
