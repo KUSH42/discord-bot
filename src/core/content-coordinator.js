@@ -792,7 +792,7 @@ export class ContentCoordinator {
       // For YouTube content, check video IDs
       if (contentData.platform === 'YouTube' && contentData.videoId) {
         operation.progress('Checking for YouTube video ID in duplicate detector');
-        const videoExists = this.duplicateDetector.hasVideoId(contentData.videoId);
+        const videoExists = this.duplicateDetector.isVideoIdKnown(contentData.videoId);
 
         if (videoExists) {
           const result = {
@@ -808,7 +808,7 @@ export class ContentCoordinator {
       // For X/Twitter content, check tweet IDs
       if (contentData.platform === 'X' && contentData.tweetId) {
         operation.progress('Checking for X/Twitter tweet ID in duplicate detector');
-        const tweetExists = this.duplicateDetector.hasTweetId(contentData.tweetId);
+        const tweetExists = this.duplicateDetector.isTweetIdKnown(contentData.tweetId);
 
         if (tweetExists) {
           const result = {

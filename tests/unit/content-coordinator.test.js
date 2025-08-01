@@ -794,8 +794,8 @@ describe('ContentCoordinator', () => {
           mockDependencies.metricsManager
         );
 
-        mockDuplicateDetector.hasVideoId = jest.fn().mockReturnValue(false);
-        mockDuplicateDetector.hasTweetId = jest.fn().mockReturnValue(false);
+        mockDuplicateDetector.isVideoIdKnown = jest.fn().mockReturnValue(false);
+        mockDuplicateDetector.isTweetIdKnown = jest.fn().mockReturnValue(false);
         mockDuplicateDetector.isDuplicateByUrl = jest.fn().mockResolvedValue(false);
       });
 
@@ -807,14 +807,14 @@ describe('ContentCoordinator', () => {
           url: 'https://www.youtube.com/watch?v=test-video-123',
         };
 
-        mockDuplicateDetector.hasVideoId.mockReturnValue(true);
+        mockDuplicateDetector.isVideoIdKnown.mockReturnValue(true);
 
         const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
 
         expect(result.found).toBe(true);
         expect(result.foundIn).toBe('youtube_duplicate_detector');
         expect(result.contentId).toBe('test-video-123');
-        expect(mockDuplicateDetector.hasVideoId).toHaveBeenCalledWith('test-video-123');
+        expect(mockDuplicateDetector.isVideoIdKnown).toHaveBeenCalledWith('test-video-123');
       });
 
       it('should detect X/Twitter tweet already announced', async () => {
@@ -825,14 +825,14 @@ describe('ContentCoordinator', () => {
           url: 'https://twitter.com/user/status/test-tweet-456',
         };
 
-        mockDuplicateDetector.hasTweetId.mockReturnValue(true);
+        mockDuplicateDetector.isTweetIdKnown.mockReturnValue(true);
 
         const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
 
         expect(result.found).toBe(true);
         expect(result.foundIn).toBe('x_duplicate_detector');
         expect(result.contentId).toBe('test-tweet-456');
-        expect(mockDuplicateDetector.hasTweetId).toHaveBeenCalledWith('test-tweet-456');
+        expect(mockDuplicateDetector.isTweetIdKnown).toHaveBeenCalledWith('test-tweet-456');
       });
 
       it('should detect content by URL when specific ID not available', async () => {
@@ -865,7 +865,7 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
 
         expect(result.found).toBe(false);
-        expect(mockDuplicateDetector.hasVideoId).toHaveBeenCalledWith('new-video-123');
+        expect(mockDuplicateDetector.isVideoIdKnown).toHaveBeenCalledWith('new-video-123');
         expect(mockDuplicateDetector.isDuplicateByUrl).toHaveBeenCalledWith(
           'https://www.youtube.com/watch?v=new-video-123'
         );
@@ -893,7 +893,7 @@ describe('ContentCoordinator', () => {
           type: 'video',
         };
 
-        mockDuplicateDetector.hasVideoId.mockImplementation(() => {
+        mockDuplicateDetector.isVideoIdKnown.mockImplementation(() => {
           throw new Error('Database connection failed');
         });
 
@@ -938,7 +938,7 @@ describe('ContentCoordinator', () => {
         };
 
         // Mock that content is found in Discord channels
-        mockDuplicateDetector.hasVideoId = jest.fn().mockReturnValue(true);
+        mockDuplicateDetector.isVideoIdKnown = jest.fn().mockReturnValue(true);
         coordinator.checkDiscordForRecentAnnouncements = jest.fn().mockResolvedValue({
           found: true,
           foundIn: 'youtube_duplicate_detector',
