@@ -5,18 +5,18 @@
 
 import {
   nowUTC,
-  _setUTCSeconds,
-  _getUTCSeconds,
-  _setUTCMinutes,
-  _getUTCMinutes,
-  _setUTCHours,
-  _getUTCHours,
-  _setUTCDate,
-  _getUTCDate,
-  _setUTCMonth,
-  _getUTCMonth,
-  _setUTCFullYear,
-  _getUTCFullYear,
+  setUTCSeconds,
+  getUTCSeconds,
+  setUTCMinutes,
+  getUTCMinutes,
+  setUTCHours,
+  getUTCHours,
+  setUTCDate,
+  getUTCDate,
+  setUTCMonth,
+  getUTCMonth,
+  setUTCFullYear,
+  getUTCFullYear,
 } from '../utilities/utc-time.js';
 
 /**
