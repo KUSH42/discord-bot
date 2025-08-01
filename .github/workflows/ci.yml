@@ -250,6 +250,7 @@ jobs:
           mkdir -p logs
           mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
           set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:unit -- \
             --config=tests/configs/jest.unit.config.js \
@@ -502,6 +503,7 @@ jobs:
           mkdir -p reports
           mkdir -p coverage/integration-tests
           set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:integration -- \
             --coverage \
@@ -609,6 +611,7 @@ jobs:
           mkdir -p reports
           mkdir -p coverage/e2e-tests
           set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npm run test:e2e -- \
             --coverage \
@@ -692,6 +695,7 @@ jobs:
           mkdir -p reports
           mkdir -p coverage/performance-tests
           set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
           npm run test:performance -- \
             --coverage \
@@ -817,6 +821,7 @@ jobs:
           mkdir -p coverage
           mkdir -p logs/security-tests
           set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
           NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
           npx jest --config tests/configs/jest.security.config.js \
             --maxWorkers=1 \
@@ -955,9 +960,100 @@ jobs:
       - name: Enhanced coverage merging and analysis
         id: coverage
         run: |
-
-          npx nyc merge ./coverage ./coverage/coverage-final.json
-          npx nyc report --reporter=lcov --temp-dir=coverage
+          echo "Starting coverage merge process..."
+          
+          # Create coverage directory structure
+          mkdir -p coverage/merged
+          
+          # Find all coverage files
+          echo "Looking for coverage files..."
+          find . -name "*coverage-final.json" -type f | head -10
+          
+          # Check if any coverage files exist
+          if ! find . -name "*coverage-final.json" -type f | head -1 | grep -q .; then
+            echo "No coverage files found - skipping coverage merge"
+            echo "status=missing" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Use c8 for coverage merging and reporting
+          echo "Merging coverage files with c8..."
+          
+          # Create temp directory for c8
+          mkdir -p .c8_output
+          
+          # Copy all coverage files to a common location for c8
+          for file in $(find . -name "*coverage-final.json" -type f); do
+            filename=$(basename "$file" .json)
+            cp "$file" ".c8_output/${filename}-$(date +%s).json"
+            echo "Copied $file to .c8_output/"
+          done
+          
+          # Merge coverage files using c8
+          echo "Merging with c8..."
+          npx c8 report \
+            --temp-directory=.c8_output \
+            --reports-dir=coverage/merged \
+            --reporter=html \
+            --reporter=lcov \
+            --reporter=json \
+            --reporter=text \
+            --src=./src \
+            --all || {
+              echo "c8 merge failed, attempting manual merge..."
+              
+              # Fallback to manual merge
+              node -e "
+              const fs = require('fs');
+              const { glob } = require('glob');
+              
+              async function mergeCoverage() {
+                try {
+                  const coverageFiles = await glob('**/*coverage-final.json');
+                  console.log('Found coverage files:', coverageFiles);
+                  
+                  if (coverageFiles.length === 0) {
+                    console.log('No coverage files found');
+                    process.exit(1);
+                  }
+                  
+                  const merged = {};
+                  
+                  for (const file of coverageFiles) {
+                    try {
+                      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+                      console.log(\`Processing \${file} with \${Object.keys(data).length} files\`);
+                      Object.assign(merged, data);
+                    } catch (err) {
+                      console.error(\`Error processing \${file}:\`, err.message);
+                    }
+                  }
+                  
+                  console.log(\`Final merged coverage has \${Object.keys(merged).length} files\`);
+                  
+                  // Write merged coverage
+                  fs.mkdirSync('coverage/merged', { recursive: true });
+                  fs.writeFileSync('./coverage/merged/coverage-final.json', JSON.stringify(merged, null, 2));
+                  console.log('Manual coverage merge completed');
+                  
+                } catch (err) {
+                  console.error('Error in coverage merge:', err.message);
+                  process.exit(1);
+                }
+              }
+              
+              mergeCoverage();
+              "
+            }
+          
+          # Check if we have merged coverage data
+          if [ -f "./coverage/merged/coverage-final.json" ] || [ -f "./coverage/merged/lcov.info" ]; then
+            echo "status=available" >> $GITHUB_OUTPUT
+            echo "Coverage merge completed successfully"
+          else
+            echo "status=missing" >> $GITHUB_OUTPUT
+            echo "No merged coverage generated"
+          fi
 
 
       - name: Generate comprehensive test report
