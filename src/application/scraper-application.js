@@ -337,6 +337,52 @@ export class ScraperApplication {
   }
 
   /**
+   * Sort tweets by timestamp (oldest to newest) for chronological processing
+   * @param {Array} tweets - Array of tweet objects
+   * @returns {Array} Sorted tweets array
+   */
+  sortTweetsByTimestamp(tweets) {
+    if (!Array.isArray(tweets) || tweets.length === 0) {
+      return tweets;
+    }
+
+    return tweets.sort((a, b) => {
+      // Handle missing timestamps by putting them at the end
+      if (!a.timestamp && !b.timestamp) {
+        return 0;
+      }
+      if (!a.timestamp) {
+        return 1;
+      }
+      if (!b.timestamp) {
+        return -1;
+      }
+
+      try {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+
+        // Invalid dates go to the end
+        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) {
+          return 0;
+        }
+        if (isNaN(dateA.getTime())) {
+          return 1;
+        }
+        if (isNaN(dateB.getTime())) {
+          return -1;
+        }
+
+        // Sort oldest to newest (ascending)
+        return dateA.getTime() - dateB.getTime();
+      } catch (error) {
+        this.logger.debug(`Error sorting tweets by timestamp: ${error.message}`);
+        return 0;
+      }
+    });
+  }
+
+  /**
    * Delay helper function
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise<void>}
@@ -617,12 +663,16 @@ export class ScraperApplication {
         operation.progress(`Found ${searchTweets.length} tweets on search page`);
       }
 
+      // Sort tweets by timestamp (oldest to newest) for chronological processing
+      const sortedSearchTweets = this.sortTweetsByTimestamp(searchTweets);
+      this.logger.debug(`Sorted ${sortedSearchTweets.length} search tweets by timestamp (oldest to newest)`);
+
       operation.progress(
-        `Processing ${searchTweets.length} tweets from search (ContentCoordinator will handle filtering)`
+        `Processing ${sortedSearchTweets.length} tweets from search (ContentCoordinator will handle filtering)`
       );
       let processedCount = 0;
-      if (searchTweets.length > 0) {
-        for (const tweet of searchTweets) {
+      if (sortedSearchTweets.length > 0) {
+        for (const tweet of sortedSearchTweets) {
           try {
             await this.processNewTweet(tweet);
             processedCount++;
@@ -657,7 +707,7 @@ export class ScraperApplication {
       });
 
       operation.success('X profile polling completed successfully', {
-        tweetsFound: searchTweets.length,
+        tweetsFound: sortedSearchTweets.length,
         tweetsProcessed: processedCount,
         nextRunInMs: nextInterval,
         nextRunTime: nextRunTimeFormatted,
@@ -749,12 +799,16 @@ export class ScraperApplication {
       operation.progress('Extracting tweets from profile page');
       const tweets = await this.extractTweets();
 
+      // Sort tweets by timestamp (oldest to newest) for chronological processing
+      const sortedTweets = this.sortTweetsByTimestamp(tweets);
+      this.logger.debug(`Sorted ${sortedTweets.length} profile tweets by timestamp (oldest to newest)`);
+
       operation.progress(
-        `Processing ${tweets.length} tweets from enhanced detection (ContentCoordinator will handle filtering)`
+        `Processing ${sortedTweets.length} tweets from enhanced detection (ContentCoordinator will handle filtering)`
       );
       let processedCount = 0;
 
-      for (const tweet of tweets) {
+      for (const tweet of sortedTweets) {
         this.logger.debug(`Processing tweet ${tweet.tweetID}, category: ${tweet.tweetCategory || 'unknown'}`);
         try {
           await this.processNewTweet(tweet);
@@ -765,7 +819,7 @@ export class ScraperApplication {
       }
 
       operation.success('Enhanced retweet detection completed', {
-        totalTweetsFound: tweets.length,
+        totalTweetsFound: sortedTweets.length,
         tweetsProcessed: processedCount,
       });
     } catch (error) {
@@ -1195,8 +1249,11 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async performEnhancedScrolling() {
+    this.logger.debug('Starting enhanced scrolling for comprehensive content loading');
+
     // Scroll down multiple times to load more content for retweet detection
-    for (let i = 0; i < 5; i++) {
+    // Increased iterations and improved timing for better content loading
+    for (let i = 0; i < 4; i++) {
       try {
         // Check if page context is still valid before evaluating
         if (!this.browser.page || this.browser.page.isClosed()) {
@@ -1204,10 +1261,78 @@ export class ScraperApplication {
           return;
         }
 
+        this.logger.debug(`Enhanced scroll iteration ${i + 1}/4: Scrolling to bottom`);
+
+        // Get current scroll position and tweet count before scrolling
         /* eslint-disable no-undef */
-        await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        const beforeScrollData = await this.browser.evaluate(() => {
+          return {
+            scrollHeight: document.body.scrollHeight,
+            scrollTop: window.pageYOffset,
+            tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+          };
+        });
         /* eslint-enable no-undef */
-        await this.delay(1500); // Wait for content to load
+
+        /* eslint-disable no-undef */
+        await this.browser.evaluate(() => {
+          // Smooth scroll to bottom instead of instant jump
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth',
+          });
+        });
+        /* eslint-enable no-undef */
+
+        // Wait longer for content to load and network requests to complete
+        await this.delay(2500); // Increased from 1500ms to 2500ms
+
+        // Check if new content was actually loaded
+        /* eslint-disable no-undef */
+        const afterScrollData = await this.browser.evaluate(() => {
+          return {
+            scrollHeight: document.body.scrollHeight,
+            scrollTop: window.pageYOffset,
+            tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+          };
+        });
+        /* eslint-enable no-undef */
+
+        const newTweets = afterScrollData.tweetCount - beforeScrollData.tweetCount;
+        const scrollHeightChanged = afterScrollData.scrollHeight > beforeScrollData.scrollHeight;
+
+        this.logger.debug(
+          `Scroll ${i + 1} results: ${newTweets} new tweets loaded, scroll height changed: ${scrollHeightChanged}`
+        );
+
+        // If no new content loaded after scroll, wait a bit longer and try once more
+        if (!scrollHeightChanged && newTweets === 0 && i < 7) {
+          this.logger.debug('No new content detected, waiting longer for potential lazy loading');
+          await this.delay(3000); // Extra wait for lazy loading
+
+          // Check again after extended wait
+          /* eslint-disable no-undef */
+          const finalCheck = await this.browser.evaluate(() => {
+            return {
+              scrollHeight: document.body.scrollHeight,
+              tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+            };
+          });
+          /* eslint-enable no-undef */
+
+          if (
+            finalCheck.tweetCount === beforeScrollData.tweetCount &&
+            finalCheck.scrollHeight === beforeScrollData.scrollHeight
+          ) {
+            this.logger.debug('No new content after extended wait, may have reached end of timeline');
+            // Continue with remaining scrolls in case there's more content
+          }
+        }
+
+        // Additional wait between scrolls to avoid overwhelming the page
+        if (i < 7) {
+          await this.delay(1000);
+        }
       } catch (error) {
         if (
           error.message.includes('Execution context was destroyed') ||
@@ -1217,9 +1342,14 @@ export class ScraperApplication {
           this.logger.warn(`Page navigation interrupted scrolling at step ${i + 1}`, { error: error.message });
           return; // Gracefully exit instead of failing
         }
-        throw error; // Re-throw other errors
+        this.logger.warn(`Error during scroll iteration ${i + 1}:`, error.message);
+        // Continue with next iteration instead of throwing
       }
     }
+
+    // Final wait to ensure all lazy-loaded content is fully rendered
+    this.logger.debug('Enhanced scrolling completed, final wait for content stabilization');
+    await this.delay(2000);
   }
 
   /**
