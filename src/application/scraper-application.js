@@ -870,13 +870,13 @@ export class ScraperApplication {
 
     this.logger.info(`Extracting tweets from URL: ${currentUrl} (expected user: ${this.xUser})`);
 
-    const monitoredUser = this.xUser; // Pass the monitored user to browser context
+    const { xUser } = this; // Pass the monitored user to browser context
     try {
       operation.progress('Injecting helper functions into browser context');
       await this.browser.evaluate(getBrowserTweetHelperFunctions());
 
       operation.progress('Executing streamlined tweet extraction script');
-      const result = await this.browser.evaluate(monitoredUser => {
+      const result = await this.browser.evaluate(xUser => {
         /* eslint-disable no-undef, no-console */
         const tweets = [];
 
@@ -952,12 +952,12 @@ export class ScraperApplication {
             // CRITICAL: Validate author matches monitored user
             // Skip tweets that aren't from our monitored user (posts/quotes/replies)
             // or retweeted by our monitored user (retweets)
-            const isFromMonitoredUser = author === monitoredUser;
-            const isRetweetByMonitoredUser = retweetedBy === monitoredUser;
+            const isFromXUser = author === xUser;
+            const isRetweetByXUser = retweetedBy === xUser;
 
-            if (!isFromMonitoredUser && !isRetweetByMonitoredUser) {
+            if (!isFromXUser && !isRetweetByXUser) {
               console.log(
-                `SKIP: Tweet ${tweetID} - author '${author}' (retweetedBy: '${retweetedBy}') doesn't match monitored user '${monitoredUser}'`
+                `SKIP: Tweet ${tweetID} - author '${author}' (retweetedBy: '${retweetedBy}') doesn't match monitored user '${xUser}'`
               );
               continue;
             }
@@ -985,7 +985,7 @@ export class ScraperApplication {
                 socialContext: article.querySelector('[data-testid="socialContext"]')?.innerText || null,
                 quoteTweetBlock: !!article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]'),
                 retweetedBy,
-                monitoredUser,
+                xUser,
                 allText: article.innerText || '',
                 // Provide raw DOM data for ContentClassifier
                 articleHtml: article.outerHTML,
@@ -993,8 +993,8 @@ export class ScraperApplication {
             };
 
             // Add retweetedBy if detected
-            if (retweetedBy === monitoredUser) {
-              tweetData.retweetedBy = monitoredUser;
+            if (retweetedBy === xUser) {
+              tweetData.retweetedBy = xUser;
             }
 
             tweets.push(tweetData);
@@ -1016,7 +1016,7 @@ export class ScraperApplication {
         }
         return tweets;
         /* eslint-enable no-undef */
-      }, monitoredUser);
+      }, xUser);
 
       // Ensure we always return an array, even if browser.evaluate returns undefined
       const tweets = Array.isArray(result) ? result : [];
@@ -1038,7 +1038,7 @@ export class ScraperApplication {
         try {
           const classificationInput = {
             author: tweet.author,
-            monitoredUser: this.xUser,
+            xUser: this.xUser,
             retweetedBy: tweet.retweetedBy,
             ...tweet.rawClassificationData,
           };
@@ -1114,7 +1114,7 @@ export class ScraperApplication {
     const operation = this.logger.startOperation('processNewTweet', {
       tweetId: tweet.tweetID,
       author: tweet.author,
-      monitoredUser: this.xUser,
+      xUser: this.xUser,
     });
 
     try {
@@ -1175,7 +1175,7 @@ export class ScraperApplication {
         try {
           const classificationInput = {
             author: tweet.author,
-            monitoredUser: this.xUser,
+            xUser: this.xUser,
             retweetedBy: tweet.retweetedBy,
             ...tweet.rawClassificationData,
           };

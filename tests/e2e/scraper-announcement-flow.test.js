@@ -552,7 +552,7 @@ describe('Scraper Announcement Flow E2E', () => {
           tweetCategory: 'Post',
           rawClassificationData: {
             author: 'testuser',
-            monitoredUser: 'testuser',
+            xUser: 'testuser',
           },
         },
         {
@@ -564,7 +564,7 @@ describe('Scraper Announcement Flow E2E', () => {
           tweetCategory: 'Reply',
           rawClassificationData: {
             author: 'testuser',
-            monitoredUser: 'testuser',
+            xUser: 'testuser',
           },
         },
         {
@@ -576,7 +576,7 @@ describe('Scraper Announcement Flow E2E', () => {
           tweetCategory: 'Retweet',
           rawClassificationData: {
             author: 'originaluser',
-            monitoredUser: 'testuser',
+            xUser: 'testuser',
           },
         },
       ];

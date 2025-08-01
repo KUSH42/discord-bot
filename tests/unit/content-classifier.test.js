@@ -131,7 +131,7 @@ describe('ContentClassifier', () => {
       it('should detect retweet when author differs from monitored user', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {
           author: 'differentuser',
-          monitoredUser: 'testuser',
+          xUser: 'testuser',
         });
 
         expect(result.type).toBe('retweet');
@@ -141,7 +141,7 @@ describe('ContentClassifier', () => {
       it('should detect retweet when author differs from monitored user with @ prefix', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {
           author: 'differentuser',
-          monitoredUser: '@testuser',
+          xUser: '@testuser',
         });
 
         expect(result.type).toBe('retweet');
@@ -151,7 +151,7 @@ describe('ContentClassifier', () => {
       it('should NOT detect retweet when author matches monitored user', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {
           author: 'testuser',
-          monitoredUser: 'testuser',
+          xUser: 'testuser',
         });
 
         expect(result.type).toBe('post');
@@ -160,7 +160,7 @@ describe('ContentClassifier', () => {
       it('should NOT detect retweet when author matches monitored user with @ prefix', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {
           author: '@testuser',
-          monitoredUser: 'testuser',
+          xUser: 'testuser',
         });
 
         expect(result.type).toBe('post');
@@ -169,7 +169,7 @@ describe('ContentClassifier', () => {
       it('should ignore Unknown authors', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {
           author: 'Unknown',
-          monitoredUser: 'testuser',
+          xUser: 'testuser',
         });
 
         expect(result.type).toBe('post');
@@ -184,7 +184,7 @@ describe('ContentClassifier', () => {
         expect(result.type).toBe('retweet');
       });
 
-      it('should fallback to text-based detection when monitoredUser metadata is missing', () => {
+      it('should fallback to text-based detection when xUser metadata is missing', () => {
         const result = classifier.classifyXContent(
           'https://x.com/user/status/1234567890',
           'RT @someone This is a retweet',

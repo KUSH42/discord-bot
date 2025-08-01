@@ -516,11 +516,12 @@ export class ContentCoordinator {
 
     // Only classify X content currently, as YouTube content is already handled properly
     if (contentData.platform === 'x') {
+      const xUser = contentData.xUser || (this.config && this.config.get('X_USER_HANDLE'));
       const metadata = {
         tweetCategory: contentData.tweetCategory,
         author: contentData.author,
         retweetedBy: contentData.retweetedBy,
-        xUser: contentData.xUser || (this.config && this.config.get('X_USER_HANDLE')),
+        xUser,
       };
 
       // Handle retweet classification logic specifically

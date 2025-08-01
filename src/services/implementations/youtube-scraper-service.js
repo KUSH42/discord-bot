@@ -500,7 +500,7 @@ export class YouTubeScraperService {
         operation.progress('Extracting live stream information from regular live page');
 
         const liveStream = await this.browserService.evaluate(
-          ({ monitoredUser, embedLiveUrl }) => {
+          ({ xUser, embedLiveUrl }) => {
             /* eslint-disable no-undef */
 
             // ENHANCED: Check for YouTube metadata first for more accurate results
@@ -635,7 +635,7 @@ export class YouTubeScraperService {
 
             // CRITICAL: Verify we're on the correct channel's page to prevent cross-channel detection
             const currentUrl = window.location.href;
-            const expectedChannelPattern = `@${monitoredUser}/live`;
+            const expectedChannelPattern = `@${xUser}/live`;
             const isOnCorrectChannelPage = currentUrl.includes(expectedChannelPattern);
 
             debugInfo.currentUrl = currentUrl;
@@ -965,7 +965,7 @@ export class YouTubeScraperService {
             /* eslint-enable no-undef */
           },
           {
-            monitoredUser: this.channelHandle,
+            xUser: this.channelHandle,
             embedLiveUrl: this.embedLiveUrl,
           }
         );

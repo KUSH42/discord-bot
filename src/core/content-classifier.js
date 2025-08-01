@@ -141,12 +141,19 @@ export class ContentClassifier {
    */
   isRetweet(text, metadata) {
     // Primary check: Author-based detection (most reliable)
-    if (metadata && metadata.author && metadata.monitoredUser) {
+    if (metadata && metadata.author && metadata.xUser) {
       const { author } = metadata;
-      const { monitoredUser } = metadata;
+      const { xUser } = metadata;
 
       // If author differs from monitored user, it's a retweet
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
+        return true;
+      }
+    }
+
+    // Check retweetedBy field as backup detection method
+    if (metadata && metadata.retweetedBy && metadata.xUser) {
+      if (metadata.retweetedBy === metadata.xUser) {
         return true;
       }
     }

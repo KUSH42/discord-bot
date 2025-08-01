@@ -106,7 +106,7 @@ describe('Tweet Category Classification', () => {
   describe('Enhanced Retweet Detection Based on Author', () => {
     it('should classify tweets as retweets when author differs from monitored user', () => {
       // Test the classification logic directly
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
 
       // Test cases: [author, expectedCategory]
       const testCases = [
@@ -122,7 +122,7 @@ describe('Tweet Category Classification', () => {
         let isRetweet = false;
 
         // Method 1: Check if author is different from monitored user
-        if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+        if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
           isRetweet = true;
         }
 
@@ -133,7 +133,7 @@ describe('Tweet Category Classification', () => {
 
     it('should handle social context as secondary detection method', () => {
       // Test social context detection
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
       const author = 'testuser'; // Same as monitored user
       const socialContextText = 'User reposted';
 
@@ -141,7 +141,7 @@ describe('Tweet Category Classification', () => {
       let isRetweet = false;
 
       // Method 1: Check if author is different from monitored user
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
         isRetweet = true;
       }
 
@@ -156,7 +156,7 @@ describe('Tweet Category Classification', () => {
 
     it('should use RT@ pattern as tertiary detection method', () => {
       // Test RT@ pattern detection
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
       const author = 'testuser'; // Same as monitored user
       const text = 'RT @someuser This is a classic retweet';
 
@@ -164,7 +164,7 @@ describe('Tweet Category Classification', () => {
       let isRetweet = false;
 
       // Method 1: Check if author is different from monitored user
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
         isRetweet = true;
       }
 
@@ -181,7 +181,7 @@ describe('Tweet Category Classification', () => {
 
     it('should prioritize author-based detection over text patterns', () => {
       // Test that author mismatch takes precedence
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
       const author = 'differentuser'; // Different from monitored user
       const _text = 'This is a regular tweet about RT something';
 
@@ -189,7 +189,7 @@ describe('Tweet Category Classification', () => {
       let isRetweet = false;
 
       // Method 1: Check if author is different from monitored user
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
         isRetweet = true;
       }
 
@@ -199,7 +199,7 @@ describe('Tweet Category Classification', () => {
 
     it('should handle complex classification scenarios', () => {
       // Test multiple scenarios
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
 
       const scenarios = [
         { author: 'testuser', text: 'My own post', expected: 'Post' },
@@ -213,7 +213,7 @@ describe('Tweet Category Classification', () => {
         let isRetweet = false;
 
         // Method 1: Check if author is different from monitored user
-        if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+        if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
           isRetweet = true;
         }
 
@@ -231,7 +231,7 @@ describe('Tweet Category Classification', () => {
   describe('Tweet Category Priority', () => {
     it('should prioritize reply classification over retweet classification', () => {
       // Test that reply detection takes precedence
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
       const author = 'otheruser'; // Different author (would be retweet)
       const text = '@testuser This is a reply'; // Reply pattern
 
@@ -239,7 +239,7 @@ describe('Tweet Category Classification', () => {
       const isReply = text.startsWith('@');
       let isRetweet = false;
 
-      if (!isReply && author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (!isReply && author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
         isRetweet = true;
       }
 
@@ -256,7 +256,7 @@ describe('Tweet Category Classification', () => {
 
     it('should demonstrate correct classification precedence', () => {
       // Test the order of classification: Reply > Quote > Retweet > Post
-      const monitoredUser = 'testuser';
+      const xUser = 'testuser';
 
       const testScenarios = [
         { author: 'otheruser', text: 'Normal tweet', expected: 'Retweet' }, // Different author
@@ -272,7 +272,7 @@ describe('Tweet Category Classification', () => {
 
         if (!isReply) {
           // Check author mismatch
-          if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+          if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
             isRetweet = true;
           }
 
