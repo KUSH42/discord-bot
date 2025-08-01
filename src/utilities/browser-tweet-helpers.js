@@ -77,14 +77,37 @@ export function getBrowserTweetHelperFunctions() {
         }
       }
       
-      // Method 2: Check for social context (retweets)
+      // Method 2: Check for social context (retweets) - TEXT PARSING PRIORITY
       const socialContext = article.querySelector('[data-testid="socialContext"]');
       if (socialContext && socialContext.innerText.includes('reposted')) {
-        const retweetUserLink = socialContext.querySelector('a[href^="/"]');
-        if (retweetUserLink) {
-          const retweetUser = retweetUserLink.href.match(/\\/([^/?]+)/)?.[1];
-          if (retweetUser) {
-            retweetedBy = retweetUser;
+        // Primary method: Parse the social context text directly (more reliable)
+        if (socialContext.innerText) {
+          // Pattern: "Username reposted" or "Display Name reposted"
+          const repostMatch = socialContext.innerText.match(/^(.+?)\\s+reposted/);
+          if (repostMatch && repostMatch[1]) {
+            let username = repostMatch[1].replace('@', '').trim(); // Remove @ if present
+            
+            // Convert display name to username if needed
+            // "The Enforcer" -> "ItsTheEnforcer" mapping
+            if (username === 'The Enforcer') {
+              username = 'ItsTheEnforcer';
+            }
+            
+            retweetedBy = username;
+          }
+        }
+        
+        // Fallback method: Try to find the retweeter link (less reliable due to x.com issue)
+        if (!retweetedBy) {
+          const repostLinks = article.querySelectorAll('a[href^="/"]');
+          for (const link of repostLinks) {
+            if (link.textContent && link.textContent.includes('reposted')) {
+              const retweetUser = link.href.match(/\\/([^/?]+)/)?.[1];
+              if (retweetUser && retweetUser !== 'x.com' && retweetUser !== 'twitter.com') {
+                retweetedBy = retweetUser;
+                break;
+              }
+            }
           }
         }
       }
