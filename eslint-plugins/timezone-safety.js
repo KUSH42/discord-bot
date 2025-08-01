@@ -254,7 +254,7 @@ const requireUtcImports = {
 
         if (utcMethods.includes(propertyName)) {
           hasDateOperations = true;
-          dateOperations.add('nowUTC, toISOStringUTC');
+          dateOperations.add(propertyName);
         }
       },
 

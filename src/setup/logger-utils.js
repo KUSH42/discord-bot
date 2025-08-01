@@ -190,11 +190,11 @@ export class DiscordTransport extends Transport {
   safeConsoleError(message, ...args) {
     try {
       console.error(message, ...args);
-    } catch (error) {
+    } catch (_error) {
       // If console.error fails (EPIPE), try console.log, then give up
       try {
         console.log('ERROR:', message, ...args);
-      } catch (fallbackError) {
+      } catch (_fallbackError) {
         // Can't log - just give up silently
       }
     }

@@ -557,11 +557,11 @@ export function createShutdownHandler(container) {
         } else {
           console.log(`[${level.toUpperCase()}]: ${message}`, ...args);
         }
-      } catch (error) {
+      } catch (_error) {
         // If logging fails (EPIPE), use stderr directly
         try {
           process.stderr.write(`[${level.toUpperCase()}]: ${message}\n`);
-        } catch (fallbackError) {
+        } catch (_fallbackError) {
           // Can't log - just continue with shutdown
         }
       }
