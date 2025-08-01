@@ -36,7 +36,7 @@ export class PlaywrightBrowserService extends BrowserService {
     const operation = this.logger.startOperation('launchBrowser', { options });
 
     try {
-      operation.progress(`Launching browser with options: ${JSON.stringify(options)}`);
+      operation.progress(`Launching browser with options: ${JSON.stringify(options, null, 1).replace(/\n/g, '')}`);
       this.browser = await chromium.launch(options);
       operation.progress(`Browser launched: ${!!this.browser}, Connected: ${this.browser?.isConnected()}`);
 

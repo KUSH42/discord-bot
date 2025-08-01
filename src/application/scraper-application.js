@@ -1051,7 +1051,7 @@ export class ScraperApplication {
           const category = classification.type || 'unknown';
 
           this.logger.debug(
-            `Tweet ${tweet.tweetID} classified as: ${category}, full result: ${JSON.stringify(classification)}`
+            `Tweet ${tweet.tweetID} classified as: ${category}, full result: ${JSON.stringify(classification, null, 1).replace(/\n/g, '')}`
           );
 
           if (stats.breakdown[category] !== undefined) {
@@ -1065,7 +1065,7 @@ export class ScraperApplication {
         }
       }
 
-      operation.success(`Tweet extraction completed: ${JSON.stringify(stats)}`);
+      operation.success(`Tweet extraction completed: ${JSON.stringify(stats, null, 1).replace(/\n/g, '')}`);
 
       // Enhanced logging for debugging intermittent detection in both Step 1 and Step 2
       if (tweets.length === 0) {
@@ -1172,7 +1172,7 @@ export class ScraperApplication {
           const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
           category = classification.type || 'unknown';
 
-          this.logger.debug(`Classification result: ${JSON.stringify(classification)}`);
+          this.logger.debug(`Classification result: ${JSON.stringify(classification, null, 1).replace(/\n/g, '')}`);
         } catch (error) {
           this.logger.debug(`Classification failed: ${error.message}`);
           // Keep default category if classification fails
@@ -1205,7 +1205,7 @@ export class ScraperApplication {
       } else {
         // Handle unexpected result format
         operation.error(
-          new Error(`Unexpected ContentCoordinator result: ${JSON.stringify(result)}`),
+          new Error(`Unexpected ContentCoordinator result: ${JSON.stringify(result, null, 1).replace(/\n/g, '')}`),
           'Unexpected processing result format',
           {
             tweetId: tweet.tweetID,

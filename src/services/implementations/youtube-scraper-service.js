@@ -340,7 +340,9 @@ export class YouTubeScraperService {
             scrapedAt: latestVideo.scrapedAt,
           };
 
-          operation.success(`Successfully scraped latest video: ${JSON.stringify(logData)}`);
+          operation.success(
+            `Successfully scraped latest video: ${JSON.stringify(logData, null, 1).replace(/\n/g, '')}`
+          );
         } else {
           const failureInfo = {
             videosUrl: this.videosUrl,
@@ -998,7 +1000,7 @@ export class YouTubeScraperService {
           };
 
           operation.success(
-            `Successfully scraped active live stream using ${liveStream.detectionMethod}: ${JSON.stringify(logData)}`
+            `Successfully scraped active live stream using ${liveStream.detectionMethod}: ${JSON.stringify(logData, null, 1).replace(/\n/g, '')}`
           );
         } else if (liveStream && liveStream.error) {
           // Error case with debug information
@@ -1007,7 +1009,7 @@ export class YouTubeScraperService {
             debugInfo: liveStream.debugInfo,
             liveStreamUrl: this.liveStreamUrl,
           };
-          operation.success(`Live stream detection failed: ${JSON.stringify(errorInfo)}`);
+          operation.success(`Live stream detection failed: ${JSON.stringify(errorInfo, null, 1).replace(/\n/g, '')}`);
           // Cannot reassign const - set to null-like state
           Object.assign(liveStream, { isCurrentlyLive: false, error: 'Detection failed' });
         } else {
@@ -1016,7 +1018,7 @@ export class YouTubeScraperService {
             liveStreamUrl: this.liveStreamUrl,
             note: 'This is normal when no live stream is currently active',
           };
-          operation.success(`No active live stream found: ${JSON.stringify(noStreamInfo)}`);
+          operation.success(`No active live stream found: ${JSON.stringify(noStreamInfo, null, 1).replace(/\n/g, '')}`);
         }
 
         return liveStream;
@@ -1108,9 +1110,13 @@ export class YouTubeScraperService {
       };
 
       if (contentProcessed > 0) {
-        operation.success(`Content scan completed: processed ${contentProcessed} items - ${JSON.stringify(summary)}`);
+        operation.success(
+          `Content scan completed: processed ${contentProcessed} items - ${JSON.stringify(summary, null, 1).replace(/\n/g, '')}`
+        );
       } else {
-        operation.success(`Content scan completed: no new content found - ${JSON.stringify(summary)}`);
+        operation.success(
+          `Content scan completed: no new content found - ${JSON.stringify(summary, null, 1).replace(/\n/g, '')}`
+        );
       }
 
       return summary;

@@ -124,7 +124,7 @@ export class ContentAnnouncer {
           announcementEnabled: this.state.get('announcementEnabled', true),
           botStartTime: this.state.get('botStartTime'),
         };
-        operation.success(`Content announcement skipped: ${JSON.stringify(skipInfo)}`);
+        operation.success(`Content announcement skipped: ${JSON.stringify(skipInfo, null, 1).replace(/\n/g, '')}`);
 
         return result;
       }

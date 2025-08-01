@@ -236,7 +236,9 @@ export class ContentCoordinator {
           type: classification.type,
           confidence: classification.confidence,
         };
-        operation.progress(`✅ Content classification completed: ${JSON.stringify(classificationInfo)}`);
+        operation.progress(
+          `✅ Content classification completed: ${JSON.stringify(classificationInfo, null, 1).replace(/\n/g, '')}`
+        );
       }
 
       // Add to content state management if not exists
@@ -299,7 +301,9 @@ export class ContentCoordinator {
         publishedAt: contentData.publishedAt,
         url: contentData.url,
       };
-      operation.progress(`📢 Proceeding with content announcement: ${JSON.stringify(announcementAttemptInfo)}`);
+      operation.progress(
+        `📢 Proceeding with content announcement: ${JSON.stringify(announcementAttemptInfo, null, 1).replace(/\n/g, '')}`
+      );
       const announcementResult = await this.announceContent(contentId, contentData, source);
 
       if (announcementResult && announcementResult.success) {
@@ -324,7 +328,9 @@ export class ContentCoordinator {
           channelId: announcementResult.channelId,
           messageId: announcementResult.messageId,
         };
-        operation.success(`🎉 Content processing completed successfully: ${JSON.stringify(successInfo)}`);
+        operation.success(
+          `🎉 Content processing completed successfully: ${JSON.stringify(successInfo, null, 1).replace(/\n/g, '')}`
+        );
 
         return {
           action: 'announced',
@@ -347,7 +353,9 @@ export class ContentCoordinator {
           action: announcementResult?.skipped ? 'skip' : 'failed',
           reason: announcementResult?.reason || 'Content announcement failed',
         };
-        operation.success(`Content processing completed with warning: ${JSON.stringify(warningInfo)}`);
+        operation.success(
+          `Content processing completed with warning: ${JSON.stringify(warningInfo, null, 1).replace(/\n/g, '')}`
+        );
 
         return {
           action: announcementResult?.skipped ? 'skip' : 'failed',
