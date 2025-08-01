@@ -123,7 +123,7 @@ export class ContentAnnouncer {
     } catch (error) {
       // Mark as failed with automatic timing and metrics
       operation.error(error, 'Failed to announce content', {
-        contentTitle: content?.title?.substring(0, 50),
+        contentTitle: content?.title?.substring(0, 120),
         attemptedChannel: this.getChannelId(content.platform, content.type)
       });
       throw error;

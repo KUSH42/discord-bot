@@ -474,7 +474,7 @@ export class DiscordMessageSender extends EventEmitter {
           result.description = truncated.replace(/[A-Za-z0-9]{24,}/g, '[REDACTED]');
         }
         if (message.content.title) {
-          result.title = message.content.title.substring(0, 50);
+          result.title = message.content.title.substring(0, 120);
         }
       }
 

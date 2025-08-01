@@ -368,7 +368,7 @@ export class ScraperApplication {
       await this.browser.setUserAgent(userAgent);
 
       operation.success('Browser initialized for X scraping', {
-        userAgent: `${userAgent.substring(0, 50)}...`,
+        userAgent: `${userAgent.substring(0, 120)}...`,
       });
     } catch (error) {
       operation.error(error, 'Failed to initialize browser');
@@ -1070,7 +1070,7 @@ export class ScraperApplication {
         }
 
         // Get first 50 characters of tweet text
-        const textPreview = (tweet.text || '').substring(0, 50);
+        const textPreview = (tweet.text || '').substring(0, 120);
         const textSuffix = (tweet.text || '').length > 50 ? '...' : '';
 
         operation.success(

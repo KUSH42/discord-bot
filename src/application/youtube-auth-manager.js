@@ -561,7 +561,7 @@ export class YouTubeAuthManager {
         hasAuthCookies: authIndicators.hasAuthCookies,
         hasUserMenu: authIndicators.hasUserMenu,
         onLoginPage: authIndicators.onLoginPage,
-        currentUrl: authIndicators.currentUrl.substring(0, 50),
+        currentUrl: authIndicators.currentUrl.substring(0, 120),
         pageTitle: authIndicators.pageTitle.substring(0, 30),
       });
 

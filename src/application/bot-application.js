@@ -318,7 +318,7 @@ export class BotApplication {
       messageId: message.id,
       authorId: message.author?.id,
       channelId: message.channel?.id,
-      contentPreview: message.content?.substring(0, 50) || 'empty',
+      contentPreview: message.content?.substring(0, 120) || 'empty',
       instanceId: this.instanceId,
     });
 

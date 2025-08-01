@@ -72,7 +72,7 @@ export class ContentAnnouncer {
       type: content?.type,
       contentId: content?.id,
       url: content?.url,
-      title: content?.title?.substring(0, 50),
+      title: content?.title?.substring(0, 120),
       author: content?.author,
       publishedAt: content?.publishedAt,
       isOld: content?.isOld,

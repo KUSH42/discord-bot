@@ -767,7 +767,7 @@ export class MonitorApplication {
   async processVideo(video, source = 'unknown') {
     const videoSummary = {
       videoId: video.id,
-      title: video.snippet?.title?.substring(0, 50) || 'Unknown title',
+      title: video.snippet?.title?.substring(0, 120) || 'Unknown title',
       channelTitle: video.snippet?.channelTitle,
       publishedAt: video.snippet?.publishedAt,
       liveBroadcastContent: video.snippet?.liveBroadcastContent,
@@ -787,7 +787,7 @@ export class MonitorApplication {
       if (await this.duplicateDetector.isDuplicate(url)) {
         return operation.success('Duplicate video detected, skipping', {
           videoId,
-          title: title.substring(0, 50),
+          title: title.substring(0, 120),
           source,
           action: 'skipped_duplicate',
         });
@@ -797,7 +797,7 @@ export class MonitorApplication {
       if (!this.isNewContent(video)) {
         return operation.success('Video is too old, skipping', {
           videoId,
-          title: title.substring(0, 50),
+          title: title.substring(0, 120),
           publishedAt: video.snippet?.publishedAt,
           botStartTime: this.state.get('botStartTime'),
           source,
@@ -849,7 +849,7 @@ export class MonitorApplication {
         return operation.success('Video announcement successful', {
           videoId,
           type: classification.type,
-          title: title.substring(0, 50),
+          title: title.substring(0, 120),
           source,
           channelId: result.channelId,
           messageId: result.messageId,
@@ -858,7 +858,7 @@ export class MonitorApplication {
         return operation.success('Video announcement skipped', {
           videoId,
           type: classification.type,
-          title: title.substring(0, 50),
+          title: title.substring(0, 120),
           reason: result.reason,
           source,
         });
@@ -866,7 +866,7 @@ export class MonitorApplication {
         operation.error(new Error(result.reason || 'Unknown announcement failure'), 'Video announcement failed', {
           videoId,
           type: classification.type,
-          title: title.substring(0, 50),
+          title: title.substring(0, 120),
           source,
         });
         throw new Error(`Video announcement failed: ${result.reason}`);

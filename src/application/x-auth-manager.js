@@ -291,7 +291,7 @@ export class XAuthManager {
           operation.success('Authentication verification completed', {
             authenticated: isOnHomePage,
             method: 'navigation_test',
-            currentUrl: currentUrl.substring(0, 50),
+            currentUrl: currentUrl.substring(0, 120),
             cookiesPresent: true,
           });
           return isOnHomePage;

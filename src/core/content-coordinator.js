@@ -126,7 +126,7 @@ export class ContentCoordinator {
       source,
       platform: contentData.platform,
       type: contentData.type,
-      title: contentData.title?.substring(0, 50) || 'Unknown',
+      title: contentData.title?.substring(0, 120) || 'Unknown',
       publishedAt: contentData.publishedAt,
       url: contentData.url,
     });

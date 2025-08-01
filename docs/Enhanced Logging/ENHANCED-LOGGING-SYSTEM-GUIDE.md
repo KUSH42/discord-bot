@@ -362,7 +362,7 @@ export class ContentAnnouncer {
     } catch (error) {
       // Mark as failed with automatic timing and metrics
       operation.error(error, 'Failed to announce content', {
-        contentTitle: content?.title?.substring(0, 50)
+        contentTitle: content?.title?.substring(0, 120)
       });
       throw error;
     }
