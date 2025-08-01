@@ -165,6 +165,15 @@ export class MessageProcessor {
           content: message.content,
           ...message.options,
         };
+
+        // Convert suppressEmbeds boolean to Discord.js v14 MessageFlags
+        if (sendOptions.suppressEmbeds) {
+          // Import MessageFlags dynamically to avoid circular imports
+          const { MessageFlags } = await import('discord.js');
+          sendOptions.flags = MessageFlags.SuppressEmbeds;
+          delete sendOptions.suppressEmbeds; // Remove the boolean option
+        }
+
         return await message.channel.send(sendOptions);
       } else if (message.content && typeof message.content === 'object') {
         // Merge content and options
