@@ -61,7 +61,7 @@ function checkHandles() {
   if (analysis.requests.length > 0) {
     console.log('\n🌐 ACTIVE REQUESTS:');
     analysis.requests.forEach(request => {
-      console.log(`  ${request.type}: ${JSON.stringify(request.details)}`);
+      console.log(`  ${request.type}: ${JSON.stringify(request.details, null, 1).replace(/\n/g, '')}`);
     });
   }
 
