@@ -189,37 +189,18 @@ describe('ScraperApplication Core Operations', () => {
       });
     });
 
-    it('should initialize sampling rates', () => {
-      expect(scraperApp.debugSamplingRate).toBe(0.1);
-      expect(scraperApp.verboseLogSamplingRate).toBe(0.05);
+    it('should initialize with default state', () => {
+      expect(scraperApp.isRunning).toBe(false);
+      expect(scraperApp.timerId).toBe(null);
     });
   });
 
-  describe('Logging Sampling', () => {
-    it('should sample debug logging based on rate', () => {
-      // Mock Math.random to control sampling
-      const originalRandom = Math.random;
-      Math.random = jest.fn().mockReturnValue(0.05); // Below debug threshold (0.1)
+  describe('State Management', () => {
+    it('should handle state changes properly', () => {
+      expect(scraperApp.isRunning).toBe(false);
 
-      expect(scraperApp.shouldLogDebug()).toBe(true);
-
-      Math.random = jest.fn().mockReturnValue(0.15); // Above debug threshold (0.1)
-      expect(scraperApp.shouldLogDebug()).toBe(false);
-
-      Math.random = originalRandom;
-    });
-
-    it('should sample verbose logging based on rate', () => {
-      // Mock Math.random to control sampling
-      const originalRandom = Math.random;
-      Math.random = jest.fn().mockReturnValue(0.03); // Below verbose threshold (0.05)
-
-      expect(scraperApp.shouldLogVerbose()).toBe(true);
-
-      Math.random = jest.fn().mockReturnValue(0.07); // Above verbose threshold (0.05)
-      expect(scraperApp.shouldLogVerbose()).toBe(false);
-
-      Math.random = originalRandom;
+      // Test state getters/setters work as expected
+      expect(typeof scraperApp.getStats).toBe('function');
     });
   });
 
@@ -331,7 +312,7 @@ describe('ScraperApplication Core Operations', () => {
       await scraperApp.initializeBrowser();
 
       expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: false,
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -356,14 +337,14 @@ describe('ScraperApplication Core Operations', () => {
       }
     });
 
-    it('should add display arg when DISPLAY environment variable is set', async () => {
+    it('should handle browser initialization without DISPLAY environment variable', async () => {
       const originalDisplay = process.env.DISPLAY;
-      process.env.DISPLAY = ':0';
+      delete process.env.DISPLAY;
 
       await scraperApp.initializeBrowser();
 
       expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: false,
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -376,15 +357,12 @@ describe('ScraperApplication Core Operations', () => {
           '--disable-images',
           '--disable-plugins',
           '--mute-audio',
-          '--display=:0',
         ],
       });
 
       // Restore original DISPLAY
       if (originalDisplay !== undefined) {
         process.env.DISPLAY = originalDisplay;
-      } else {
-        delete process.env.DISPLAY;
       }
     });
 

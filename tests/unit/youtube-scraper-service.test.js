@@ -120,7 +120,7 @@ describe('YouTubeScraperService', () => {
       expect(scraperService.liveStreamUrl).toBe('https://www.youtube.com/@testchannel/live');
       expect(scraperService.embedLiveUrl).toBe('https://www.youtube.com/embed/UC_test_channel_id/live');
       expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: false,
+        headless: true,
         args: expect.arrayContaining([
           '--no-sandbox',
           '--disable-setuid-sandbox',

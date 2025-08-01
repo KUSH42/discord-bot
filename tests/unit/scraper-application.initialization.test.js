@@ -83,7 +83,9 @@ describe('ScraperApplication Initialization', () => {
     mockDependencies = {
       browserService: mockBrowserService,
       contentClassifier: mockClassifier,
-      contentAnnouncer: mockAnnouncer,
+      contentCoordinator: {
+        processContent: jest.fn().mockResolvedValue({ action: 'announced' }),
+      },
       config: mockConfig,
       stateManager: mockStateManager,
       discordService: {},
@@ -92,6 +94,14 @@ describe('ScraperApplication Initialization', () => {
       debugManager: mockDebugManager,
       metricsManager: mockMetricsManager,
       xAuthManager: mockAuthManager,
+      duplicateDetector: (() => {
+        const seenUrls = new Set();
+        return {
+          isDuplicate: jest.fn().mockImplementation(url => seenUrls.has(url)),
+          markAsSeen: jest.fn().mockImplementation(url => seenUrls.add(url)),
+          getStats: jest.fn().mockReturnValue({ totalSeen: 0, totalChecked: 0 }),
+        };
+      })(),
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
