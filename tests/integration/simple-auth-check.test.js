@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { XAuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 
 /**

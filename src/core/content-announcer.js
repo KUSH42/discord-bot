@@ -425,7 +425,7 @@ export class ContentAnnouncer {
   formatXMessage(content) {
     const { author, authorDisplayName, url, type, retweetedBy } = content;
     let emoji = '🐦';
-    let actionText = 'posted';
+    let actionText = 'tweeted';
 
     switch (type) {
       case 'reply':
@@ -442,7 +442,7 @@ export class ContentAnnouncer {
         break;
       default:
         emoji = '🐦';
-        actionText = 'posted';
+        actionText = 'tweeted';
     }
 
     let finalUrl = url;

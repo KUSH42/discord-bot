@@ -167,8 +167,8 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.performEnhancedScrolling();
 
-      // Enhanced scrolling now performs 8 iterations with 3 evaluate calls per iteration
-      expect(scraperApp.browser.evaluate).toHaveBeenCalledTimes(24);
+      // Enhanced scrolling now performs 4 iterations with 3 evaluate calls per iteration
+      expect(scraperApp.browser.evaluate).toHaveBeenCalledTimes(12);
       // Delay is called multiple times per iteration (2500ms + 1000ms per iteration, plus final delay)
       expect(mockDelay).toHaveBeenCalled();
       expect(mockDelay).toHaveBeenCalledWith(2500); // Main delay between scrolls

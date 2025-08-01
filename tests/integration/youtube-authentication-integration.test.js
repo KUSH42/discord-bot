@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { YouTubeScraperService } from '../../src/services/implementations/youtube-scraper-service.js';
+import { YouTubeAuthManager } from '../../src/application/youtube-auth-manager.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('YouTube Authentication Integration Tests', () => {
   let scraperService;
+  let authManager;
   let mockLogger;
   let mockConfig;
   let mockBrowserService;
   let mockDependencies;
   let mockContentCoordinator;
+  let mockStateManager;
 
   beforeEach(() => {
     jest.clearAllMocks();

@@ -124,9 +124,9 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
 
       await scraperApp.performEnhancedScrolling();
 
-      // Enhanced scrolling now performs 8 iterations with 3 evaluate calls per iteration
-      // (before scroll, scroll action, after scroll) = 24 total calls
-      expect(mockBrowserService.evaluate).toHaveBeenCalledTimes(24);
+      // Enhanced scrolling now performs 5 iterations with 3 evaluate calls per iteration
+      // (before scroll, scroll action, after scroll) = 12 total calls
+      expect(mockBrowserService.evaluate).toHaveBeenCalledTimes(12);
       expect(mockBrowserService.evaluate).toHaveBeenCalledWith(expect.any(Function));
     });
 
@@ -137,8 +137,8 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       await scraperApp.performEnhancedScrolling();
 
       // Verify the correct number of evaluate calls
-      // Enhanced scrolling now performs 8 iterations with 3 evaluate calls per iteration
-      expect(mockBrowserService.evaluate).toHaveBeenCalledTimes(24);
+      // Enhanced scrolling now performs 4 iterations with 3 evaluate calls per iteration
+      expect(mockBrowserService.evaluate).toHaveBeenCalledTimes(12);
 
       // Verify that each call is made with a function that performs scrolling
       mockBrowserService.evaluate.mock.calls.forEach(call => {

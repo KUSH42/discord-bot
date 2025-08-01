@@ -11,6 +11,8 @@ describe('Credential Handling Security Tests', () => {
   let duplicateDetector;
   let mockBrowser;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
   let originalEnv;
 
   beforeEach(() => {
@@ -45,11 +47,33 @@ describe('Credential Handling Security Tests', () => {
       },
     };
 
+    // Enhanced logging mock setup - using the proper pattern from CLAUDE.md
+    mockDebugManager = {
+      isEnabled: jest.fn(() => false),
+      getLevel: jest.fn(() => 1),
+      toggleFlag: jest.fn(),
+      setLevel: jest.fn(),
+    };
+
+    mockMetricsManager = {
+      recordMetric: jest.fn(),
+      startTimer: jest.fn(() => ({ end: jest.fn() })),
+      incrementCounter: jest.fn(),
+      setGauge: jest.fn(),
+    };
+
     mockLogger = {
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      startOperation: jest.fn(() => ({
+        progress: jest.fn(),
+        success: jest.fn(),
+        error: jest.fn(),
+      })),
+      generateCorrelationId: jest.fn(() => 'test-correlation-id'),
+      forOperation: jest.fn(() => mockLogger),
     };
 
     configuration = new Configuration();
@@ -61,6 +85,8 @@ describe('Credential Handling Security Tests', () => {
       config: configuration,
       stateManager,
       logger: mockLogger,
+      debugManager: mockDebugManager,
+      metricsManager: mockMetricsManager,
     });
   });
 
@@ -248,6 +274,8 @@ describe('Credential Handling Security Tests', () => {
         config: testConfig,
         stateManager,
         logger: mockLogger,
+        debugManager: mockDebugManager,
+        metricsManager: mockMetricsManager,
       });
 
       // Verify the values are stored but sanitized for use
@@ -440,6 +468,8 @@ describe('Credential Handling Security Tests', () => {
           config: new Configuration(),
           stateManager,
           logger: mockLogger,
+          debugManager: mockDebugManager,
+          metricsManager: mockMetricsManager,
         });
       }).toThrow();
 
@@ -468,6 +498,8 @@ describe('Credential Handling Security Tests', () => {
           config,
           stateManager,
           logger: mockLogger,
+          debugManager: mockDebugManager,
+          metricsManager: mockMetricsManager,
         });
 
         expect(authMgr).toBeDefined();
@@ -496,6 +528,8 @@ describe('Credential Handling Security Tests', () => {
         config,
         stateManager,
         logger: mockLogger,
+        debugManager: mockDebugManager,
+        metricsManager: mockMetricsManager,
       });
 
       // Values should be accessible but treated as literal strings

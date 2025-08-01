@@ -793,6 +793,8 @@ export class ScraperApplication {
 
       operation.progress(`URL verification passed: on ${this.xUser} profile (${currentUrl})`);
 
+      // Wait for timeline to load
+      await this.delay(2500);
       operation.progress('Performing enhanced scrolling to load more timeline content');
       await this.performEnhancedScrolling();
 
