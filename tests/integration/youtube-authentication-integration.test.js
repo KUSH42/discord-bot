@@ -42,19 +42,24 @@ describe('YouTube Authentication Integration Tests', () => {
         };
         return config[key] !== undefined ? config[key] : defaultValue;
       }),
+      getRequired: jest.fn(key => {
+        const config = {
+          YOUTUBE_USERNAME: 'test@example.com',
+          YOUTUBE_PASSWORD: 'testpassword123',
+        };
+        return config[key];
+      }),
+    };
+
+    mockStateManager = {
+      get: jest.fn(),
+      set: jest.fn(),
+      delete: jest.fn(),
     };
 
     mockContentCoordinator = {
       processContent: jest.fn().mockResolvedValue({ action: 'announced' }),
     };
-
-    scraperService = new YouTubeScraperService({
-      logger: mockLogger,
-      config: mockConfig,
-      contentCoordinator: mockContentCoordinator,
-      debugManager: mockDependencies.debugManager,
-      metricsManager: mockDependencies.metricsManager,
-    });
 
     // Comprehensive browser service mock for authentication flows
     mockBrowserService = {
@@ -70,8 +75,28 @@ describe('YouTube Authentication Integration Tests', () => {
       setCookies: jest.fn(),
       close: jest.fn(),
       isRunning: jest.fn(() => true),
+      page: jest.fn(() => ({})),
     };
-    scraperService.browserService = mockBrowserService;
+
+    // Create YouTube auth manager with dependencies
+    authManager = new YouTubeAuthManager({
+      browserService: mockBrowserService,
+      config: mockConfig,
+      stateManager: mockStateManager,
+      logger: mockLogger,
+      debugManager: mockDependencies.debugManager,
+      metricsManager: mockDependencies.metricsManager,
+    });
+
+    scraperService = new YouTubeScraperService({
+      logger: mockLogger,
+      config: mockConfig,
+      contentCoordinator: mockContentCoordinator,
+      debugManager: mockDependencies.debugManager,
+      metricsManager: mockDependencies.metricsManager,
+      browserService: mockBrowserService,
+      youtubeAuthManager: authManager,
+    });
   });
 
   afterEach(async () => {
@@ -86,12 +111,12 @@ describe('YouTube Authentication Integration Tests', () => {
 
   describe('Complete Authentication Flow Integration', () => {
     it('should successfully authenticate through complete Google/YouTube flow', async () => {
-      // Mock all the helper methods to simulate successful authentication
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      // Mock all the helper methods on the auth manager to simulate successful authentication
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       // Mock browser service calls in sequence
       mockBrowserService.goto.mockResolvedValue();
@@ -100,60 +125,55 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.type.mockResolvedValue();
       mockBrowserService.click.mockResolvedValue();
 
-      // Mock signed-in indicator detection
-      mockBrowserService.evaluate.mockResolvedValue(true); // Successfully signed in
+      // Mock authentication check to return true
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(true);
 
-      await scraperService.authenticateWithYouTube();
+      const result = await authManager.ensureAuthenticated();
+
+      expect(result).toBe(true);
 
       // Verify complete flow execution
       expect(mockBrowserService.goto).toHaveBeenCalledWith(
         'https://accounts.google.com/signin/v2/identifier?service=youtube'
       );
-      expect(mockBrowserService.goto).toHaveBeenCalledWith('https://www.youtube.com');
       expect(mockBrowserService.type).toHaveBeenCalledWith('input[type="email"]', 'test@example.com');
       expect(mockBrowserService.type).toHaveBeenCalledWith('input[type="password"]', 'testpassword123');
       expect(mockBrowserService.click).toHaveBeenCalledWith('#identifierNext');
       expect(mockBrowserService.click).toHaveBeenCalledWith('#passwordNext');
 
       // Verify helper methods were called
-      expect(scraperService.handleCookieConsent).toHaveBeenCalled();
-      expect(scraperService.handleAccountChallenges).toHaveBeenCalled();
-      expect(scraperService.handle2FA).toHaveBeenCalled();
-      expect(scraperService.handleCaptcha).toHaveBeenCalled();
-      expect(scraperService.handleDeviceVerification).toHaveBeenCalled();
-
-      // Verify authentication state is set
-      expect(scraperService.isAuthenticated).toBe(true);
-
-      // Verify enhanced logging integration
-      expect(mockLogger.info).toHaveBeenCalledWith('Starting YouTube authentication...', expect.any(Object));
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube', expect.any(Object));
+      expect(authManager.handleCookieConsent).toHaveBeenCalled();
+      expect(authManager.handleAccountChallenges).toHaveBeenCalled();
+      expect(authManager.handle2FA).toHaveBeenCalled();
+      expect(authManager.handleCaptcha).toHaveBeenCalled();
+      expect(authManager.handleConsentPageRedirect).toHaveBeenCalled();
     });
 
     it('should handle authentication failure with proper error context', async () => {
       const authError = new Error('Network timeout during authentication');
       mockBrowserService.goto.mockRejectedValue(authError);
 
-      await scraperService.authenticateWithYouTube();
+      const result = await authManager.ensureAuthenticated();
 
       // Verify error handling and state
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        '⚠️Failed to authenticate with YouTube:',
-        expect.objectContaining({
-          error: 'Network timeout during authentication',
-          stack: expect.any(String),
-        })
+      expect(result).toBe(false);
+
+      // Check that enhanced logging captured the error
+      const operationMock = mockLogger.startOperation.mock.results[0].value;
+      expect(operationMock.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.stringContaining('Authentication failed'),
+        expect.any(Object)
       );
     });
 
     it('should maintain authentication state across browser recovery', async () => {
       // Mock all the helper methods for both authentication attempts
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       // Initial successful authentication
       mockBrowserService.goto.mockResolvedValue();
@@ -161,61 +181,58 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.type.mockResolvedValue();
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
-      mockBrowserService.evaluate.mockResolvedValue(true); // Signed in
 
-      await scraperService.authenticateWithYouTube();
-      expect(scraperService.isAuthenticated).toBe(true);
+      // Mock isAuthenticated to return true after authentication
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(true);
 
-      // Simulate browser recovery scenario
-      const recoveryOperation = scraperService.logger.startOperation('browserRecovery', {});
+      let result = await authManager.ensureAuthenticated();
+      expect(result).toBe(true);
+
+      // Simulate browser recovery scenario - mock isAuthenticated to return false first, then true
+      authManager.isAuthenticated.mockResolvedValueOnce(false).mockResolvedValue(true);
 
       // Mock recovery process
       mockBrowserService.isRunning.mockReturnValueOnce(false).mockReturnValue(true);
       mockBrowserService.launch.mockResolvedValue();
 
-      // Reset authentication state to simulate recovery
-      scraperService.isAuthenticated = false;
-
       // Simulate recovery completing with re-authentication
-      await scraperService.authenticateWithYouTube();
+      result = await authManager.ensureAuthenticated();
 
-      recoveryOperation.success('Browser recovery completed with re-authentication');
-
-      expect(scraperService.isAuthenticated).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube', expect.any(Object));
+      expect(result).toBe(true);
     });
   });
 
   describe('Authentication Challenge Integration', () => {
     it('should handle authentication challenges and still complete successfully', async () => {
       // Mock helper methods to simulate various challenges being handled
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true); // Challenge handled successfully
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true); // Challenge handled successfully
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
       mockBrowserService.type.mockResolvedValue();
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
-      mockBrowserService.evaluate.mockResolvedValue(true);
 
-      await scraperService.authenticateWithYouTube();
+      // Mock authentication to succeed
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(true);
 
-      expect(scraperService.isAuthenticated).toBe(true);
-      expect(scraperService.handleAccountChallenges).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube', expect.any(Object));
+      const result = await authManager.ensureAuthenticated();
+
+      expect(result).toBe(true);
+      expect(authManager.handleAccountChallenges).toHaveBeenCalled();
     });
 
     it('should fail authentication when challenges cannot be handled', async () => {
       // Mock helper methods to simulate challenge failure
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(false); // Challenge failed
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(false); // Challenge failed
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
@@ -223,21 +240,24 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
 
-      await scraperService.authenticateWithYouTube();
+      // Mock authentication to fail
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(false);
 
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(scraperService.handleAccountChallenges).toHaveBeenCalled();
+      const result = await authManager.ensureAuthenticated();
+
+      expect(result).toBe(false);
+      expect(authManager.handleAccountChallenges).toHaveBeenCalled();
       // Should not proceed to other steps when challenge fails
-      expect(scraperService.handle2FA).not.toHaveBeenCalled();
+      expect(authManager.handle2FA).not.toHaveBeenCalled();
     });
 
     it('should fail authentication when 2FA cannot be completed', async () => {
       // Mock helper methods with 2FA failure
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(false); // 2FA failed
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(false); // 2FA failed
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
@@ -245,22 +265,25 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
 
-      await scraperService.authenticateWithYouTube();
+      // Mock authentication to fail
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(false);
 
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(scraperService.handleAccountChallenges).toHaveBeenCalled();
-      expect(scraperService.handle2FA).toHaveBeenCalled();
+      const result = await authManager.ensureAuthenticated();
+
+      expect(result).toBe(false);
+      expect(authManager.handleAccountChallenges).toHaveBeenCalled();
+      expect(authManager.handle2FA).toHaveBeenCalled();
       // Should not proceed to CAPTCHA when 2FA fails
-      expect(scraperService.handleCaptcha).not.toHaveBeenCalled();
+      expect(authManager.handleCaptcha).not.toHaveBeenCalled();
     });
 
     it('should fail authentication when CAPTCHA blocks the process', async () => {
       // Mock helper methods with CAPTCHA failure
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(false); // CAPTCHA failed
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(false); // CAPTCHA failed
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
@@ -268,73 +291,92 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
 
-      await scraperService.authenticateWithYouTube();
+      // Mock authentication to fail
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(false);
 
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(scraperService.handleCaptcha).toHaveBeenCalled();
-      // Should not proceed to device verification when CAPTCHA fails
-      expect(scraperService.handleDeviceVerification).not.toHaveBeenCalled();
+      const result = await authManager.ensureAuthenticated();
+
+      expect(result).toBe(false);
+      expect(authManager.handleCaptcha).toHaveBeenCalled();
+      // Should not proceed to consent page redirect when CAPTCHA fails
+      expect(authManager.handleConsentPageRedirect).not.toHaveBeenCalled();
     });
   });
 
   describe('Authentication State Management Integration', () => {
     it('should properly handle authentication when disabled in config', async () => {
-      // Create service with authentication disabled
+      // Create auth manager with authentication disabled
       const disabledConfig = {
         ...mockConfig,
-        getBoolean: jest.fn(() => false), // Authentication disabled
-      };
-
-      const disabledService = new YouTubeScraperService({
-        logger: mockLogger,
-        config: disabledConfig,
-        contentCoordinator: mockContentCoordinator,
-        debugManager: mockDependencies.debugManager,
-        metricsManager: mockDependencies.metricsManager,
-      });
-
-      await disabledService.authenticateWithYouTube();
-
-      expect(disabledService.isAuthenticated).toBe(false);
-      expect(mockLogger.debug).toHaveBeenCalledWith('YouTube authentication is disabled', expect.any(Object));
-    });
-
-    it('should handle missing credentials gracefully', async () => {
-      // Create service with missing credentials
-      const noCredsConfig = {
-        ...mockConfig,
         get: jest.fn((key, defaultValue) => {
-          if (key === 'YOUTUBE_USERNAME' || key === 'YOUTUBE_PASSWORD') {
-            return '';
+          if (key === 'YOUTUBE_AUTH_ENABLED') {
+            return 'false';
           }
           return mockConfig.get(key, defaultValue);
         }),
       };
 
-      const noCredsService = new YouTubeScraperService({
+      const disabledAuthManager = new YouTubeAuthManager({
+        browserService: mockBrowserService,
+        config: disabledConfig,
+        stateManager: mockStateManager,
         logger: mockLogger,
-        config: noCredsConfig,
-        contentCoordinator: mockContentCoordinator,
         debugManager: mockDependencies.debugManager,
         metricsManager: mockDependencies.metricsManager,
       });
 
-      await noCredsService.authenticateWithYouTube();
+      const result = await disabledAuthManager.ensureAuthenticated();
 
-      expect(noCredsService.isAuthenticated).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'YouTube authentication enabled but credentials not provided',
-        expect.any(Object)
+      expect(result).toBe(true); // Returns true when disabled (no auth needed)
+
+      // Check that operation was logged as disabled
+      const operationMock = mockLogger.startOperation.mock.results[0].value;
+      expect(operationMock.success).toHaveBeenCalledWith(
+        'YouTube authentication is disabled',
+        expect.objectContaining({ method: 'disabled' })
+      );
+    });
+
+    it('should handle missing credentials gracefully', async () => {
+      // Create auth manager with missing credentials
+      const noCredsConfig = {
+        ...mockConfig,
+        getRequired: jest.fn(key => {
+          if (key === 'YOUTUBE_USERNAME' || key === 'YOUTUBE_PASSWORD') {
+            return '';
+          }
+          return mockConfig.getRequired(key);
+        }),
+      };
+
+      const noCredsAuthManager = new YouTubeAuthManager({
+        browserService: mockBrowserService,
+        config: noCredsConfig,
+        stateManager: mockStateManager,
+        logger: mockLogger,
+        debugManager: mockDependencies.debugManager,
+        metricsManager: mockDependencies.metricsManager,
+      });
+
+      const result = await noCredsAuthManager.ensureAuthenticated();
+
+      expect(result).toBe(false);
+
+      // Check that operation was logged as error due to missing credentials
+      const operationMock = mockLogger.startOperation.mock.results[0].value;
+      expect(operationMock.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        'YouTube authentication enabled but credentials not provided'
       );
     });
 
     it('should handle authentication timeout during sign-in check', async () => {
       // Mock helper methods for successful flow until sign-in check
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
@@ -342,128 +384,152 @@ describe('YouTube Authentication Integration Tests', () => {
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
 
-      // Mock signed-in check failure
-      mockBrowserService.evaluate.mockResolvedValue(false); // Not signed in
+      // Mock authentication check to fail
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(false);
 
-      await scraperService.authenticateWithYouTube();
+      const result = await authManager.ensureAuthenticated();
 
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        '⚠️ YouTube authentication may have failed - proceeding without authentication',
-        expect.any(Object)
-      );
+      expect(result).toBe(false);
+
+      // Check that operation logged verification failure
+      const operationMock = mockLogger.startOperation.mock.results[0].value;
+      expect(operationMock.error).toHaveBeenCalledWith(expect.any(Error), 'Login completed but verification failed');
     });
   });
 
   describe('Enhanced Logging Integration for Authentication', () => {
     it('should track authentication operations with enhanced logging', async () => {
       // Mock successful authentication
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      jest.spyOn(authManager, 'handleCookieConsent').mockResolvedValue();
+      jest.spyOn(authManager, 'handleAccountChallenges').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handle2FA').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleCaptcha').mockResolvedValue(true);
+      jest.spyOn(authManager, 'handleConsentPageRedirect').mockResolvedValue();
 
       mockBrowserService.goto.mockResolvedValue();
       mockBrowserService.waitForSelector.mockResolvedValue();
       mockBrowserService.type.mockResolvedValue();
       mockBrowserService.click.mockResolvedValue();
       mockBrowserService.waitFor.mockResolvedValue();
-      mockBrowserService.evaluate.mockResolvedValue(true);
 
-      await scraperService.authenticateWithYouTube();
+      // Mock authentication to succeed
+      jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(true);
 
-      // Verify enhanced logging captured authentication steps
-      expect(mockLogger.info).toHaveBeenCalledWith('Starting YouTube authentication...', expect.any(Object));
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube', expect.any(Object));
+      const result = await authManager.ensureAuthenticated();
 
-      // Verify the logger was called multiple times during the process
-      expect(mockLogger.info).toHaveBeenCalledTimes(2);
+      expect(result).toBe(true);
+
+      // Verify enhanced logging captured authentication operations
+      expect(mockLogger.startOperation).toHaveBeenCalledWith(
+        'ensureAuthenticated',
+        expect.objectContaining({
+          authEnabled: true,
+          maxRetries: 3,
+          username: '[CONFIGURED]',
+        })
+      );
     });
 
     it('should sanitize sensitive data in authentication error logs', async () => {
-      const authError = new Error('Authentication failed');
-      authError.response = {
-        data: {
-          username: 'test@example.com',
-          password: 'testpassword123',
-          token: 'secret-token-123',
-        },
-      };
+      const authError = new Error('Authentication failed with credentials testpassword123');
 
       mockBrowserService.goto.mockRejectedValue(authError);
 
-      await scraperService.authenticateWithYouTube();
+      const result = await authManager.ensureAuthenticated();
 
-      // Verify error logging occurred but sensitive data was sanitized
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        '⚠️Failed to authenticate with YouTube:',
+      expect(result).toBe(false);
+
+      // Verify error logging occurred with sanitized data
+      const operationMock = mockLogger.startOperation.mock.results[0].value;
+      expect(operationMock.error).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.stringContaining('Authentication failed'),
         expect.objectContaining({
-          error: 'Authentication failed',
-          stack: expect.any(String),
+          errorMessage: expect.not.stringContaining('testpassword123'),
         })
       );
-
-      // Ensure no sensitive data appears in logs
-      const errorCall = mockLogger.error.mock.calls.find(call => call[0].includes('Failed to authenticate'));
-      expect(JSON.stringify(errorCall)).not.toContain('testpassword123');
-      expect(JSON.stringify(errorCall)).not.toContain('secret-token-123');
     });
   });
 
   describe('Authentication Integration with Service Initialization', () => {
     it('should seamlessly integrate authentication with service initialization', async () => {
-      // Mock successful authentication
-      jest.spyOn(scraperService, 'handleCookieConsent').mockResolvedValue();
-      jest.spyOn(scraperService, 'handleAccountChallenges').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handle2FA').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleCaptcha').mockResolvedValue(true);
-      jest.spyOn(scraperService, 'handleDeviceVerification').mockResolvedValue();
+      // Mock successful authentication on the auth manager
+      jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue(true);
 
-      mockBrowserService.goto.mockResolvedValue();
-      mockBrowserService.waitForSelector.mockResolvedValue();
-      mockBrowserService.type.mockResolvedValue();
-      mockBrowserService.click.mockResolvedValue();
-      mockBrowserService.waitFor.mockResolvedValue();
-      mockBrowserService.evaluate
-        .mockResolvedValueOnce(true) // Authentication success
-        .mockResolvedValueOnce({
-          // Initial video for initialization
-          id: 'test123',
-          title: 'Test Video',
-          url: 'https://www.youtube.com/watch?v=test123',
-          publishedAt: new Date().toISOString(),
-        });
+      // Mock scraper service evaluate calls for initialization content detection
+      mockBrowserService.evaluate.mockResolvedValue({
+        // Initial video for initialization
+        id: 'test123',
+        title: 'Test Video',
+        url: 'https://www.youtube.com/watch?v=test123',
+        publishedAt: new Date().toISOString(),
+      });
 
-      const authSpy = jest.spyOn(scraperService, 'authenticateWithYouTube');
+      // Mock config to include required YOUTUBE_CHANNEL_ID
+      const configWithChannelId = {
+        ...mockConfig,
+        getRequired: jest.fn(key => {
+          if (key === 'YOUTUBE_CHANNEL_ID') {
+            return 'UC123456789';
+          }
+          return mockConfig.getRequired(key);
+        }),
+      };
 
-      await scraperService.initialize('testchannel');
+      // Create a new scraper service with the updated config for this test
+      const testScraperService = new YouTubeScraperService({
+        logger: mockLogger,
+        config: configWithChannelId,
+        contentCoordinator: mockContentCoordinator,
+        debugManager: mockDependencies.debugManager,
+        metricsManager: mockDependencies.metricsManager,
+        browserService: mockBrowserService,
+        youtubeAuthManager: authManager,
+      });
 
-      expect(authSpy).toHaveBeenCalled();
-      expect(scraperService.isAuthenticated).toBe(true);
-      expect(scraperService.isInitialized).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('✅ Successfully authenticated with YouTube', expect.any(Object));
+      await testScraperService.initialize('testchannel');
+
+      expect(authManager.ensureAuthenticated).toHaveBeenCalled();
+      expect(testScraperService.isInitialized).toBe(true);
     });
 
     it('should handle authentication failure during initialization gracefully', async () => {
-      const authError = new Error('Authentication timeout');
-      mockBrowserService.goto.mockRejectedValue(authError);
+      // Mock authentication failure on the auth manager
+      jest.spyOn(authManager, 'ensureAuthenticated').mockResolvedValue(false);
+
+      // Mock scraper service evaluate calls for initialization
       mockBrowserService.evaluate.mockResolvedValue({
         id: 'test123',
         title: 'Test Video',
         url: 'https://www.youtube.com/watch?v=test123',
       });
 
-      await scraperService.initialize('testchannel');
+      // Mock config to include required YOUTUBE_CHANNEL_ID
+      const configWithChannelId = {
+        ...mockConfig,
+        getRequired: jest.fn(key => {
+          if (key === 'YOUTUBE_CHANNEL_ID') {
+            return 'UC123456789';
+          }
+          return mockConfig.getRequired(key);
+        }),
+      };
 
-      expect(scraperService.isAuthenticated).toBe(false);
-      expect(scraperService.isInitialized).toBe(true); // Should still initialize
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        '⚠️Failed to authenticate with YouTube:',
-        expect.objectContaining({
-          error: 'Authentication timeout',
-        })
-      );
+      // Create a new scraper service with the updated config for this test
+      const testScraperService = new YouTubeScraperService({
+        logger: mockLogger,
+        config: configWithChannelId,
+        contentCoordinator: mockContentCoordinator,
+        debugManager: mockDependencies.debugManager,
+        metricsManager: mockDependencies.metricsManager,
+        browserService: mockBrowserService,
+        youtubeAuthManager: authManager,
+      });
+
+      await testScraperService.initialize('testchannel');
+
+      expect(authManager.ensureAuthenticated).toHaveBeenCalled();
+      expect(testScraperService.isInitialized).toBe(true); // Should still initialize
     });
   });
 });

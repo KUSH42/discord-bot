@@ -795,11 +795,36 @@ export class ScraperApplication {
 
       // Wait for timeline to load
       await this.delay(2500);
-      operation.progress('Performing enhanced scrolling to load more timeline content');
+
+      // CRITICAL FIX: Extract recent tweets BEFORE scrolling to prevent replacement
+      operation.progress('Extracting recent tweets from initial timeline view');
+      const recentTweets = await this.extractTweets();
+      operation.progress(`Found ${recentTweets.length} recent tweets in initial view`);
+
+      // Then perform enhanced scrolling to load older content
+      operation.progress('Performing enhanced scrolling to load additional timeline content');
       await this.performEnhancedScrolling();
 
-      operation.progress('Extracting tweets from profile page');
-      const tweets = await this.extractTweets();
+      // Extract additional tweets loaded by scrolling
+      operation.progress('Extracting additional tweets after scrolling');
+      const additionalTweets = await this.extractTweets();
+      operation.progress(`Found ${additionalTweets.length} tweets after scrolling`);
+
+      // Merge tweets and deduplicate by tweetID to prevent duplicates
+      const allTweets = [...recentTweets];
+      const seenTweetIds = new Set(recentTweets.map(t => t.tweetID));
+
+      for (const tweet of additionalTweets) {
+        if (!seenTweetIds.has(tweet.tweetID)) {
+          allTweets.push(tweet);
+          seenTweetIds.add(tweet.tweetID);
+        }
+      }
+
+      operation.progress(
+        `Merged ${recentTweets.length} recent + ${additionalTweets.length - (additionalTweets.length - (allTweets.length - recentTweets.length))} additional tweets = ${allTweets.length} total unique tweets`
+      );
+      const tweets = allTweets;
 
       // Sort tweets by timestamp (oldest to newest) for chronological processing
       const sortedTweets = this.sortTweetsByTimestamp(tweets);

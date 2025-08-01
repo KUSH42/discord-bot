@@ -69,6 +69,7 @@ export class DiscordTransport extends Transport {
       maxBackoffDelay: opts.maxBackoffDelay || 30000, // 30 second max backoff
       testMode: process.env.NODE_ENV === 'test', // Enable test mode in test environment
       autoStart: process.env.NODE_ENV !== 'test', // Don't auto-start in test environment
+      suppressEmbeds: true,
     });
 
     // Don't start periodic flushing in test environment to prevent test timeouts
@@ -276,6 +277,7 @@ export class DiscordTransport extends Transport {
         if (part) {
           await this.messageSender.queueMessage(this.channel, part, {
             priority: 1, // Logging messages have normal priority
+            suppressEmbeds: true, // better for readability in Bot Support Channel
           });
         }
       }

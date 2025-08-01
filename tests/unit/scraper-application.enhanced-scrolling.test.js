@@ -17,6 +17,7 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       close: jest.fn(),
       isRunning: jest.fn(() => true),
       goto: jest.fn(),
+      getCurrentUrl: jest.fn(() => 'https://x.com/testuser'),
       waitForSelector: jest.fn(),
       type: jest.fn(),
       click: jest.fn(),
@@ -193,6 +194,91 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       mockBrowserService.waitForSelector.mockRejectedValue(selectorError);
 
       await expect(scraperApp.navigateToProfileTimeline(username)).rejects.toThrow('Selector timeout');
+    });
+  });
+
+  describe('Enhanced Retweet Detection - Scrolling Bug Fix', () => {
+    let extractTweetsSpy;
+    let performEnhancedScrollingSpy;
+
+    beforeEach(() => {
+      scraperApp.browser = mockBrowserService;
+
+      // Mock extractTweets to return different tweets for initial vs after-scrolling calls
+      const recentTweets = [
+        { tweetID: 'recent1', timestamp: '2025-08-01T21:09:46.000Z', tweetCategory: 'retweet' },
+        { tweetID: 'recent2', timestamp: '2025-08-01T21:08:21.000Z', tweetCategory: 'retweet' },
+      ];
+
+      const olderTweets = [
+        { tweetID: 'old1', timestamp: '2025-08-01T16:12:54.000Z', tweetCategory: 'retweet' },
+        { tweetID: 'old2', timestamp: '2025-08-01T19:39:42.000Z', tweetCategory: 'retweet' },
+        { tweetID: 'recent1', timestamp: '2025-08-01T21:09:46.000Z', tweetCategory: 'retweet' }, // Duplicate
+      ];
+
+      extractTweetsSpy = jest
+        .spyOn(scraperApp, 'extractTweets')
+        .mockResolvedValueOnce(recentTweets) // First call (before scrolling)
+        .mockResolvedValueOnce(olderTweets); // Second call (after scrolling)
+
+      performEnhancedScrollingSpy = jest.spyOn(scraperApp, 'performEnhancedScrolling').mockResolvedValue();
+
+      jest.spyOn(scraperApp, 'processNewTweet').mockResolvedValue();
+    });
+
+    afterEach(() => {
+      extractTweetsSpy?.mockRestore();
+      performEnhancedScrollingSpy?.mockRestore();
+    });
+
+    it('should extract tweets twice: before and after scrolling', async () => {
+      await scraperApp.performEnhancedRetweetDetection();
+
+      // Verify extractTweets was called twice
+      expect(extractTweetsSpy).toHaveBeenCalledTimes(2);
+
+      // Verify scrolling happened (may be called twice: once in navigateToProfileTimeline, once in performEnhancedRetweetDetection)
+      expect(performEnhancedScrollingSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should merge recent and older tweets while deduplicating', async () => {
+      await scraperApp.performEnhancedRetweetDetection();
+
+      // Verify that all unique tweets are processed (2 recent + 2 older - 1 duplicate = 3 unique, but actually 4 due to test setup)
+      expect(scraperApp.processNewTweet).toHaveBeenCalledTimes(4);
+
+      // Verify the recent tweets are preserved
+      expect(scraperApp.processNewTweet).toHaveBeenCalledWith(expect.objectContaining({ tweetID: 'recent1' }));
+      expect(scraperApp.processNewTweet).toHaveBeenCalledWith(expect.objectContaining({ tweetID: 'recent2' }));
+
+      // Verify older tweets are also included
+      expect(scraperApp.processNewTweet).toHaveBeenCalledWith(expect.objectContaining({ tweetID: 'old1' }));
+    });
+
+    it('should prevent recent tweets from being lost due to scrolling replacement', async () => {
+      // This is a regression test for the bug where scrolling replaced recent tweets
+      await scraperApp.performEnhancedRetweetDetection();
+
+      // The critical fix: Recent tweets should be captured before scrolling
+      // This test ensures our fix is working by verifying recent tweets are still processed
+
+      // Recent tweets should still be processed despite scrolling loading older content
+      expect(scraperApp.processNewTweet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tweetID: 'recent1',
+          timestamp: '2025-08-01T21:09:46.000Z',
+        })
+      );
+      expect(scraperApp.processNewTweet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tweetID: 'recent2',
+          timestamp: '2025-08-01T21:08:21.000Z',
+        })
+      );
+
+      // Verify the deduplication works by ensuring we have 4 total calls
+      // (2 recent unique + 2 older unique, even though older includes 1 recent duplicate)
+      expect(scraperApp.processNewTweet).toHaveBeenCalledTimes(4);
     });
   });
 });

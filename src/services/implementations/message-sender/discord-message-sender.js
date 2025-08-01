@@ -37,6 +37,7 @@ export class DiscordMessageSender extends EventEmitter {
     // Configuration
     this.autoStart = options.autoStart !== false;
     this.testMode = options.testMode || false;
+    this.suppressEmbeds = options.suppressEmbeds || false;
     this.maxConcurrentProcessing = options.maxConcurrentProcessing || 1;
 
     // Metrics aggregation
