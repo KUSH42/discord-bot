@@ -126,6 +126,12 @@ describe('ScraperApplication Restart Functionality', () => {
       stateManager: { getState: jest.fn(), setState: jest.fn() },
       discordService: { sendMessage: jest.fn() },
       eventBus: { emit: jest.fn(), on: jest.fn() },
+      duplicateDetector: {
+        isDuplicate: jest.fn(() => false),
+        addFingerprint: jest.fn(),
+        cleanupOldFingerprints: jest.fn(),
+        getStats: jest.fn(() => ({ total: 0, filtered: 0 })),
+      },
       delay: mockDelay, // Inject mock delay for direct control
     };
 

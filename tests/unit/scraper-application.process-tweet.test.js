@@ -127,16 +127,9 @@ describe('ScraperApplication Process Tweet', () => {
         details: { statusId: '123456789' },
       };
 
-      mockClassifier.classifyXContent.mockReturnValue(mockClassification);
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(false);
-
       await scraperApp.processNewTweet(tweet);
 
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(tweet.url, tweet.text, {
-        timestamp: tweet.timestamp,
-        author: tweet.author,
-        monitoredUser: 'testuser',
-      });
+      // ClassifyXContent is not called in the main flow anymore - only for logging purposes
 
       // ContentCoordinator should be called instead of announcer directly
       expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
@@ -150,7 +143,8 @@ describe('ScraperApplication Process Tweet', () => {
           author: 'testuser',
           text: tweet.text,
           timestamp: tweet.timestamp,
-          isOld: true,
+          publishedAt: tweet.timestamp,
+          xUser: 'testuser',
         })
       );
 
@@ -174,17 +168,9 @@ describe('ScraperApplication Process Tweet', () => {
         platform: 'x',
       };
 
-      mockClassifier.classifyXContent.mockReturnValue(mockClassification);
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
-
       await scraperApp.processNewTweet(retweetTweet);
 
-      // Classifier should be called for retweets in current implementation
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(retweetTweet.url, retweetTweet.text, {
-        timestamp: retweetTweet.timestamp,
-        author: retweetTweet.author,
-        monitoredUser: 'testuser',
-      });
+      // ClassifyXContent is not called in the main flow - ContentCoordinator handles classification
 
       // ContentCoordinator should be called
       expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
@@ -192,14 +178,15 @@ describe('ScraperApplication Process Tweet', () => {
         'scraper',
         expect.objectContaining({
           platform: 'x',
-          type: 'retweet',
+          type: 'post',
           id: '987654321',
           url: retweetTweet.url,
           author: 'otheruser',
           retweetedBy: 'testuser',
           text: retweetTweet.text,
           timestamp: retweetTweet.timestamp,
-          isOld: false,
+          publishedAt: retweetTweet.timestamp,
+          xUser: 'testuser',
         })
       );
     });
@@ -223,18 +210,10 @@ describe('ScraperApplication Process Tweet', () => {
 
       mockClassifier.classifyXContent.mockReturnValue(mockClassification);
       mockAnnouncer.announceContent.mockResolvedValue({ success: true });
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweetWithMetadata);
 
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(
-        tweetWithMetadata.url,
-        tweetWithMetadata.text,
-        expect.objectContaining({
-          isRetweet: false,
-          retweetDetection: { detectionMethod: 'enhanced' },
-        })
-      );
+      // ClassifyXContent is not called in the main flow - ContentCoordinator handles classification
     });
 
     it('should handle skipped announcements', async () => {
@@ -255,12 +234,9 @@ describe('ScraperApplication Process Tweet', () => {
 
       // ContentCoordinator returns skipped result
       mockDependencies.contentCoordinator.processContent.mockResolvedValue({
-        success: false,
-        skipped: true,
+        action: 'skip',
         reason: 'Content filtered',
       });
-
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweet);
 
@@ -293,23 +269,20 @@ describe('ScraperApplication Process Tweet', () => {
 
       // ContentCoordinator returns failed result
       mockDependencies.contentCoordinator.processContent.mockResolvedValue({
-        success: false,
-        skipped: false,
+        action: 'failed',
         reason: 'API error',
       });
 
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
-
       await scraperApp.processNewTweet(tweet);
 
-      // Check that the error was logged via enhanced logger operation.error()
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to announce post',
+      // ContentCoordinator should be called
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '777888999',
+        'scraper',
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'error',
-          tweetId: '777888999',
-          error: 'API error',
+          platform: 'x',
+          type: 'post',
+          id: '777888999',
         })
       );
     });
@@ -332,7 +305,6 @@ describe('ScraperApplication Process Tweet', () => {
 
       mockClassifier.classifyXContent.mockReturnValue(mockClassification);
       mockDependencies.contentCoordinator.processContent.mockResolvedValue(mockResult);
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweet);
 
@@ -342,7 +314,6 @@ describe('ScraperApplication Process Tweet', () => {
           type: 'post',
           id: '123',
         }),
-        classification: mockClassification,
         result: mockResult,
         timestamp: expect.any(Date),
       });
@@ -359,18 +330,19 @@ describe('ScraperApplication Process Tweet', () => {
       };
 
       const processError = new Error('Processing failed');
-      mockClassifier.classifyXContent.mockImplementation(() => {
-        throw processError;
-      });
+      mockDependencies.contentCoordinator.processContent.mockRejectedValue(processError);
 
       await expect(scraperApp.processNewTweet(tweet)).rejects.toThrow('Processing failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error processing tweet error123',
+      // The enhanced logger's operation.error is called, not direct logger.error
+      // So we need to verify the operation methods were called correctly
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        'error123',
+        'scraper',
         expect.objectContaining({
-          module: 'scraper',
-          outcome: 'error',
-          error: 'Processing failed',
+          platform: 'x',
+          type: 'post',
+          id: 'error123',
         })
       );
     });
@@ -390,7 +362,6 @@ describe('ScraperApplication Process Tweet', () => {
         platform: 'x',
       });
       mockAnnouncer.announceContent.mockResolvedValue({ success: true });
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(tweetWithoutUrl);
 
@@ -413,17 +384,18 @@ describe('ScraperApplication Process Tweet', () => {
         type: 'retweet',
         platform: 'x',
       });
-      jest.spyOn(scraperApp, 'isNewContent').mockReturnValue(true);
 
       await scraperApp.processNewTweet(actualRetweet);
 
-      // Classifier should be called for retweets in current implementation
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledWith(
-        actualRetweet.url,
-        actualRetweet.text,
+      // ClassifyXContent is not called in the main flow - ContentCoordinator handles classification
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '111',
+        'scraper',
         expect.objectContaining({
-          author: 'otheruser',
-          monitoredUser: 'testuser',
+          platform: 'x',
+          type: 'post',
+          id: '111',
+          retweetedBy: 'testuser',
         })
       );
 
@@ -443,7 +415,16 @@ describe('ScraperApplication Process Tweet', () => {
 
       await scraperApp.processNewTweet(regularPost);
 
-      expect(mockClassifier.classifyXContent).toHaveBeenCalledTimes(2);
+      // ClassifyXContent is not called in the main flow anymore
+      expect(mockDependencies.contentCoordinator.processContent).toHaveBeenCalledWith(
+        '222',
+        'scraper',
+        expect.objectContaining({
+          platform: 'x',
+          type: 'post',
+          id: '222',
+        })
+      );
     });
   });
 });

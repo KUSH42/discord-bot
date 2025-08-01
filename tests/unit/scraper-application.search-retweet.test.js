@@ -24,6 +24,7 @@ describe('Search and Retweet Logic', () => {
       close: jest.fn(),
       isRunning: jest.fn(() => true),
       goto: jest.fn(),
+      getCurrentUrl: jest.fn(() => 'https://x.com/search?q=(from%3Atestuser)'),
       waitForSelector: jest.fn(),
       type: jest.fn(),
       click: jest.fn(),
@@ -104,6 +105,12 @@ describe('Search and Retweet Logic', () => {
 
     mockDelay = jest.fn().mockResolvedValue();
 
+    // Mock duplicate detector
+    const mockDuplicateDetector = {
+      isDuplicate: jest.fn().mockResolvedValue(false),
+      addFingerprint: jest.fn().mockResolvedValue(),
+    };
+
     // Create scraper application instance
     scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
@@ -118,6 +125,7 @@ describe('Search and Retweet Logic', () => {
       discord: mockDiscordService,
       xAuthManager: mockAuthManager,
       delay: mockDelay,
+      duplicateDetector: mockDuplicateDetector,
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
