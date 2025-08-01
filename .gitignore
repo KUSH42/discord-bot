@@ -189,5 +189,7 @@ mcp.json
 # Debugging artifacts
 *.png
 bot-*.log.*
-
 .fake
+
+# crush
+.crush

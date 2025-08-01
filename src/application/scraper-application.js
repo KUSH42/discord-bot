@@ -836,9 +836,9 @@ export class ScraperApplication {
             // Extract author and social context using helper functions
             const authorData = window.extractAuthorInfo
               ? window.extractAuthorInfo(article, tweetUrl)
-              : { author: 'Unknown', retweetedBy: null };
+              : { author: 'Unknown', authorDisplayName: null, retweetedBy: null };
 
-            const { author, retweetedBy } = authorData;
+            const { author, authorDisplayName, retweetedBy } = authorData;
 
             // CRITICAL: Validate author matches monitored user
             // Skip tweets that aren't from our monitored user (posts/quotes/replies)
@@ -868,6 +868,7 @@ export class ScraperApplication {
               tweetID,
               url: tweetUrl,
               author,
+              authorDisplayName,
               text,
               timestamp,
               // Remove inline classification - let ContentClassifier handle this
@@ -915,10 +916,10 @@ export class ScraperApplication {
       const stats = {
         tweetsFound: tweets.length,
         breakdown: {
-          posts: 0,
-          replies: 0,
-          quotes: 0,
-          retweets: 0,
+          post: 0,
+          reply: 0,
+          quote: 0,
+          retweet: 0,
           unknown: 0,
         },
       };
@@ -1015,6 +1016,7 @@ export class ScraperApplication {
         id: tweet.tweetID,
         url: tweet.url,
         author: tweet.author,
+        authorDisplayName: tweet.authorDisplayName,
         retweetedBy: tweet.retweetedBy,
         text: tweet.text,
         timestamp: tweet.timestamp,

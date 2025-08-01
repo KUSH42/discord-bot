@@ -67,6 +67,7 @@ export function getBrowserTweetHelperFunctions() {
     // Helper function to extract author information
     window.extractAuthorInfo = function(article, url) {
       let author = 'Unknown';
+      let authorDisplayName = null;
       let retweetedBy = null;
       
       // Method 1: Extract from URL (most reliable)
@@ -75,6 +76,20 @@ export function getBrowserTweetHelperFunctions() {
         if (usernameMatch && usernameMatch[1]) {
           author = usernameMatch[1];
         }
+      }
+      
+      // Method 1.5: Extract display name from User-Name element
+      try {
+        const userNameElement = article.querySelector('[data-testid="User-Name"]');
+        if (userNameElement) {
+          // Look for the display name (usually the first text node or span)
+          const displayNameSpan = userNameElement.querySelector('span');
+          if (displayNameSpan && displayNameSpan.textContent) {
+            authorDisplayName = displayNameSpan.textContent.trim();
+          }
+        }
+      } catch (error) {
+        // Display name extraction failed, continue with username
       }
       
       // Method 2: Check for social context (retweets) - TEXT PARSING PRIORITY
@@ -112,7 +127,7 @@ export function getBrowserTweetHelperFunctions() {
         }
       }
       
-      return { author, retweetedBy };
+      return { author, authorDisplayName, retweetedBy };
     };
     
     // Helper function to extract tweet text

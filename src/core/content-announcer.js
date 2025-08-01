@@ -423,7 +423,7 @@ export class ContentAnnouncer {
    * @returns {string} Formatted message
    */
   formatXMessage(content) {
-    const { author, url, type, retweetedBy } = content;
+    const { author, authorDisplayName, url, type, retweetedBy } = content;
     let emoji = '🐦';
     let actionText = 'posted';
 
@@ -452,9 +452,10 @@ export class ContentAnnouncer {
       finalUrl = this.convertToVxTwitter(url);
     }
 
-    let message = `${emoji} **${author}** ${actionText}:\n${finalUrl}`;
+    const displayName = authorDisplayName || author;
+    let message = `${emoji} **${displayName}** ${actionText}:\n${finalUrl}`;
     if (type === 'retweet' && retweetedBy) {
-      message = `${emoji} **${retweetedBy}** retweeted:\n**${author}**: ${finalUrl}`;
+      message = `${emoji} **${retweetedBy}** retweeted:\n**${displayName}**: ${finalUrl}`;
     }
 
     return message;
