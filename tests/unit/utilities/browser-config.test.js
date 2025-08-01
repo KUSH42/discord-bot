@@ -35,7 +35,7 @@ describe('Browser Configuration Utility', () => {
     it('should return default YouTube scraping configuration', () => {
       const config = getYouTubeScrapingBrowserConfig();
 
-      expect(config).toHaveProperty('headless', false);
+      expect(config).toHaveProperty('headless', true);
       expect(config).toHaveProperty('args');
       expect(config.args).toEqual(expect.arrayContaining(SAFE_BROWSER_ARGS));
     });
@@ -121,11 +121,11 @@ describe('Browser Config Branch Coverage', () => {
       }
     });
 
-    it('should handle DISPLAY for YouTube config', () => {
+    it('should handle DISPLAY for YouTube config when headless is false', () => {
       const originalDisplay = process.env.DISPLAY;
       process.env.DISPLAY = ':0';
 
-      const config = getYouTubeScrapingBrowserConfig();
+      const config = getYouTubeScrapingBrowserConfig({ headless: false });
       expect(config.args).toContain('--display=:0');
 
       // Restore
@@ -136,11 +136,11 @@ describe('Browser Config Branch Coverage', () => {
       }
     });
 
-    it('should handle DISPLAY for Profile config', () => {
+    it('should handle DISPLAY for Profile config when headless is false', () => {
       const originalDisplay = process.env.DISPLAY;
       process.env.DISPLAY = ':1';
 
-      const config = getProfileBrowserConfig();
+      const config = getProfileBrowserConfig({ headless: false });
       expect(config.args).toContain('--display=:1');
 
       // Restore

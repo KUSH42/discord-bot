@@ -530,7 +530,7 @@ export class YouTubeScraperService {
                   }
                 }
               }
-            } catch (e) {
+            } catch (_e) {
               // Continue with DOM parsing if metadata extraction fails
             }
 

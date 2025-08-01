@@ -114,6 +114,11 @@ describe('Browser Initialization', () => {
       logger: mockLogger,
       xAuthManager: mockAuthManager,
       persistentStorage: mockPersistentStorage,
+      duplicateDetector: {
+        isDuplicate: jest.fn().mockReturnValue(false),
+        addContent: jest.fn(),
+        clear: jest.fn(),
+      },
     });
   });
 
@@ -127,7 +132,7 @@ describe('Browser Initialization', () => {
 
     expect(mockBrowserService.launch).toHaveBeenCalledWith(
       expect.objectContaining({
-        headless: false,
+        headless: true,
         args: expect.any(Array),
       })
     );

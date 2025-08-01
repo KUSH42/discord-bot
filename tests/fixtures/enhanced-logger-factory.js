@@ -26,7 +26,9 @@ export const createEnhancedLoggerMocks = () => {
     warn: jest.fn(),
     debug: jest.fn(),
     verbose: jest.fn(),
-    child: jest.fn().mockReturnThis(),
+    child: jest.fn(function () {
+      return this;
+    }), // Ensure 'this' context is maintained
     startOperation: jest.fn(() => ({
       progress: jest.fn(),
       success: jest.fn(),
@@ -38,6 +40,7 @@ export const createEnhancedLoggerMocks = () => {
     debugManager: mockDebugManager,
     metricsManager: mockMetricsManager,
     logger: mockLogger,
+    baseLogger: mockLogger, // Add baseLogger alias for backward compatibility
   };
 };
 

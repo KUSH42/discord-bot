@@ -37,8 +37,6 @@ class CoverageMerger {
    * Find all LCOV files in specified directories
    */
   findCoverageFiles(searchPaths) {
-    const patterns = ['C', './test-results/**/lcov.info', './coverage/**/lcov.info'];
-
     console.log('🔍 Searching for coverage files...');
 
     for (const searchPath of searchPaths) {
@@ -423,7 +421,7 @@ Examples:
     const summary = await merger.mergeCoverageFiles(outputPath);
 
     // Generate JSON files
-    const { summaryPath, metricsPath } = merger.generateJsonSummary(jsonOutputDir);
+    merger.generateJsonSummary(jsonOutputDir);
 
     console.log('\n✅ Coverage merging completed successfully!');
     console.log(`📊 Final Coverage: ${summary.totals.lines.pct.toFixed(2)}%`);

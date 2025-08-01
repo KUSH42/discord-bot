@@ -226,6 +226,10 @@ export class ContentCoordinator {
       const classification = await this.classifyContent(contentData);
       if (classification) {
         contentData.classification = classification;
+        // Update content type based on classification for proper channel routing
+        if (classification.type && classification.type !== 'unknown') {
+          contentData.type = classification.type;
+        }
         const classificationInfo = {
           type: classification.type,
           confidence: classification.confidence,
@@ -445,6 +449,11 @@ export class ContentCoordinator {
    * @returns {string} Content type
    */
   determineContentType(contentData) {
+    // Use classification result if available (for X content)
+    if (contentData.classification && contentData.classification.type) {
+      return contentData.classification.type;
+    }
+
     if (contentData.type) {
       return contentData.type;
     }

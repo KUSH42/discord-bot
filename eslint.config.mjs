@@ -12,6 +12,7 @@ export default [
       'coverage/**',
       'dist/**',
       'build/**',
+      'scripts/**',
       '.env*',
       '*.log',
       '.cache/**',

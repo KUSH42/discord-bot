@@ -1,15 +1,19 @@
 import { chromium } from 'playwright';
 import { BrowserService } from '../interfaces/browser-service.js';
+import { createEnhancedLogger } from '../../utilities/enhanced-logger.js';
 
 /**
  * Playwright-based browser service implementation
  * Provides browser automation capabilities using Playwright
  */
 export class PlaywrightBrowserService extends BrowserService {
-  constructor() {
+  constructor(baseLogger, debugManager, metricsManager) {
     super();
     this.browser = null;
     this.page = null;
+
+    // Create enhanced logger for browser operations
+    this.logger = createEnhancedLogger('browser', baseLogger, debugManager, metricsManager);
   }
 
   /**
@@ -29,17 +33,27 @@ export class PlaywrightBrowserService extends BrowserService {
       this.page = null;
     }
 
-    console.log('🔍 Launching browser with options:', JSON.stringify(options, null, 2));
-    this.browser = await chromium.launch(options);
-    console.log('🔍 Browser launched:', !!this.browser, 'Connected:', this.browser?.isConnected());
+    const operation = this.logger.startOperation('launchBrowser', { options });
 
-    this.page = await this.browser.newPage();
-    console.log('🔍 Page created:', !!this.page, 'Closed:', this.page?.isClosed());
+    try {
+      operation.progress(`Launching browser with options: ${JSON.stringify(options)}`);
+      this.browser = await chromium.launch(options);
+      operation.progress(`Browser launched: ${!!this.browser}, Connected: ${this.browser?.isConnected()}`);
 
-    // Verify browser and page are ready
-    if (!this.browser || !this.page) {
-      console.error('❌ Browser or page is null after launch:', { browser: !!this.browser, page: !!this.page });
-      throw new Error('Failed to initialize browser or page after launch');
+      this.page = await this.browser.newPage();
+      operation.progress(`Page created: ${!!this.page}, Closed: ${this.page?.isClosed()}`);
+
+      // Verify browser and page are ready
+      if (!this.browser || !this.page) {
+        const error = new Error('Failed to initialize browser or page after launch');
+        operation.error(error, 'Browser or page initialization failed', { browser: !!this.browser, page: !!this.page });
+        throw error;
+      }
+
+      operation.success('Browser and page launched successfully');
+    } catch (error) {
+      operation.error(error, 'Browser launch failed');
+      throw error;
     }
 
     if (!this.browser.isConnected()) {
@@ -70,19 +84,19 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<Object>} Response object
    */
   async goto(url, options = {}, retries = 3) {
-    console.log('🔍 goto() called with URL:', url);
-    console.log('🔍 Browser state:', {
-      browser: !!this.browser,
-      page: !!this.page,
-      browserConnected: this.browser?.isConnected?.(),
-      pageClosed: this.page?.isClosed?.(),
-    });
+    const operation = this.logger.startOperation('goto', { url, retries });
+
+    operation.progress(`Navigating to URL: ${url}`);
+    operation.progress(
+      `Browser state: browser=${!!this.browser}, page=${!!this.page}, browserConnected=${this.browser?.isConnected?.()}, pageClosed=${this.page?.isClosed?.()}`
+    );
 
     for (let i = 0; i < retries; i++) {
       // Validate browser state before each attempt
       if (!this.browser || !this.page) {
-        console.error('❌ Browser or page not available at goto()');
-        throw new Error(`Browser or page not available: browser=${!!this.browser}, page=${!!this.page}`);
+        const error = new Error(`Browser or page not available: browser=${!!this.browser}, page=${!!this.page}`);
+        operation.error(error, 'Browser or page not available');
+        throw error;
       }
 
       // Check if browser is still connected
@@ -96,7 +110,9 @@ export class PlaywrightBrowserService extends BrowserService {
       }
 
       try {
-        return await this.page.goto(url, options);
+        const result = await this.page.goto(url, options);
+        operation.success(`Successfully navigated to ${url}`);
+        return result;
       } catch (error) {
         // Check if error is due to closed browser/page - don't retry these
         if (
@@ -104,13 +120,16 @@ export class PlaywrightBrowserService extends BrowserService {
           error.message.includes('Browser connection lost') ||
           error.message.includes('Page has been closed')
         ) {
+          operation.error(error, 'Navigation failed due to browser connection loss');
           throw error;
         }
 
         if (i < retries - 1) {
+          operation.progress(`Navigation attempt ${i + 1} failed, retrying: ${error.message}`);
           // Use setTimeout instead of page.waitForTimeout to avoid using potentially closed page
           await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
         } else {
+          operation.error(error, `Navigation failed after ${retries} attempts`);
           throw error;
         }
       }
@@ -263,16 +282,20 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async setUserAgent(userAgent) {
-    console.log('🔍 Setting user agent:', userAgent);
+    const operation = this.logger.startOperation('setUserAgent', { userAgent });
+
+    operation.progress(`Setting user agent: ${userAgent}`);
     if (!this.page) {
-      console.error('❌ No page available for setUserAgent');
-      throw new Error('No page available');
+      const error = new Error('No page available');
+      operation.error(error, 'No page available for setUserAgent');
+      throw error;
     }
-    console.log('🔍 Page available, setting headers...');
+
+    operation.progress('Page available, setting headers...');
     await this.page.setExtraHTTPHeaders({
       'User-Agent': userAgent,
     });
-    console.log('✅ User agent set successfully');
+    operation.success('User agent set successfully');
   }
 
   /**

@@ -174,13 +174,21 @@ async function setupExternalServices(container, config) {
   });
 
   // X scraper browser service - dedicated singleton for X scraping
-  container.registerSingleton('xBrowserService', () => {
-    return new PlaywrightBrowserService();
+  container.registerSingleton('xBrowserService', c => {
+    return new PlaywrightBrowserService(
+      c.resolve('logger').child({ service: 'XBrowserService' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
+    );
   });
 
   // YouTube scraper browser service - dedicated singleton for YouTube scraping
-  container.registerSingleton('youtubeBrowserService', () => {
-    return new PlaywrightBrowserService();
+  container.registerSingleton('youtubeBrowserService', c => {
+    return new PlaywrightBrowserService(
+      c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
+    );
   });
 }
 

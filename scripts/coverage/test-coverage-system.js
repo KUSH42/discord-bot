@@ -9,7 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync as _execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -331,11 +331,11 @@ end_of_record
             // Mock npm install to avoid actual installation
             const childProcessModule = await import('child_process');
             const originalExecSync = childProcessModule.execSync;
-            let npmInstallCalled = false;
+            let _npmInstallCalled = false;
 
             childProcessModule.execSync = (command, options) => {
               if (command.includes('npm install') || command.includes('npm list')) {
-                npmInstallCalled = true;
+                _npmInstallCalled = true;
                 throw new Error('Command not found'); // Simulate failure
               }
               return originalExecSync(command, options);

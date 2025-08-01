@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { XAuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('XAuthManager', () => {

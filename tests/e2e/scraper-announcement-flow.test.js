@@ -109,6 +109,7 @@ describe('Scraper Announcement Flow E2E', () => {
       isRunning: jest.fn(() => true),
       isConnected: jest.fn(() => true),
       setUserAgent: jest.fn(() => Promise.resolve()),
+      getCurrentUrl: jest.fn(() => Promise.resolve('https://x.com/search?q=from%3Atestuser')),
     };
 
     // Mock Auth Manager
@@ -549,6 +550,10 @@ describe('Scraper Announcement Flow E2E', () => {
           text: 'This is a test post',
           timestamp: new Date().toISOString(),
           tweetCategory: 'Post',
+          rawClassificationData: {
+            author: 'testuser',
+            monitoredUser: 'testuser',
+          },
         },
         {
           tweetID: '1234567891',
@@ -557,6 +562,10 @@ describe('Scraper Announcement Flow E2E', () => {
           text: '@someone This is a reply',
           timestamp: new Date().toISOString(),
           tweetCategory: 'Reply',
+          rawClassificationData: {
+            author: 'testuser',
+            monitoredUser: 'testuser',
+          },
         },
         {
           tweetID: '1234567892',
@@ -565,6 +574,10 @@ describe('Scraper Announcement Flow E2E', () => {
           text: 'RT @originaluser: This is a retweet',
           timestamp: new Date().toISOString(),
           tweetCategory: 'Retweet',
+          rawClassificationData: {
+            author: 'originaluser',
+            monitoredUser: 'testuser',
+          },
         },
       ];
 
