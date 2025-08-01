@@ -88,7 +88,7 @@ export class YouTubeScraperService {
 
       // Launch browser with optimized settings for scraping
       const browserOptions = getYouTubeScrapingBrowserConfig({
-        headless: false,
+        headless: true,
       });
 
       await this.browserService.launch(browserOptions);

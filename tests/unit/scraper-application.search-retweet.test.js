@@ -109,6 +109,11 @@ describe('Search and Retweet Logic', () => {
     const mockDuplicateDetector = {
       isDuplicate: jest.fn().mockResolvedValue(false),
       addFingerprint: jest.fn().mockResolvedValue(),
+      getStats: jest.fn().mockReturnValue({
+        totalChecked: 0,
+        duplicatesFound: 0,
+        uniqueContent: 0,
+      }),
     };
 
     // Create scraper application instance
@@ -276,7 +281,7 @@ describe('Search and Retweet Logic', () => {
       expect.objectContaining({
         timestamp: expect.any(Date),
         tweetsFound: 1,
-        newTweets: 1,
+        tweetsProcessed: 1,
         stats: expect.any(Object),
       })
     );

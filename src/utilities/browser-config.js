@@ -28,7 +28,7 @@ const DANGEROUS_BROWSER_ARGS = ['--disable-web-security', '--disable-extensions'
 /**
  * Get standard browser configuration for X scraping
  * @param {Object} options - Additional options
- * @param {boolean} options.headless - Whether to run headless (default: false)
+ * @param {boolean} options.headless - Whether to run headless (default: true)
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
@@ -61,7 +61,7 @@ export function getXScrapingBrowserConfig(options = {}) {
  */
 export function getYouTubeScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? false, // Back to false - use proper display server
+    headless: options.headless ?? true, // Back to true
     args: [...SAFE_BROWSER_ARGS],
   };
 

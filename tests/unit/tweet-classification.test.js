@@ -75,6 +75,17 @@ describe('Tweet Category Classification', () => {
       child: jest.fn().mockReturnThis(), // Support logger.child() calls
     };
 
+    // Mock duplicate detector
+    const mockDuplicateDetector = {
+      isDuplicate: jest.fn().mockResolvedValue(false),
+      addFingerprint: jest.fn().mockResolvedValue(),
+      getStats: jest.fn().mockReturnValue({
+        totalChecked: 0,
+        duplicatesFound: 0,
+        uniqueContent: 0,
+      }),
+    };
+
     // Create scraper application instance
     _scraperApp = new ScraperApplication({
       browserService: mockBrowserService,
@@ -82,6 +93,7 @@ describe('Tweet Category Classification', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
+      duplicateDetector: mockDuplicateDetector,
       persistentStorage: {
         get: jest.fn(),
         set: jest.fn(),

@@ -2,11 +2,13 @@ import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals
 import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { Configuration } from '../../src/infrastructure/configuration.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
+import { DuplicateDetector } from '../../src/duplicate-detector.js';
 
 describe('Credential Handling Security Tests', () => {
   let authManager;
   let configuration;
   let stateManager;
+  let duplicateDetector;
   let mockBrowser;
   let mockLogger;
   let originalEnv;
@@ -52,6 +54,7 @@ describe('Credential Handling Security Tests', () => {
 
     configuration = new Configuration();
     stateManager = new StateManager();
+    duplicateDetector = new DuplicateDetector();
 
     authManager = new XAuthManager({
       browserService: mockBrowser,
