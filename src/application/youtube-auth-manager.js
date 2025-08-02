@@ -546,7 +546,7 @@ export class YouTubeAuthManager {
           '[data-target-id="sign-in-button"]',
           'yt-button-renderer[aria-label*="Sign in"]',
           '.ytd-button-renderer[aria-label*="Sign in"]',
-          'button:contains("Sign in")', // Note: this won't work in querySelector, will handle separately
+          // Note: :contains() selector removed as it's not valid CSS - handled by text-based search below
         ];
 
         let signInButton = null;

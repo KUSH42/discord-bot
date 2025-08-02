@@ -632,6 +632,19 @@ export function createShutdownHandler(container) {
         hasError = true;
       }
 
+      // Clean up lockfile if it exists
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const lockFile = path.join(process.cwd(), '.bot-running.lock');
+        if (fs.existsSync(lockFile)) {
+          fs.unlinkSync(lockFile);
+          safeLog('info', 'Removed process lockfile');
+        }
+      } catch (error) {
+        safeLog('warn', 'Could not remove lockfile:', error.message);
+      }
+
       // Choose exit code based on signal type and errors
       let exitCode = 0;
 

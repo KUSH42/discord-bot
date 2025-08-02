@@ -44,6 +44,70 @@ function safeConsoleLog(message, ...args) {
 }
 
 /**
+ * Check for existing bot instances to prevent conflicts
+ */
+async function checkForExistingInstances() {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    const lockFile = path.join(process.cwd(), '.bot-running.lock');
+
+    // Check for lockfile
+    if (fs.existsSync(lockFile)) {
+      try {
+        const lockContent = fs.readFileSync(lockFile, 'utf8');
+        const lockPid = parseInt(lockContent.trim(), 10);
+
+        // Check if the PID is still running
+        try {
+          process.kill(lockPid, 0); // Signal 0 checks if process exists
+          safeConsoleLog('❌ Found lockfile with active PID:', lockPid);
+          safeConsoleLog('   Kill existing instance with: kill', lockPid);
+          safeConsoleLog('   Or remove stale lockfile with: rm .bot-running.lock');
+          process.exit(1);
+        } catch (error) {
+          // Process doesn't exist, remove stale lockfile
+          safeConsoleLog('🧹 Removing stale lockfile from PID:', lockPid);
+          fs.unlinkSync(lockFile);
+        }
+      } catch (error) {
+        // Corrupted lockfile, remove it
+        safeConsoleLog('🧹 Removing corrupted lockfile');
+        fs.unlinkSync(lockFile);
+      }
+    }
+
+    // Check for existing node processes running index.js (excluding current process)
+    const { stdout } = await execAsync(`pgrep -f "node.*index\\.js" | grep -v ${process.pid} || true`);
+
+    if (stdout.trim()) {
+      const existingPids = stdout
+        .trim()
+        .split('\n')
+        .filter(pid => pid.trim());
+      if (existingPids.length > 0) {
+        safeConsoleLog('❌ Found existing bot instance(s) running:');
+        safeConsoleLog(`   PIDs: ${existingPids.join(', ')}`);
+        safeConsoleLog('   Kill existing instances with: pkill -f "node.*index\\.js"');
+        safeConsoleLog('   Or use the restart command in Discord: !restart');
+        process.exit(1);
+      }
+    }
+
+    // Create lockfile for this instance
+    fs.writeFileSync(lockFile, process.pid.toString());
+    safeConsoleLog('🔒 Created process lockfile with PID:', process.pid);
+  } catch (error) {
+    // If process check fails, log warning but continue (process might not have pgrep)
+    safeConsoleLog('⚠️  Could not check for existing bot instances:', error.message);
+  }
+}
+
+/**
  * Main application entry point
  * WARNING: This starts real production applications with infinite background processes
  * DO NOT call this function in tests - it will cause hanging and memory leaks
@@ -53,6 +117,10 @@ async function startBot() {
   if (process.env.NODE_ENV === 'test') {
     throw new Error('startBot() should not be called in test environment - it starts infinite background processes');
   }
+
+  // Check for existing bot processes to prevent zombie instances
+  await checkForExistingInstances();
+
   let container;
   try {
     const configuration = new Configuration();
@@ -293,10 +361,23 @@ async function startWebServer(container, config) {
     res.status(404).json({ error: 'Not Found' });
   });
 
-  // Start server
+  // Start server with port conflict detection
   const port = config.get('PSH_PORT', 3000);
   const server = app.listen(port, () => {
     logger.info(`🌐 Web server listening on port ${port}`);
+  });
+
+  // Handle port conflicts and other server errors
+  server.on('error', error => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(`❌ Port ${port} is already in use. Another service is running on this port.`);
+      logger.error('Please check for existing bot instances or change PSH_PORT in your .env file');
+      logger.error(`Try: pkill -f "node.*index\\.js" or lsof -i :${port} to identify the conflicting process`);
+      process.exit(1);
+    } else {
+      logger.error(`❌ Server error: ${error.message}`, { error: error.code, port });
+      process.exit(1);
+    }
   });
 
   // Store server reference for graceful shutdown

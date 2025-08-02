@@ -22,6 +22,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+.bot-running.lock
 
 # Github Actions artifacts
 coverage
