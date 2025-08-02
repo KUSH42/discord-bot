@@ -478,8 +478,8 @@ export class YouTubeScraperService {
                 // FALLBACK: Try ytInitialData extraction (less reliable for current video)
                 const scriptTags = document.querySelectorAll('script');
                 for (const script of scriptTags) {
-                  if (script.textContent && script.textContent.includes('ytInitialData')) {
-                    const match = script.textContent.match(/var ytInitialData = ({.+?});/);
+                  if (script.textContent && script.textContent.includes('ytInitialPlayerResponse')) {
+                    const match = script.textContent.match(/var ytInitialPlayerResponse = ({.+?});/);
                     if (match) {
                       const data = JSON.parse(match[1]);
                       // Extract video info from YouTube's structured data
@@ -641,29 +641,6 @@ export class YouTubeScraperService {
                 debugInfo,
                 badges: youtubeMetadata.badges,
               };
-            }
-
-            // Continue with DOM-based detection strategies if metadata fails...
-            // SIMPLE FALLBACK: If ytInitialData fails, use any video link on the page
-            const videoLinks = document.querySelectorAll('a[href*="/watch?v="]');
-            if (videoLinks.length > 0) {
-              const videoLink = videoLinks[0];
-              const videoIdMatch = videoLink.href.match(/[?&]v=([^&]+)/);
-              if (videoIdMatch) {
-                debugInfo.strategiesAttempted.push('simple-video-link-fallback');
-                return {
-                  id: videoIdMatch[1],
-                  title: document.title.replace(' - YouTube', '') || 'Live Stream',
-                  url: `https://www.youtube.com/watch?v=${videoIdMatch[1]}`,
-                  type: 'livestream',
-                  platform: 'youtube',
-                  isCurrentlyLive: true, // Assume live since we're on live page with "watching now"
-                  publishedAt: new Date().toISOString(),
-                  scrapedAt: new Date().toISOString(),
-                  detectionMethod: 'simple-video-link-fallback',
-                  debugInfo,
-                };
-              }
             }
 
             // Strategy 1: Look for the primary live stream on channel's /live page
