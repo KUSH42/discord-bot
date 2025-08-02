@@ -411,7 +411,7 @@ export class YouTubeScraperService {
 
         // First try the regular live page approach (most comprehensive metadata)
         const liveStream = await this.browserService.evaluate(
-          ({ xUser, embedLiveUrl }) => {
+          ({ xUser, _liveStreamUrl }) => {
             /* eslint-disable no-undef */
 
             // ENHANCED: Check for YouTube metadata first for more accurate results
