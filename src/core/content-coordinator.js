@@ -555,7 +555,26 @@ export class ContentCoordinator {
       }
 
       // Use classifier for other content
-      return this.classifier.classifyXContent(contentData.url, contentData.text || contentData.content, metadata);
+      const classificationResult = this.classifier.classifyXContent(
+        contentData.url,
+        contentData.text || contentData.content,
+        metadata
+      );
+
+      // Debug logging for quote tweet classification
+      if (classificationResult && classificationResult.type === 'quote') {
+        this.logger.debug('Quote tweet detected during classification', {
+          contentId: contentData.id,
+          url: contentData.url,
+          type: classificationResult.type,
+          confidence: classificationResult.confidence,
+          quoteTweetIndicators: metadata.quoteTweetBlock,
+          hasQuoteUrl:
+            metadata.allText && /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/.test(metadata.allText),
+        });
+      }
+
+      return classificationResult;
     }
 
     return null;
@@ -577,6 +596,12 @@ export class ContentCoordinator {
       contentType: this.determineContentType(contentData),
       // Ensure the classified type is used for announcement
       type: contentData.type, // This should now contain the classified type
+      // Preserve classification metadata for announcer
+      classification: contentData.classification,
+      // Ensure key metadata fields are preserved
+      retweetedBy: contentData.retweetedBy,
+      authorDisplayName: contentData.authorDisplayName,
+      channelTitle: contentData.channelTitle,
     };
 
     return await this.contentAnnouncer.announceContent(announcementData);

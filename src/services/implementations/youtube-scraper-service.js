@@ -211,106 +211,113 @@ export class YouTubeScraperService {
         // Extract latest video information using multiple selector strategies
         let latestVideo = null;
         try {
-          latestVideo = await this.browserService.evaluate(() => {
-            const selectors = [
-              { name: 'modern-grid', selector: 'ytd-rich-grid-media:first-child #video-title-link' },
-              { name: 'rich-item', selector: 'ytd-rich-item-renderer:first-child #video-title-link' },
-              { name: 'grid-with-contents', selector: '#contents ytd-rich-grid-media:first-child a#video-title' },
-              { name: 'list-renderer', selector: '#contents ytd-video-renderer:first-child a#video-title' },
-              { name: 'generic-watch', selector: 'a[href*="/watch?v="]' },
-              { name: 'shorts-and-titled', selector: 'a[href*="/shorts/"], a[title][href*="youtube.com/watch"]' },
-            ];
+          latestVideo = await this.browserService.evaluate(
+            ({ channelHandle }) => {
+              const selectors = [
+                { name: 'modern-grid', selector: 'ytd-rich-grid-media:first-child #video-title-link' },
+                { name: 'rich-item', selector: 'ytd-rich-item-renderer:first-child #video-title-link' },
+                { name: 'grid-with-contents', selector: '#contents ytd-rich-grid-media:first-child a#video-title' },
+                { name: 'list-renderer', selector: '#contents ytd-video-renderer:first-child a#video-title' },
+                { name: 'generic-watch', selector: 'a[href*="/watch?v="]' },
+                { name: 'shorts-and-titled', selector: 'a[href*="/shorts/"], a[title][href*="youtube.com/watch"]' },
+              ];
 
-            let videoElement = null;
-            let usedStrategy = null;
+              let videoElement = null;
+              let usedStrategy = null;
 
-            for (const strategy of selectors) {
-              // eslint-disable-next-line no-undef
-              videoElement = document.querySelector(strategy.selector);
-              if (videoElement) {
-                usedStrategy = strategy.name;
-                break;
+              for (const strategy of selectors) {
+                // eslint-disable-next-line no-undef
+                videoElement = document.querySelector(strategy.selector);
+                if (videoElement) {
+                  usedStrategy = strategy.name;
+                  break;
+                }
               }
-            }
 
-            if (!videoElement) {
-              return { success: false, strategies: selectors.map(s => s.name) };
-            }
+              if (!videoElement) {
+                return { success: false, strategies: selectors.map(s => s.name) };
+              }
 
-            // Extract video ID from URL
-            const videoUrl = videoElement.href;
-            let videoIdMatch = videoUrl.match(/[?&]v=([^&]+)/);
+              // Extract video ID from URL
+              const videoUrl = videoElement.href;
+              let videoIdMatch = videoUrl.match(/[?&]v=([^&]+)/);
 
-            // If no standard video ID, try shorts format
-            if (!videoIdMatch) {
-              videoIdMatch = videoUrl.match(/\/shorts\/([^?&]+)/);
-            }
+              // If no standard video ID, try shorts format
+              if (!videoIdMatch) {
+                videoIdMatch = videoUrl.match(/\/shorts\/([^?&]+)/);
+              }
 
-            if (!videoIdMatch) {
-              return { success: false, error: 'Could not extract video ID', url: videoUrl };
-            }
+              if (!videoIdMatch) {
+                return { success: false, error: 'Could not extract video ID', url: videoUrl };
+              }
 
-            const videoId = videoIdMatch[1];
-            const title = videoElement.textContent?.trim() || 'Unknown Title';
+              const videoId = videoIdMatch[1];
+              const title = videoElement.textContent?.trim() || 'Unknown Title';
 
-            // Try to get additional metadata
-            const videoContainer = videoElement.closest(
-              'ytd-rich-grid-media, ytd-rich-item-renderer, ytd-video-renderer'
-            );
-            let publishedText = 'Unknown';
-            let viewsText = 'Unknown';
-            let thumbnailUrl = null;
-
-            if (videoContainer) {
-              // Try to find published time
-              const metadataElements = videoContainer.querySelectorAll(
-                '#metadata-line span, #published-time-text, .ytd-video-meta-block span'
+              // Try to get additional metadata
+              const videoContainer = videoElement.closest(
+                'ytd-rich-grid-media, ytd-rich-item-renderer, ytd-video-renderer'
               );
-              for (const element of metadataElements) {
-                const text = element.textContent?.trim();
-                if (
-                  text &&
-                  (text.includes('ago') ||
-                    text.includes('hour') ||
-                    text.includes('day') ||
-                    text.includes('week') ||
-                    text.includes('month'))
-                ) {
-                  publishedText = text;
-                  break;
+              let publishedText = 'Unknown';
+              let viewsText = 'Unknown';
+              let thumbnailUrl = null;
+
+              if (videoContainer) {
+                // Try to find published time
+                const metadataElements = videoContainer.querySelectorAll(
+                  '#metadata-line span, #published-time-text, .ytd-video-meta-block span'
+                );
+                for (const element of metadataElements) {
+                  const text = element.textContent?.trim();
+                  if (
+                    text &&
+                    (text.includes('ago') ||
+                      text.includes('hour') ||
+                      text.includes('day') ||
+                      text.includes('week') ||
+                      text.includes('month'))
+                  ) {
+                    publishedText = text;
+                    break;
+                  }
+                }
+
+                // Try to find view count
+                for (const element of metadataElements) {
+                  const text = element.textContent?.trim();
+                  if (text && (text.includes('view') || text.includes('watching'))) {
+                    viewsText = text;
+                    break;
+                  }
+                }
+
+                // Try to find thumbnail
+                const thumbnail = videoContainer.querySelector('img[src*="i.ytimg.com"]');
+                if (thumbnail) {
+                  thumbnailUrl = thumbnail.src;
                 }
               }
 
-              // Try to find view count
-              for (const element of metadataElements) {
-                const text = element.textContent?.trim();
-                if (text && (text.includes('view') || text.includes('watching'))) {
-                  viewsText = text;
-                  break;
-                }
-              }
-
-              // Try to find thumbnail
-              const thumbnail = videoContainer.querySelector('img[src*="i.ytimg.com"]');
-              if (thumbnail) {
-                thumbnailUrl = thumbnail.src;
-              }
+              return {
+                success: true,
+                strategy: usedStrategy,
+                id: videoId,
+                title,
+                url: videoUrl,
+                publishedText,
+                viewsText,
+                thumbnailUrl,
+                type: 'video',
+                platform: 'youtube',
+                scrapedAt: new Date().toISOString(),
+                // Add channel title from the channel handle
+                channelTitle: channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle,
+              };
+            },
+            {
+              channelHandle: this.channelHandle,
             }
-
-            return {
-              success: true,
-              strategy: usedStrategy,
-              id: videoId,
-              title,
-              url: videoUrl,
-              publishedText,
-              viewsText,
-              thumbnailUrl,
-              type: 'video',
-              platform: 'youtube',
-              scrapedAt: new Date().toISOString(),
-            };
-          });
+          );
         } catch (error) {
           this.logger.error('Failed to extract video information:', error.message);
           latestVideo = { success: false, error: `Video extraction failed: ${error.message}` };
@@ -862,11 +869,16 @@ export class YouTubeScraperService {
               };
             }
 
+            // Determine if this should be classified as livestream content
+            // Content found on /streams page should be classified as livestream regardless of current live status
+            const isOnStreamsPage = currentUrl.includes('/streams');
+            const shouldClassifyAsLivestream = isCurrentlyLive || isOnStreamsPage;
+
             return {
               id: videoIdMatch[1],
               title,
               url: liveElement.href,
-              type: isCurrentlyLive ? 'livestream' : 'video',
+              type: shouldClassifyAsLivestream ? 'livestream' : 'video',
               platform: 'youtube',
               actualPublishedAt,
               publishedText,
@@ -876,6 +888,8 @@ export class YouTubeScraperService {
               scrapedAt: new Date().toISOString(),
               detectionMethod: detectionMethod || 'regular-page-detection',
               debugInfo,
+              // Add channel title from the channel handle
+              channelTitle: channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle,
             };
             /* eslint-enable no-undef */
           },
