@@ -403,6 +403,7 @@ export class ContentAnnouncer {
         typeText = 'uploaded a new video';
     }
 
+    /*
     if (options.useEmbed && type === 'livestream') {
       return {
         embeds: [
@@ -423,6 +424,7 @@ export class ContentAnnouncer {
         ],
       };
     }
+    */
 
     // Use better fallback that shows we're missing the channel name
     const displayChannelTitle = this.sanitizeContent(channelTitle) || 'Unknown Channel';
