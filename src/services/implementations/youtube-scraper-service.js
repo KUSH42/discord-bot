@@ -407,6 +407,40 @@ export class YouTubeScraperService {
         operation.progress('Handling consent page redirects');
         await this.authManager.handleConsentPageRedirect();
 
+        operation.progress('Waiting for YouTube JavaScript to load...');
+        // Wait for YouTube's JavaScript to load and execute
+        /* eslint-disable no-undef */
+        try {
+          await this.browserService.waitForFunction(
+            () => {
+              return (
+                window.ytInitialPlayerResponse || window.ytInitialData || document.querySelector('ytd-app') !== null
+              );
+            },
+            { timeout: 10000 } // Wait up to 10 seconds for YouTube to load
+          );
+          operation.progress('YouTube JavaScript loaded successfully');
+        } catch (waitError) {
+          operation.progress(`YouTube JavaScript load timeout, proceeding anyway: ${waitError.message}`);
+          // Still proceed with a basic delay as fallback
+          await this.browserService.waitFor(3000);
+        }
+
+        operation.progress('Cleaning up DOM to improve evaluation performance');
+        // Remove bloated elements that can cause evaluation failures (chat, sidebar, etc.)
+        await this.browserService.evaluate(() => {
+          const secondary = document.getElementById('secondary');
+          if (secondary) {
+            secondary.remove();
+          }
+          // Also remove any other heavy elements that might cause issues
+          const chat = document.querySelector('ytd-live-chat-frame');
+          if (chat) {
+            chat.remove();
+          }
+        });
+        /* eslint-enable no-undef */
+
         operation.progress('Extracting live stream information from regular live page (primary method)');
 
         // First try the regular live page approach (most comprehensive metadata)
