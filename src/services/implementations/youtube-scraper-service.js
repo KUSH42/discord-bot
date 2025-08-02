@@ -420,6 +420,15 @@ export class YouTubeScraperService {
 
             // Try to extract from YouTube's page data (most reliable)
             try {
+              // DEBUG: Check what's available on the page
+              debugInfo.pageAnalysis = {
+                hasYtInitialPlayerResponse: !!window.ytInitialPlayerResponse,
+                hasYtInitialData: !!window.ytInitialData,
+                currentUrl: window.location.href,
+                pageTitle: document.title,
+                scriptCount: document.querySelectorAll('script').length,
+              };
+
               // PRIORITY 1: Try ytInitialPlayerResponse for current video (most accurate for live streams)
               if (window.ytInitialPlayerResponse && window.ytInitialPlayerResponse.videoDetails) {
                 const { videoDetails } = window.ytInitialPlayerResponse;
@@ -430,6 +439,7 @@ export class YouTubeScraperService {
                   badges: [], // Player response doesn't include badges, but we have the videoId
                 };
                 metadataExtracted = true;
+                debugInfo.extractionMethod = 'ytInitialPlayerResponse';
               } else {
                 // FALLBACK: Try ytInitialData extraction (less reliable for current video)
                 const scriptTags = document.querySelectorAll('script');
@@ -857,6 +867,16 @@ export class YouTubeScraperService {
             `Live stream detection failed via regular page: ${JSON.stringify({
               error: liveStream.error,
               debugInfo: liveStream.debugInfo,
+            })}`
+          );
+        } else {
+          // Log when liveStream is null or undefined
+          operation.progress(
+            `Live stream detection returned null/undefined via regular page: ${JSON.stringify({
+              liveStream,
+              isNull: liveStream === null,
+              isUndefined: liveStream === undefined,
+              type: typeof liveStream,
             })}`
           );
         }
