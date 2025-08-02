@@ -10,7 +10,7 @@ export class YouTubeAuthManager {
     this.state = dependencies.stateManager;
     this.youtubeUsername = this.config.getRequired('YOUTUBE_USERNAME');
     this.youtubePassword = this.config.getRequired('YOUTUBE_PASSWORD');
-    this.authEnabled = this.config.get('YOUTUBE_AUTH_ENABLED', 'false') === 'true';
+    this.authEnabled = this.config.get('YOUTUBE_AUTHENTICATION_ENABLED', 'false') === 'true';
 
     // Create enhanced logger for this module
     this.logger = createEnhancedLogger(
