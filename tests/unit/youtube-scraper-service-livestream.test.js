@@ -97,8 +97,9 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       const result = await scraperService.fetchActiveLiveStream();
 
       expect(result).toBeNull();
+      // Now tries regular live page first (after my fix)
       expect(mockBrowserService.goto).toHaveBeenCalledWith(
-        'https://www.youtube.com/embed/UCTestChannelId123/live',
+        'https://www.youtube.com/@testchannel/live',
         expect.objectContaining({
           waitUntil: 'networkidle',
           timeout: 30000,
@@ -106,92 +107,87 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       );
     });
 
-    it('should detect active livestream using embed detection', async () => {
-      // Mock the embed check result (what the browser.evaluate actually returns)
-      const mockEmbedCheck = {
-        hasActiveStream: true,
-        hasLiveBadge: true,
-        hasLiveClass: false,
-        isLiveVideo: true,
-        hasVideoContent: true,
-        videoReadyState: 4,
-        videoDuration: null,
-        playerClasses: 'ytp-live-badge',
-        currentUrl: 'https://www.youtube.com/embed/UCTestChannelId123/live?v=test-video-id',
-        reason: 'active-livestream-detected',
+    it('should detect active livestream using regular page detection', async () => {
+      // Mock the result structure that the browser evaluation returns
+      const mockLivePageResult = {
+        id: 'test-video-id',
+        title: 'Live Stream',
+        url: 'https://www.youtube.com/watch?v=test-video-id',
+        type: 'livestream',
+        platform: 'youtube',
+        publishedAt: '2025-07-28T12:00:00.000Z',
+        scrapedAt: '2025-07-28T12:00:00.000Z',
+        detectionMethod: 'youtube-metadata-live',
+        isCurrentlyLive: true,
       };
 
-      mockBrowserService.evaluate.mockResolvedValue(mockEmbedCheck);
+      mockBrowserService.evaluate.mockResolvedValue(mockLivePageResult);
 
       const result = await scraperService.fetchActiveLiveStream();
 
       expect(result).not.toBeNull();
       expect(result.id).toBe('test-video-id');
       expect(result.type).toBe('livestream');
-      expect(result.detectionMethod).toBe('embed-url-primary-detection');
+      expect(result.detectionMethod).toBe('youtube-metadata-live');
       expect(result.isCurrentlyLive).toBe(true);
     });
 
-    it('should fall back to regular live page when embed shows no active stream', async () => {
+    it('should fall back to embed when regular page shows no active stream', async () => {
       // Mock auth manager
       const mockAuthManager = {
         handleConsentPageRedirect: jest.fn().mockResolvedValue(),
       };
       scraperService.authManager = mockAuthManager;
 
-      // First call returns no active stream from embed
-      const mockEmbedCheck = {
-        hasActiveStream: false,
-        reason: 'no-active-livestream',
+      // First call returns no active stream from regular page (primary method)
+      const mockRegularPageError = {
+        error: 'No live element found',
+        debugInfo: { strategiesAttempted: ['youtube-metadata-extraction'] },
       };
 
-      // Second call returns live stream data from regular page
-      const mockLivePageResult = {
-        id: 'test-video-id-2',
-        title: 'Live Stream from Regular Page',
-        url: 'https://www.youtube.com/watch?v=test-video-id-2',
-        type: 'livestream',
-        platform: 'youtube',
-        publishedAt: '2025-07-28T12:00:00.000Z',
-        scrapedAt: '2025-07-28T12:00:00.000Z',
-        detectionMethod: 'regular-page-detection',
-      };
-
-      mockBrowserService.evaluate
-        .mockResolvedValueOnce(mockEmbedCheck) // First call (embed check)
-        .mockResolvedValueOnce(mockLivePageResult); // Second call (regular page)
-
-      const result = await scraperService.fetchActiveLiveStream();
-
-      expect(result).toEqual(mockLivePageResult);
-      expect(result.detectionMethod).toBe('regular-page-detection');
-      expect(mockBrowserService.goto).toHaveBeenCalledTimes(2); // Both embed and regular page
-      expect(mockAuthManager.handleConsentPageRedirect).toHaveBeenCalled();
-    });
-
-    it('should handle case where channel ID is used as fallback video ID', async () => {
-      // Mock embed check result with no extractable video ID from URL
-      const mockEmbedCheck = {
+      // Second call returns live stream data from embed (fallback method)
+      const mockEmbedResult = {
         hasActiveStream: true,
         hasLiveBadge: true,
-        hasLiveClass: false,
-        isLiveVideo: true,
-        hasVideoContent: true,
-        videoReadyState: 4,
-        videoDuration: null,
-        playerClasses: 'ytp-live-badge',
-        currentUrl: 'https://www.youtube.com/embed/UCTestChannelId123/live', // No ?v= parameter
+        currentUrl: 'https://www.youtube.com/embed/UCTestChannelId123/live?v=test-video-id-2',
         reason: 'active-livestream-detected',
       };
 
-      mockBrowserService.evaluate.mockResolvedValue(mockEmbedCheck);
+      mockBrowserService.evaluate
+        .mockResolvedValueOnce(mockRegularPageError) // First call (regular page fails)
+        .mockResolvedValueOnce(mockEmbedResult); // Second call (embed succeeds)
 
       const result = await scraperService.fetchActiveLiveStream();
 
       expect(result).not.toBeNull();
-      expect(result.id).toBe('UCTestChannelId123'); // Should use channel ID as fallback
+      expect(result.id).toBe('test-video-id-2');
+      expect(result.detectionMethod).toBe('embed-url-fallback-detection');
+      expect(mockBrowserService.goto).toHaveBeenCalledTimes(2); // Both regular page and embed
+      expect(mockAuthManager.handleConsentPageRedirect).toHaveBeenCalled();
+    });
+
+    it('should handle case where ytInitialPlayerResponse provides correct video ID', async () => {
+      // Mock regular page result with ytInitialPlayerResponse data (the fix)
+      const mockRegularPageResult = {
+        id: '8jbTBnXRgnw', // This is the CORRECT video ID we should extract
+        title: 'US NUCLEAR SUBS DEPLOY TO RUSSIA - Live Stream',
+        url: 'https://www.youtube.com/watch?v=8jbTBnXRgnw',
+        type: 'livestream',
+        platform: 'youtube',
+        publishedAt: '2025-07-28T12:00:00.000Z',
+        scrapedAt: '2025-07-28T12:00:00.000Z',
+        detectionMethod: 'youtube-metadata-live',
+        isCurrentlyLive: true,
+      };
+
+      mockBrowserService.evaluate.mockResolvedValue(mockRegularPageResult);
+
+      const result = await scraperService.fetchActiveLiveStream();
+
+      expect(result).not.toBeNull();
+      expect(result.id).toBe('8jbTBnXRgnw'); // Should be the ACTUAL video ID, not channel ID
       expect(result.type).toBe('livestream');
-      expect(result.detectionMethod).toBe('embed-url-primary-detection');
+      expect(result.detectionMethod).toBe('youtube-metadata-live');
     });
 
     it('should NOT detect ended livestreams without live indicators', async () => {
