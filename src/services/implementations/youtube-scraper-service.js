@@ -17,12 +17,14 @@ export class YouTubeScraperService {
     metricsManager,
     browserService,
     youtubeAuthManager,
+    stateManager,
   }) {
     // Create enhanced logger for YouTube module
     this.logger = createEnhancedLogger('youtube', logger, debugManager, metricsManager);
     this.config = config;
     this.contentCoordinator = contentCoordinator;
     this.browserService = browserService;
+    this.stateManager = stateManager;
     this.browserMutex = new AsyncMutex(); // Prevent concurrent browser operations
     this.isShuttingDown = false; // Flag to coordinate graceful shutdown
     this.videosUrl = null;
@@ -57,6 +59,30 @@ export class YouTubeScraperService {
   }
 
   /**
+   * Get the channel title from state manager or fallback to extracted name
+   * @returns {string} Channel title for display
+   */
+  getChannelTitle() {
+    // First try to get from state manager (set by MonitorApplication API validation)
+    const apiChannelTitle = this.stateManager?.get('youtubeChannelTitle');
+    if (apiChannelTitle && apiChannelTitle !== 'Unknown') {
+      return apiChannelTitle;
+    }
+
+    // Fallback to extracted display name
+    if (this.extractedDisplayName) {
+      return this.extractedDisplayName;
+    }
+
+    // Final fallback to processed channel handle
+    if (this.channelHandle) {
+      return this.channelHandle.startsWith('@') ? this.channelHandle.substring(1) : this.channelHandle;
+    }
+
+    return 'Unknown Channel';
+  }
+
+  /**
    * Initialize the scraper with channel URL
    * @param {string} channelHandle - YouTube channel handle (e.g., @channelname)
    * @returns {Promise<void>}
@@ -81,7 +107,7 @@ export class YouTubeScraperService {
     // Construct channel URLs
     const baseUrl = `https://www.youtube.com/@${channelHandle}`;
     this.videosUrl = `${baseUrl}/videos`;
-    this.liveStreamUrl = `${baseUrl}/streams`;
+    this.liveStreamUrl = `${baseUrl}/live`;
     this.embedLiveUrl = `https://www.youtube.com/embed/${youtubeChannelId}/live`;
 
     try {
@@ -318,9 +344,8 @@ export class YouTubeScraperService {
                 type: 'video',
                 platform: 'youtube',
                 scrapedAt: new Date().toISOString(),
-                // Use extracted channel display name if available, otherwise fall back to processed handle
-                channelTitle:
-                  extractedDisplayName || (channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle),
+                // Use channel title from API or extracted display name
+                channelTitle: this.getChannelTitle(),
               };
             },
             {
@@ -540,7 +565,7 @@ export class YouTubeScraperService {
 
         // First try the regular live page approach (most comprehensive metadata)
         const liveStream = await this.browserService.evaluate(
-          ({ channelHandle, extractedDisplayName }) => {
+          ({ channelHandle, extractedDisplayName, apiChannelTitle }) => {
             /* eslint-disable no-undef */
 
             // ENHANCED: Check for YouTube metadata first for more accurate results
@@ -738,7 +763,7 @@ export class YouTubeScraperService {
 
               if (!isOnCorrectChannel) {
                 debugInfo.channelVerification = {
-                  channelTitle: extractedDisplayName ?? expectedChannelHandle,
+                  channelTitle: apiChannelTitle || extractedDisplayName || expectedChannelHandle,
                   currentUrl,
                   extractedVideoId: youtubeMetadata.videoId,
                   reason: 'ytInitialPlayerResponse found on wrong channel page',
@@ -771,7 +796,7 @@ export class YouTubeScraperService {
                   scrapedAt: new Date().toISOString(),
                   detectionMethod: 'youtube-metadata-live',
                   debugInfo,
-                  channelTitle: extractedDisplayName ?? expectedChannelHandle,
+                  channelTitle: apiChannelTitle || extractedDisplayName || expectedChannelHandle,
                   badges: youtubeMetadata.badges,
                   channelVerified: true,
                 };
@@ -979,15 +1004,18 @@ export class YouTubeScraperService {
               scrapedAt: new Date().toISOString(),
               detectionMethod: detectionMethod || 'regular-page-detection',
               debugInfo,
-              // Use extracted channel display name if available, otherwise fall back to processed handle
+              // Use channel title from API or extracted display name
               channelTitle:
-                extractedDisplayName || (channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle),
+                apiChannelTitle ||
+                extractedDisplayName ||
+                (channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle),
             };
             /* eslint-enable no-undef */
           },
           {
             channelHandle: this.channelHandle,
             extractedDisplayName: this.extractedDisplayName,
+            apiChannelTitle: this.stateManager?.get('youtubeChannelTitle'),
           }
         );
 

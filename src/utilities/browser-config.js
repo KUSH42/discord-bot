@@ -1,6 +1,9 @@
 /**
  * Shared browser configuration for consistent browser launch options
  * Prevents duplication of browser arguments across different services
+ *
+ * Global Configuration:
+ * - HEADLESS_BROWSER: Set to 'true' for headless mode, 'false' for GUI mode (default: 'false')
  */
 
 /**
@@ -26,15 +29,27 @@ const SAFE_BROWSER_ARGS = [
 const DANGEROUS_BROWSER_ARGS = ['--disable-web-security', '--disable-extensions', '--disable-ipc-flooding-protection'];
 
 /**
+ * Get the global headless browser setting from environment
+ * @returns {boolean} True if browser should run headless, false for GUI mode
+ */
+function getGlobalHeadlessSetting() {
+  const headlessEnv = process.env.HEADLESS_BROWSER;
+  if (headlessEnv === undefined) {
+    return false; // Default to GUI mode for better compatibility
+  }
+  return headlessEnv.toLowerCase() === 'true';
+}
+
+/**
  * Get standard browser configuration for X scraping
  * @param {Object} options - Additional options
- * @param {boolean} options.headless - Whether to run headless (default: true)
+ * @param {boolean} options.headless - Whether to run headless (overrides global HEADLESS_BROWSER setting)
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
 export function getXScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? false, // Back to false - use proper display server
+    headless: options.headless ?? getGlobalHeadlessSetting(),
     args: [...SAFE_BROWSER_ARGS],
   };
 
@@ -55,13 +70,13 @@ export function getXScrapingBrowserConfig(options = {}) {
 /**
  * Get standard browser configuration for YouTube scraping
  * @param {Object} options - Additional options
- * @param {boolean} options.headless - Whether to run headless (default: false)
+ * @param {boolean} options.headless - Whether to run headless (overrides global HEADLESS_BROWSER setting)
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
 export function getYouTubeScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.false ?? false, // Back to false
+    headless: options.headless ?? getGlobalHeadlessSetting(),
     args: [...SAFE_BROWSER_ARGS],
   };
 
@@ -82,14 +97,14 @@ export function getYouTubeScrapingBrowserConfig(options = {}) {
 /**
  * Get browser configuration for profile management (can be more permissive)
  * @param {Object} options - Additional options
- * @param {boolean} options.headless - Whether to run headless (default: false)
+ * @param {boolean} options.headless - Whether to run headless (overrides global HEADLESS_BROWSER setting)
  * @param {string} options.userDataDir - User data directory for profile
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
 export function getProfileBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? false,
+    headless: options.headless ?? getGlobalHeadlessSetting(),
     args: [...SAFE_BROWSER_ARGS],
   };
 
@@ -134,4 +149,4 @@ export function validateBrowserArgs(args) {
   };
 }
 
-export { SAFE_BROWSER_ARGS, DANGEROUS_BROWSER_ARGS };
+export { SAFE_BROWSER_ARGS, DANGEROUS_BROWSER_ARGS, getGlobalHeadlessSetting };

@@ -184,8 +184,12 @@ export class MonitorApplication {
         throw new Error('Failed to fetch YouTube channel details');
       }
 
+      // Store channel title in state manager for use by other services
+      const channelTitle = channelDetails.snippet?.title || 'Unknown';
+      this.state.set('youtubeChannelTitle', channelTitle);
+
       operation.success('YouTube API validation successful', {
-        channelTitle: channelDetails.snippet?.title || 'Unknown',
+        channelTitle,
         channelId: this.youtubeChannelId,
         subscriberCount: channelDetails.statistics?.subscriberCount,
       });

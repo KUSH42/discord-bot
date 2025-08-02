@@ -361,6 +361,7 @@ async function setupApplicationServices(container, _config) {
       metricsManager: c.resolve('metricsManager'),
       browserService: c.resolve('youtubeBrowserService'),
       youtubeAuthManager: c.resolve('youtubeAuthManager'),
+      stateManager: c.resolve('stateManager'),
     });
   });
 }

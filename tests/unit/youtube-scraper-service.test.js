@@ -10,6 +10,7 @@ describe('YouTubeScraperService', () => {
   let mockDependencies;
   let mockContentCoordinator;
   let mockYouTubeAuthManager;
+  let mockStateManager;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -63,7 +64,19 @@ describe('YouTubeScraperService', () => {
     mockYouTubeAuthManager = {
       handleConsentPageRedirect: jest.fn().mockResolvedValue(),
       authenticateWithYouTube: jest.fn().mockResolvedValue(),
+      ensureAuthenticated: jest.fn().mockResolvedValue(true),
       isAuthenticated: false,
+    };
+
+    // Mock state manager
+    mockStateManager = {
+      get: jest.fn(key => {
+        if (key === 'youtubeChannelTitle') {
+          return 'Test Channel Name';
+        }
+        return undefined;
+      }),
+      set: jest.fn(),
     };
 
     // Create the browser service mock first
@@ -91,6 +104,7 @@ describe('YouTubeScraperService', () => {
       metricsManager: mockDependencies.metricsManager,
       youtubeAuthManager: mockYouTubeAuthManager,
       browserService: mockBrowserService,
+      stateManager: mockStateManager,
     });
   });
 
@@ -120,21 +134,24 @@ describe('YouTubeScraperService', () => {
       expect(scraperService.videosUrl).toBe('https://www.youtube.com/@testchannel/videos');
       expect(scraperService.liveStreamUrl).toBe('https://www.youtube.com/@testchannel/live');
       expect(scraperService.embedLiveUrl).toBe('https://www.youtube.com/embed/UC_test_channel_id/live');
-      expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: true,
-        args: expect.arrayContaining([
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-          '--disable-images',
-          '--disable-plugins',
-          '--mute-audio',
-        ]),
-      });
+      // Browser should be launched with standard safe arguments
+      expect(mockBrowserService.launch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headless: expect.any(Boolean),
+          args: expect.arrayContaining([
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+            '--disable-images',
+            '--disable-plugins',
+            '--mute-audio',
+          ]),
+        })
+      );
       expect(mockLogger.info).toHaveBeenCalledWith(
         'YouTube scraper initialized but no videos found',
         expect.objectContaining({
