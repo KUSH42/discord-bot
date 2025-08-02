@@ -136,11 +136,11 @@ describe('Browser Config Branch Coverage', () => {
       }
     });
 
-    it('should handle DISPLAY for Profile config when headless is false', () => {
+    it('should handle DISPLAY for Profile config', () => {
       const originalDisplay = process.env.DISPLAY;
       process.env.DISPLAY = ':1';
 
-      const config = getProfileBrowserConfig({ headless: false });
+      const config = getProfileBrowserConfig();
       expect(config.args).toContain('--display=:1');
 
       // Restore

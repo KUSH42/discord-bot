@@ -238,7 +238,7 @@ export class Configuration {
     return {
       stealthEnabled: this.getBoolean('BROWSER_STEALTH_ENABLED', true),
       behaviorSimulationEnabled: this.getBoolean('BEHAVIOR_SIMULATION_ENABLED', true),
-      headless: this.getBoolean('BROWSER_HEADLESS', true),
+      headless: this.getBoolean('BROWSER_HEADLESS', false),
       userAgentRotationInterval: this.getNumber('USER_AGENT_ROTATION_INTERVAL', 3600000),
       intelligentRateLimiting: this.getBoolean('INTELLIGENT_RATE_LIMITING', true),
       minRequestInterval: this.getNumber('MIN_REQUEST_INTERVAL', 30000),

@@ -61,7 +61,7 @@ export function getXScrapingBrowserConfig(options = {}) {
  */
 export function getYouTubeScrapingBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? true, // Back to true
+    headless: options.false ?? false, // Back to false
     args: [...SAFE_BROWSER_ARGS],
   };
 
@@ -89,7 +89,7 @@ export function getYouTubeScrapingBrowserConfig(options = {}) {
  */
 export function getProfileBrowserConfig(options = {}) {
   const config = {
-    headless: options.headless ?? true,
+    headless: options.headless ?? false,
     args: [...SAFE_BROWSER_ARGS],
   };
 

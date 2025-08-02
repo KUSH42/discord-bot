@@ -124,7 +124,6 @@ export class ContentAnnouncer {
           announcementEnabled: this.state.get('announcementEnabled', true),
           botStartTime: this.state.get('botStartTime'),
         };
-        operation.success(`Content announcement skipped: ${JSON.stringify(skipInfo, null, 1).replace(/\n/g, '')}`);
 
         return result;
       }
@@ -271,8 +270,10 @@ export class ContentAnnouncer {
    * @returns {boolean} True if should announce
    */
   shouldAnnounceYouTubeContent(content) {
+    const announceOldTweets = this.config.getBoolean('ANNOUNCE_OLD_TWEETS', false);
+
     // Check if content is new enough
-    if (content.publishedAt && this.state.get('botStartTime')) {
+    if (!announceOldTweets && content.publishedAt && this.state.get('botStartTime')) {
       const publishedTime = new Date(content.publishedAt);
       const botStartTime = this.state.get('botStartTime');
 

@@ -80,7 +80,7 @@ export class YouTubeScraperService {
     // Construct channel URLs
     const baseUrl = `https://www.youtube.com/@${channelHandle}`;
     this.videosUrl = `${baseUrl}/videos`;
-    this.liveStreamUrl = `${baseUrl}/live`;
+    this.liveStreamUrl = `${baseUrl}/streams`;
     this.embedLiveUrl = `https://www.youtube.com/embed/${youtubeChannelId}/live`;
 
     try {
@@ -88,7 +88,7 @@ export class YouTubeScraperService {
 
       // Launch browser with optimized settings for scraping
       const browserOptions = getYouTubeScrapingBrowserConfig({
-        headless: true,
+        headless: false,
       });
 
       await this.browserService.launch(browserOptions);
@@ -108,9 +108,8 @@ export class YouTubeScraperService {
 
       // Perform authentication if enabled
       if (this.authEnabled && this.authManager) {
-        operation.progress('Performing YouTube authentication');
-        await this.authManager.authenticateWithYouTube();
-        this.isAuthenticated = this.authManager.isAuthenticated;
+        operation.progress('Ensuring YouTube authentication');
+        this.isAuthenticated = await this.authManager.ensureAuthenticated();
       }
 
       operation.progress('Fetching initial content to establish baseline');
@@ -445,7 +444,7 @@ export class YouTubeScraperService {
 
         // First try the regular live page approach (most comprehensive metadata)
         const liveStream = await this.browserService.evaluate(
-          ({ xUser }) => {
+          ({ channelHandle }) => {
             /* eslint-disable no-undef */
 
             // ENHANCED: Check for YouTube metadata first for more accurate results
@@ -603,8 +602,12 @@ export class YouTubeScraperService {
 
             // CRITICAL: Verify we're on the correct channel's page to prevent cross-channel detection
             const currentUrl = window.location.href;
-            const expectedChannelPattern = `@${xUser}/live`;
-            const isOnCorrectChannelPage = currentUrl.includes(expectedChannelPattern);
+            const expectedChannelPattern = `${channelHandle}/streams`;
+            const isOnCorrectChannelPage =
+              (currentUrl.includes(`@${channelHandle}`) ||
+                currentUrl.includes(`youtube.com/${channelHandle}`) ||
+                currentUrl.includes(`channel/${channelHandle}`)) &&
+              (currentUrl.includes(`/live`) || currentUrl.includes(`/streams`));
 
             debugInfo.currentUrl = currentUrl;
             debugInfo.expectedChannelPattern = expectedChannelPattern;
@@ -627,20 +630,54 @@ export class YouTubeScraperService {
             if (metadataExtracted && youtubeMetadata && youtubeMetadata.videoId) {
               debugInfo.strategiesAttempted.push('youtube-metadata-extraction');
 
-              // Always return the video if we extracted it from ytInitialPlayerResponse - assume it's live since we're on /live page
-              return {
-                id: youtubeMetadata.videoId,
-                title: youtubeMetadata.title || 'Live Stream',
-                url: `https://www.youtube.com/watch?v=${youtubeMetadata.videoId}`,
-                type: 'livestream',
-                platform: 'youtube',
-                isCurrentlyLive: true,
-                publishedAt: new Date().toISOString(),
-                scrapedAt: new Date().toISOString(),
-                detectionMethod: 'youtube-metadata-live',
-                debugInfo,
-                badges: youtubeMetadata.badges,
-              };
+              // SANITY CHECK: Verify we're on the correct channel page
+              const currentUrl = window.location.href;
+              const expectedChannelHandle = channelHandle; // This is passed as parameter
+              const isOnCorrectChannel =
+                currentUrl.includes(`@${expectedChannelHandle}`) ||
+                currentUrl.includes(`youtube.com/${expectedChannelHandle}`) ||
+                currentUrl.includes(`channel/${expectedChannelHandle}`);
+
+              if (!isOnCorrectChannel) {
+                debugInfo.channelVerification = {
+                  channelTitle: expectedChannelHandle,
+                  currentUrl,
+                  extractedVideoId: youtubeMetadata.videoId,
+                  reason: 'ytInitialPlayerResponse found on wrong channel page',
+                };
+
+                return {
+                  debugInfo,
+                  error: `Channel verification failed: ytInitialPlayerResponse video ${youtubeMetadata.videoId} found on wrong channel page: ${currentUrl}`,
+                  channelTitle: expectedChannelHandle,
+                  currentUrl,
+                };
+              }
+
+              // CRITICAL: Only return if this is actually a LIVE stream
+              const isActuallyLive = youtubeMetadata.isLive || youtubeMetadata.isLiveContent;
+
+              if (!isActuallyLive) {
+                debugInfo.rejectedReason = 'ytInitialPlayerResponse video is not currently live';
+                // Continue to other detection strategies instead of returning
+              } else {
+                // Return the video from ytInitialPlayerResponse - this is an active live stream
+                return {
+                  id: youtubeMetadata.videoId,
+                  title: youtubeMetadata.title || 'Live Stream',
+                  url: `https://www.youtube.com/watch?v=${youtubeMetadata.videoId}`,
+                  type: 'livestream',
+                  platform: 'youtube',
+                  isCurrentlyLive: true, // Confirmed live from YouTube's data
+                  publishedAt: new Date().toISOString(),
+                  scrapedAt: new Date().toISOString(),
+                  detectionMethod: 'youtube-metadata-live',
+                  debugInfo,
+                  channelTitle: channelHandle,
+                  badges: youtubeMetadata.badges,
+                  channelVerified: true,
+                };
+              }
             }
 
             // Strategy 1: Look for the primary live stream on channel's /live page
@@ -714,7 +751,11 @@ export class YouTubeScraperService {
             }
 
             if (!liveElement) {
-              return { debugInfo, error: 'No live element found' };
+              // NO FALLBACK: We only want to announce ACTIVE live streams
+              // If no live element found, that means there's no active stream
+              debugInfo.strategiesAttempted.push('no-active-livestream-detected');
+
+              return { debugInfo, error: 'No active live stream found - only past streams available' };
             }
 
             const url = liveElement.href;
@@ -839,7 +880,7 @@ export class YouTubeScraperService {
             /* eslint-enable no-undef */
           },
           {
-            xUser: this.channelHandle,
+            channelHandle: this.channelHandle,
           }
         );
 

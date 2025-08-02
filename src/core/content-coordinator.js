@@ -522,31 +522,24 @@ export class ContentCoordinator {
         author: contentData.author,
         retweetedBy: contentData.retweetedBy,
         xUser,
+        // Include raw classification data from browser extraction for proper classification
+        ...contentData.rawClassificationData,
       };
 
       // Handle retweet classification logic specifically
-      if (contentData.tweetCategory === 'Retweet' && contentData.author && contentData.retweetedBy) {
-        const { xUser } = metadata;
-
-        // Check if this is a true retweet (monitored user retweeted someone else's content)
-        if (
-          contentData.author !== xUser &&
-          contentData.author !== `@${xUser}` &&
-          contentData.author !== 'Unknown' &&
-          (contentData.retweetedBy === xUser || contentData.retweetedBy === `@${xUser}`)
-        ) {
-          return {
-            type: 'retweet',
-            confidence: 0.99,
-            platform: 'x',
-            details: {
-              statusId: contentData.id || contentData.tweetID,
-              originalAuthor: contentData.author,
-              retweetedBy: xUser,
-              detectionMethod: 'social-context-based',
-            },
-          };
-        }
+      // Check if this is a retweet based on retweetedBy field (set during extraction)
+      if (contentData.retweetedBy === xUser && contentData.author && contentData.author !== xUser) {
+        return {
+          type: 'retweet',
+          confidence: 0.99,
+          platform: 'x',
+          details: {
+            statusId: contentData.id || contentData.tweetID,
+            originalAuthor: contentData.author,
+            retweetedBy: xUser,
+            detectionMethod: 'retweetedBy-field-based',
+          },
+        };
       }
 
       // Use classifier for other content

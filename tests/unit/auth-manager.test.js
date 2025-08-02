@@ -28,6 +28,8 @@ describe('XAuthManager', () => {
       type: jest.fn().mockResolvedValue(),
       click: jest.fn().mockResolvedValue(),
       waitForNavigation: jest.fn().mockResolvedValue(),
+      getContent: jest.fn().mockResolvedValue('<html>Password login form</html>'),
+      getUrl: jest.fn().mockResolvedValue('https://x.com/i/flow/login'),
       page: mockPage,
     };
 
@@ -36,6 +38,13 @@ describe('XAuthManager', () => {
         const config = {
           TWITTER_USERNAME: 'test_user',
           TWITTER_PASSWORD: 'test_password',
+        };
+        return config[key];
+      }),
+      get: jest.fn().mockImplementation(key => {
+        const config = {
+          TWITTER_EMAIL: 'test@example.com',
+          TWITTER_PHONE: '+1234567890',
         };
         return config[key];
       }),
@@ -610,6 +619,171 @@ describe('XAuthManager', () => {
           module: 'auth',
         })
       );
+    });
+  });
+
+  describe('unusual login activity challenge handling', () => {
+    beforeEach(() => {
+      // Mock successful base authentication methods
+      jest.spyOn(xAuthManager, 'isAuthenticated').mockResolvedValue(true);
+      jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should handle no challenge detected successfully', async () => {
+      // Mock no challenge indicators found
+      mockBrowserService.waitForSelector.mockRejectedValue(new Error('Selector not found'));
+      mockBrowserService.getContent.mockResolvedValue('<html>Regular password form</html>');
+
+      const result = await xAuthManager.handleUnusualLoginChallenge();
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle email challenge with email configured', async () => {
+      // Mock challenge detected
+      mockBrowserService.waitForSelector
+        .mockResolvedValueOnce() // Challenge selector found
+        .mockResolvedValueOnce() // Verification input found
+        .mockResolvedValueOnce(); // Continue button found
+
+      mockBrowserService.getContent.mockResolvedValue(
+        "<html>Help us verify it's you. Please enter your email address</html>"
+      );
+
+      const challengePromise = xAuthManager.handleUnusualLoginChallenge();
+
+      // Advance timers for internal delays
+      await jest.advanceTimersByTimeAsync(5000);
+
+      const result = await challengePromise;
+
+      expect(result).toBe(true);
+      expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="text"]', 'test@example.com');
+      expect(mockBrowserService.click).toHaveBeenCalled();
+    });
+
+    it('should handle phone challenge with phone configured', async () => {
+      // Mock config with only phone
+      mockConfig.get.mockImplementation(key => {
+        const config = {
+          TWITTER_PHONE: '+1234567890',
+        };
+        return config[key];
+      });
+
+      // Mock challenge detected
+      mockBrowserService.waitForSelector
+        .mockResolvedValueOnce() // Challenge selector found
+        .mockResolvedValueOnce() // Verification input found
+        .mockResolvedValueOnce(); // Continue button found
+
+      mockBrowserService.getContent.mockResolvedValue(
+        "<html>Help us verify it's you. Please enter your phone number</html>"
+      );
+
+      const challengePromise = xAuthManager.handleUnusualLoginChallenge();
+
+      // Advance timers for internal delays
+      await jest.advanceTimersByTimeAsync(5000);
+
+      const result = await challengePromise;
+
+      expect(result).toBe(true);
+      expect(mockBrowserService.type).toHaveBeenCalledWith('input[name="text"]', '+1234567890');
+      expect(mockBrowserService.click).toHaveBeenCalled();
+    });
+
+    it('should throw error when challenge detected but no credentials configured', async () => {
+      // Create a fresh XAuthManager instance with no email/phone configured
+      const configWithoutCredentials = {
+        getRequired: jest.fn().mockImplementation(key => {
+          const config = {
+            TWITTER_USERNAME: 'test_user',
+            TWITTER_PASSWORD: 'test_password',
+          };
+          return config[key];
+        }),
+        get: jest.fn().mockReturnValue(null), // No email or phone
+      };
+
+      const xAuthManagerNoCredentials = new XAuthManager({
+        browserService: mockBrowserService,
+        config: configWithoutCredentials,
+        stateManager: mockStateManager,
+        logger: mockLogger,
+        debugManager: jest.fn(),
+        metricsManager: jest.fn(),
+      });
+
+      // Mock challenge detected - use explicit mock implementation to avoid fallback issues
+      let callCount = 0;
+      mockBrowserService.waitForSelector.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve();
+        } // Challenge selector found
+        if (callCount === 2) {
+          return Promise.resolve('input[name="text"]');
+        } // Verification input found
+        return Promise.reject(new Error('Selector not found')); // Other selectors fail
+      });
+
+      mockBrowserService.getContent.mockResolvedValue(
+        "<html>Help us verify it's you. Please enter your email address</html>"
+      );
+
+      // This test should fail when checking for credentials
+      await expect(xAuthManagerNoCredentials.handleUnusualLoginChallenge()).rejects.toThrow(
+        'Unusual login activity challenge detected, but no email or phone number configured for verification'
+      );
+    }, 15000); // Increase timeout for this test
+
+    it('should throw error when continue button cannot be found', async () => {
+      // Mock challenge detected and form filled, but no continue button
+      mockBrowserService.waitForSelector
+        .mockResolvedValueOnce() // Challenge selector found
+        .mockResolvedValueOnce() // Verification input found
+        .mockRejectedValue(new Error('Continue button not found')); // All continue selectors fail
+
+      mockBrowserService.getContent.mockResolvedValue(
+        "<html>Help us verify it's you. Please enter your email address</html>"
+      );
+
+      const challengePromise = xAuthManager.handleUnusualLoginChallenge();
+
+      await expect(challengePromise).rejects.toThrow(
+        'Could not find continue button after filling verification challenge'
+      );
+    }, 10000);
+
+    it('should be called during loginToX flow', async () => {
+      const challengeSpy = jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
+
+      const loginPromise = xAuthManager.loginToX();
+
+      // Advance timers for internal delays in loginToX
+      await jest.advanceTimersByTimeAsync(10000);
+
+      await loginPromise;
+
+      expect(challengeSpy).toHaveBeenCalled();
+    }, 15000);
+
+    it('should recognize challenge errors as non-recoverable', () => {
+      const challengeError = new Error(
+        'Unusual login activity challenge detected, but no email or phone number configured'
+      );
+
+      const result = xAuthManager.isRecoverableError(challengeError);
+
+      expect(result).toBe(false);
     });
   });
 });

@@ -73,6 +73,7 @@ describe('YouTubeScraperService', () => {
       setViewport: jest.fn().mockResolvedValue(),
       goto: jest.fn().mockResolvedValue(),
       waitFor: jest.fn().mockResolvedValue(),
+      waitForFunction: jest.fn().mockResolvedValue(true),
       evaluate: jest.fn(),
       waitForSelector: jest.fn().mockResolvedValue(),
       type: jest.fn().mockResolvedValue(),

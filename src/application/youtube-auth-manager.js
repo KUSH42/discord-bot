@@ -54,9 +54,18 @@ export class YouTubeAuthManager {
       try {
         operation.progress(`Authentication attempt ${attempt}/${maxRetries}`);
 
-        // Check if already authenticated
+        // Quick authentication check first (faster)
+        if (await this.isQuickAuthenticated()) {
+          operation.success('Already authenticated with YouTube (quick check)', {
+            method: 'quick_session_check',
+            attempt,
+          });
+          return true;
+        }
+
+        // Full authentication check as fallback
         if (await this.isAuthenticated()) {
-          operation.success('Already authenticated with YouTube', {
+          operation.success('Already authenticated with YouTube (full check)', {
             method: 'existing_session',
             attempt,
           });
@@ -126,6 +135,15 @@ export class YouTubeAuthManager {
       operation.progress('Navigating to Google sign-in page');
       await this.browserService.goto('https://accounts.google.com/signin/v2/identifier?service=youtube');
 
+      // Check if already authenticated before proceeding with login form
+      operation.progress('Checking if already authenticated');
+      if (await this.isAuthenticated()) {
+        operation.success('Already authenticated, skipping login flow', {
+          method: 'early_detection',
+        });
+        return true;
+      }
+
       // Handle cookie consent if present
       operation.progress('Handling cookie consent');
       await this.handleCookieConsent();
@@ -144,7 +162,7 @@ export class YouTubeAuthManager {
       await this.browserService.click('#passwordNext');
       await this.browserService.waitFor(5000);
 
-      // Handle potential challenges
+      // Handle potential challenges (with shorter timeouts for faster detection)
       operation.progress('Checking for authentication challenges');
       const challengeResult = await this.handleAccountChallenges();
       if (!challengeResult) {
@@ -152,7 +170,7 @@ export class YouTubeAuthManager {
         return false;
       }
 
-      // Check for 2FA
+      // Check for 2FA (with shorter timeout for faster detection)
       operation.progress('Checking for 2FA requirements');
       const twoFAResult = await this.handle2FA();
       if (!twoFAResult) {
@@ -160,7 +178,7 @@ export class YouTubeAuthManager {
         return false;
       }
 
-      // Check for CAPTCHA
+      // Check for CAPTCHA (with shorter timeout for faster detection)
       operation.progress('Checking for CAPTCHA challenges');
       const captchaResult = await this.handleCaptcha();
       if (!captchaResult) {
@@ -307,7 +325,7 @@ export class YouTubeAuthManager {
 
       for (const selector of emailChallengeSelectors) {
         try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
+          await this.browserService.waitForSelector(selector, { timeout: 1000 });
           operation.error(
             new Error('Email verification challenge detected'),
             'Email verification challenge requires manual intervention'
@@ -327,7 +345,7 @@ export class YouTubeAuthManager {
 
       for (const selector of phoneChallengeSelectors) {
         try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
+          await this.browserService.waitForSelector(selector, { timeout: 1000 });
           operation.error(
             new Error('Phone verification challenge detected'),
             'Phone verification challenge requires manual intervention'
@@ -366,7 +384,7 @@ export class YouTubeAuthManager {
 
       for (const selector of twoFASelectors) {
         try {
-          await this.browserService.waitForSelector(selector, { timeout: 3000 });
+          await this.browserService.waitForSelector(selector, { timeout: 1000 });
           operation.error(
             new Error('2FA challenge detected'),
             '2FA challenge detected - authentication cannot proceed automatically'
@@ -408,7 +426,7 @@ export class YouTubeAuthManager {
 
       for (const selector of captchaSelectors) {
         try {
-          await this.browserService.waitForSelector(selector, { timeout: 2000 });
+          await this.browserService.waitForSelector(selector, { timeout: 1000 });
           operation.error(
             new Error('CAPTCHA challenge detected'),
             'CAPTCHA challenge detected - authentication cannot proceed automatically'
@@ -425,6 +443,29 @@ export class YouTubeAuthManager {
       operation.error(error, 'Error checking CAPTCHA requirements', {
         errorMessage: this.sanitizeErrorMessage(error.message),
       });
+      return false;
+    }
+  }
+
+  /**
+   * Quick authentication check that can be called frequently without side effects.
+   * Uses a lightweight approach to verify authentication status.
+   * @returns {Promise<boolean>} True if authenticated
+   */
+  async isQuickAuthenticated() {
+    try {
+      if (!this.browserService || !this.browserService.page) {
+        return false;
+      }
+
+      // Quick cookie-based check first (fastest method)
+      const hasAuthCookies = await this.browserService.evaluate(() => {
+        // eslint-disable-next-line no-undef
+        return document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
+      });
+
+      return hasAuthCookies;
+    } catch (error) {
       return false;
     }
   }
@@ -479,25 +520,6 @@ export class YouTubeAuthManager {
           }
         }
 
-        // Multiple selectors for sign-in buttons
-
-        const signInSelectors = [
-          'a[aria-label*="Sign in"]',
-          'button[aria-label*="Sign in"]',
-          '.sign-in-link',
-          '[href*="accounts.google.com"]',
-          'tp-yt-paper-button:has-text("Sign in")',
-        ];
-
-        let signInButton = null;
-        for (const selector of signInSelectors) {
-          // eslint-disable-next-line no-undef
-          signInButton = document.querySelector(selector);
-          if (signInButton) {
-            break;
-          }
-        }
-
         // Check for authentication cookies as additional indicator
         // eslint-disable-next-line no-undef
         const hasAuthCookies = document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
@@ -507,6 +529,34 @@ export class YouTubeAuthManager {
         const hasUserMenu = !!document.querySelector('[aria-label*="menu"], [data-target-id="topbar-menu-button"]');
 
         // Check if we're on login/error pages (bad indicators)
+
+        // Multiple selectors for sign-in buttons
+
+        const signInSelectors = [
+          'a[aria-label*="Sign in"]',
+          'button[aria-label*="Sign in"]',
+          '.sign-in-link',
+          '[href*="accounts.google.com"]',
+          'tp-yt-paper-button',
+        ];
+
+        let signInButton = null;
+        for (const selector of signInSelectors) {
+          // eslint-disable-next-line no-undef
+          const element = document.querySelector(selector);
+          if (element) {
+            // Special handling for tp-yt-paper-button - check if it contains "Sign in" text
+            if (selector === 'tp-yt-paper-button') {
+              if (element.textContent && element.textContent.includes('Sign in')) {
+                signInButton = element;
+                break;
+              }
+            } else {
+              signInButton = element;
+              break;
+            }
+          }
+        }
 
         const onLoginPage =
           // eslint-disable-next-line no-undef

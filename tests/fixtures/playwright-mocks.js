@@ -11,6 +11,7 @@ export const createPlaywrightMocks = () => {
     isClosed: jest.fn().mockReturnValue(false),
     goto: jest.fn(),
     waitForSelector: jest.fn(),
+    waitForFunction: jest.fn().mockResolvedValue(true),
     evaluate: jest.fn(),
     type: jest.fn(),
     click: jest.fn(),

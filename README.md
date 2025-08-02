@@ -495,6 +495,8 @@ All configuration is managed through the `.env` file.
 | `PSH_PORT`                         | The port for the webhook server to listen on.                              | No       | `3000`                |
 | `X_USER_HANDLE`                    | The handle of the X user to monitor.                                       | **Yes**  |                       |
 | `TWITTER_USERNAME`                 | The username of the X account used for scraping.                           | **Yes**  |                       |
+| `TWITTER_EMAIL`                    | Email address for X account (for unusual login activity challenges).      | No       |                       |
+| `TWITTER_PHONE`                    | Phone number for X account (for unusual login activity challenges).       | No       |                       |
 | `TWITTER_PASSWORD`                 | The password for the scraping account.                                     | **Yes**  |                       |
 | `ALLOWED_USER_IDS`                 | Comma-separated list of Discord user IDs authorized for admin commands.    | **Yes**  |                       |
 | `COMMAND_PREFIX`                   | The prefix for bot commands.                                               | No       | `!`                   |

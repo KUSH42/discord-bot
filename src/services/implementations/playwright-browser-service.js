@@ -158,7 +158,9 @@ export class PlaywrightBrowserService extends BrowserService {
     if (!this.page) {
       throw new Error('No page available');
     }
-    return await this.page.waitForNavigation(options);
+    // Use waitForLoadState instead of deprecated waitForNavigation
+    await this.page.waitForLoadState(options.waitUntil || 'domcontentloaded', { timeout: options.timeout });
+    return null; // waitForNavigation returned response, but waitForLoadState doesn't
   }
 
   /**
@@ -345,6 +347,14 @@ export class PlaywrightBrowserService extends BrowserService {
   }
 
   /**
+   * Get current page URL (alias for getCurrentUrl)
+   * @returns {Promise<string>} Current URL
+   */
+  async getUrl() {
+    return await this.getCurrentUrl();
+  }
+
+  /**
    * Check if element exists
    * @param {string} selector - CSS selector
    * @returns {Promise<boolean>} True if element exists
@@ -432,6 +442,33 @@ export class PlaywrightBrowserService extends BrowserService {
    */
   isRunning() {
     return this.browser !== null;
+  }
+
+  /**
+   * Wait for a function to return truthy value
+   * @param {Function} fn - Function to evaluate in page context
+   * @param {Object} options - Wait options
+   * @returns {Promise<*>} Function result
+   */
+  async waitForFunction(fn, options = {}) {
+    if (!this.page) {
+      throw new Error('No page available');
+    }
+
+    // Check if page is closed before attempting wait
+    if (this.page.isClosed()) {
+      throw new Error('Page is closed');
+    }
+
+    try {
+      return await this.page.waitForFunction(fn, options);
+    } catch (error) {
+      // Provide more context for common navigation-related errors
+      if (error.message.includes('Execution context was destroyed')) {
+        throw new Error(`Execution context was destroyed (likely due to navigation): ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**
