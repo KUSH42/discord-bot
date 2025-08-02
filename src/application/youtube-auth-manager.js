@@ -135,13 +135,15 @@ export class YouTubeAuthManager {
       operation.progress('Navigating to Google sign-in page');
       await this.browserService.goto('https://accounts.google.com/signin/v2/identifier?service=youtube');
 
-      // Check if already authenticated before proceeding with login form
-      operation.progress('Checking if already authenticated');
-      if (await this.isAuthenticated()) {
-        operation.success('Already authenticated, skipping login flow', {
-          method: 'early_detection',
-        });
-        return true;
+      // Wait for sign-in page to load fully
+      await this.browserService.waitFor(2000);
+
+      // Verify we're on the sign-in page
+      // eslint-disable-next-line
+      const currentUrl = await this.browserService.evaluate(() => window.location.href);
+      if (!currentUrl.includes('accounts.google.com')) {
+        operation.error(new Error('Not on Google sign-in page'), `Expected sign-in page but on: ${currentUrl}`);
+        return false;
       }
 
       // Handle cookie consent if present
@@ -538,6 +540,13 @@ export class YouTubeAuthManager {
           '.sign-in-link',
           '[href*="accounts.google.com"]',
           'tp-yt-paper-button',
+          // Additional aggressive detection for YouTube's various sign-in states
+          'button[aria-label*="sign in"]', // case variations
+          'a[aria-label*="sign in"]',
+          '[data-target-id="sign-in-button"]',
+          'yt-button-renderer[aria-label*="Sign in"]',
+          '.ytd-button-renderer[aria-label*="Sign in"]',
+          'button:contains("Sign in")', // Note: this won't work in querySelector, will handle separately
         ];
 
         let signInButton = null;
@@ -553,6 +562,20 @@ export class YouTubeAuthManager {
               }
             } else {
               signInButton = element;
+              break;
+            }
+          }
+        }
+
+        // Additional aggressive text-based search for "Sign in" if not found yet
+        if (!signInButton) {
+          // eslint-disable-next-line no-undef
+          const allButtons = document.querySelectorAll('button, a, yt-button-renderer, .ytd-button-renderer');
+          for (const btn of allButtons) {
+            const text = btn.textContent || btn.innerText || '';
+            const ariaLabel = btn.getAttribute('aria-label') || '';
+            if (text.toLowerCase().includes('sign in') || ariaLabel.toLowerCase().includes('sign in')) {
+              signInButton = btn;
               break;
             }
           }
@@ -590,6 +613,9 @@ export class YouTubeAuthManager {
       if (!authIndicators.hasSignIn) {
         authScore += 2;
       } // Good positive indicator
+      if (authIndicators.hasSignIn) {
+        authScore -= 4;
+      } // Strong negative indicator - "Sign in" button visible
       if (authIndicators.hasAuthCookies) {
         authScore += 2;
       } // Good positive indicator
@@ -600,7 +626,7 @@ export class YouTubeAuthManager {
         authScore -= 5;
       } // Strong negative indicator
 
-      const isAuthenticated = authScore >= 3; // Require strong evidence
+      const isAuthenticated = authScore >= 3; // Require positive evidence with strong penalties for sign-in buttons
 
       operation.success(`Authentication check completed with score ${authScore}`, {
         authenticated: isAuthenticated,

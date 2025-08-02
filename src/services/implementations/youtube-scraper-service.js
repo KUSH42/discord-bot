@@ -34,6 +34,7 @@ export class YouTubeScraperService {
     this.scrapingInterval = null;
     this.isAuthenticated = false;
     this.extractedDisplayName = null;
+    this.consecutiveFailures = 0;
 
     // Configuration
     this.minInterval = parseInt(config.get('YOUTUBE_SCRAPER_INTERVAL_MIN', '300000'), 10);
@@ -203,7 +204,11 @@ export class YouTubeScraperService {
 
         if (this.extractedDisplayName === null) {
           this.extractedDisplayName = (await this.extractChannelTitle()) ?? this.channelHandle;
-          operation.progress(`Extracting YouTube channel's display name: ${this.extractedDisplayName}`);
+          const apiChannelTitle = this.stateManager?.get('youtubeChannelTitle');
+          const finalChannelTitle = this.getChannelTitle();
+          operation.progress(
+            `Channel title resolved: ${finalChannelTitle} (API: ${apiChannelTitle || 'none'}, extracted: ${this.extractedDisplayName})`
+          );
         }
 
         operation.progress('Handling consent page redirects');
@@ -244,14 +249,27 @@ export class YouTubeScraperService {
         let latestVideo = null;
         try {
           latestVideo = await this.browserService.evaluate(
-            ({ channelHandle, extractedDisplayName }) => {
+            ({ channelHandle, extractedDisplayName, apiChannelTitle }) => {
               const selectors = [
+                // Primary selectors (authenticated users)
                 { name: 'modern-grid', selector: 'ytd-rich-grid-media:first-child #video-title-link' },
                 { name: 'rich-item', selector: 'ytd-rich-item-renderer:first-child #video-title-link' },
                 { name: 'grid-with-contents', selector: '#contents ytd-rich-grid-media:first-child a#video-title' },
                 { name: 'list-renderer', selector: '#contents ytd-video-renderer:first-child a#video-title' },
+
+                // Fallback selectors (logged-out/different layouts)
+                { name: 'logged-out-grid', selector: 'ytd-grid-video-renderer:first-child a#video-title' },
+                { name: 'logged-out-item', selector: 'ytd-item-section-renderer a#video-title' },
+                { name: 'mobile-grid', selector: '.ytd-rich-grid-renderer a[href*="/watch?v="]' },
+                { name: 'basic-video-link', selector: 'h3 a[href*="/watch?v="]' },
+
+                // Generic fallbacks (broad compatibility)
                 { name: 'generic-watch', selector: 'a[href*="/watch?v="]' },
                 { name: 'shorts-and-titled', selector: 'a[href*="/shorts/"], a[title][href*="youtube.com/watch"]' },
+
+                // Additional rotation-resistant selectors
+                { name: 'any-video-title', selector: '[id*="video-title"] a[href*="/watch?v="]' },
+                { name: 'data-context-menu', selector: 'a[data-context-menu-trigger][href*="/watch?v="]' },
               ];
 
               let videoElement = null;
@@ -345,12 +363,16 @@ export class YouTubeScraperService {
                 platform: 'youtube',
                 scrapedAt: new Date().toISOString(),
                 // Use channel title from API or extracted display name
-                channelTitle: this.getChannelTitle(),
+                channelTitle:
+                  apiChannelTitle ||
+                  extractedDisplayName ||
+                  (channelHandle.startsWith('@') ? channelHandle.substring(1) : channelHandle),
               };
             },
             {
               channelHandle: this.channelHandle,
               extractedDisplayName: this.extractedDisplayName,
+              apiChannelTitle: this.stateManager?.get('youtubeChannelTitle'),
             }
           );
         } catch (error) {
@@ -365,6 +387,7 @@ export class YouTubeScraperService {
 
           this.metrics.successfulScrapes++;
           this.metrics.lastSuccessfulScrape = new Date();
+          this.consecutiveFailures = 0; // Reset failure counter on success
 
           // Create a plain object for logging to avoid complex object serialization issues
           const logData = {
@@ -385,13 +408,65 @@ export class YouTubeScraperService {
             `Successfully scraped latest video: ${JSON.stringify(logData, null, 1).replace(/\n/g, '')}`
           );
         } else {
+          // Increment failure counter for authentication refresh logic
+          this.consecutiveFailures++;
+
           const failureInfo = {
             videosUrl: this.videosUrl,
             debugInfo,
+            consecutiveFailures: this.consecutiveFailures,
           };
 
           if (latestVideo && !latestVideo.success) {
             failureInfo.attemptedStrategies = latestVideo.strategies;
+          }
+
+          // Check authentication status immediately if we're failing to find content
+          if (this.authManager && (this.consecutiveFailures === 1 || this.consecutiveFailures >= 3)) {
+            operation.progress('Checking authentication status due to scraping failure');
+            try {
+              const isAuthenticated = await this.authManager.isAuthenticated();
+              if (!isAuthenticated) {
+                this.logger.warn('Authentication check failed during scraping - attempting refresh', {
+                  consecutiveFailures: this.consecutiveFailures,
+                });
+
+                // Force re-authentication immediately if not authenticated
+                const authResult = await this.authManager.ensureAuthenticated();
+                if (authResult) {
+                  this.logger.info('Authentication refresh completed successfully');
+                  this.consecutiveFailures = 0; // Reset on successful auth
+                  operation.progress('Authentication refreshed - ready to retry');
+                } else {
+                  this.logger.error('Authentication refresh failed');
+                }
+              }
+            } catch (authError) {
+              this.logger.error('Authentication status check error:', authError.message);
+            }
+          }
+
+          // If we still have multiple consecutive failures, try refreshing authentication
+          if (this.consecutiveFailures >= 3 && this.authManager) {
+            operation.progress('Multiple failures detected, attempting authentication refresh');
+            try {
+              this.logger.info('Attempting authentication refresh due to consecutive scraping failures', {
+                consecutiveFailures: this.consecutiveFailures,
+                lastSuccessfulScrape: this.metrics.lastSuccessfulScrape,
+              });
+
+              // Force re-authentication
+              const authResult = await this.authManager.ensureAuthenticated();
+              if (authResult) {
+                this.logger.info('Authentication refresh completed, resetting failure counter');
+                this.consecutiveFailures = 0; // Reset on successful auth
+                operation.progress('Authentication refreshed successfully');
+              } else {
+                this.logger.warn('Authentication refresh failed');
+              }
+            } catch (authError) {
+              this.logger.error('Authentication refresh error:', authError.message);
+            }
           }
 
           operation.error(new Error('No videos found during scraping'), 'No videos found during scraping', failureInfo);
