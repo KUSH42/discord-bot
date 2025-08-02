@@ -279,6 +279,17 @@ export class PlaywrightBrowserService extends BrowserService {
   }
 
   /**
+   * Clear all cookies from the browser context
+   * @returns {Promise<void>}
+   */
+  async clearCookies() {
+    if (!this.page) {
+      throw new Error('No page available');
+    }
+    await this.page.context().clearCookies();
+  }
+
+  /**
    * Set user agent
    * @param {string} userAgent - User agent string
    * @returns {Promise<void>}

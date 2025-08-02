@@ -131,6 +131,10 @@ export class YouTubeAuthManager {
     try {
       operation.progress('Starting YouTube authentication...');
 
+      // Clear all cookies to ensure clean authentication state
+      operation.progress('Clearing existing cookies for fresh authentication');
+      await this.browserService.clearCookies();
+
       // Navigate to YouTube sign-in page
       operation.progress('Navigating to Google sign-in page');
       await this.browserService.goto('https://accounts.google.com/signin/v2/identifier?service=youtube');
@@ -640,6 +644,22 @@ export class YouTubeAuthManager {
         currentUrl: authIndicators.currentUrl.substring(0, 120),
         pageTitle: authIndicators.pageTitle.substring(0, 30),
       });
+
+      // Enhanced debugging for authentication detection issues
+      this.logger.info(
+        `YouTube auth debug: ${JSON.stringify({
+          authScore,
+          indicators: authIndicators,
+          scoreBreakdown: {
+            avatar: authIndicators.hasAvatar ? '+3' : '0',
+            noSignIn: !authIndicators.hasSignIn ? '+2' : '0',
+            hasSignIn: authIndicators.hasSignIn ? '-4' : '0',
+            authCookies: authIndicators.hasAuthCookies ? '+2' : '0',
+            userMenu: authIndicators.hasUserMenu ? '+1' : '0',
+            loginPage: authIndicators.onLoginPage ? '-5' : '0',
+          },
+        })}`
+      );
 
       return isAuthenticated;
     } catch (error) {
