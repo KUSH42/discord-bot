@@ -812,7 +812,7 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
-        expect(result.foundIn).toBe('youtube_duplicate_detector');
+        expect(result.foundIn).toBe('youtube_duplicate_detector_cache');
         expect(result.contentId).toBe('test-video-123');
         expect(mockDuplicateDetector.isVideoIdKnown).toHaveBeenCalledWith('test-video-123');
       });
@@ -830,7 +830,7 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
-        expect(result.foundIn).toBe('x_duplicate_detector');
+        expect(result.foundIn).toBe('x_duplicate_detector_cache');
         expect(result.contentId).toBe('test-tweet-456');
         expect(mockDuplicateDetector.isTweetIdKnown).toHaveBeenCalledWith('test-tweet-456');
       });
@@ -847,7 +847,7 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
-        expect(result.foundIn).toBe('url_duplicate_detector');
+        expect(result.foundIn).toBe('url_duplicate_detector_cache');
         expect(result.url).toBe('https://www.youtube.com/watch?v=test-video-789');
         expect(mockDuplicateDetector.isDuplicateByUrl).toHaveBeenCalledWith(
           'https://www.youtube.com/watch?v=test-video-789'
@@ -941,7 +941,7 @@ describe('ContentCoordinator', () => {
         mockDuplicateDetector.isVideoIdKnown = jest.fn().mockReturnValue(true);
         coordinator.checkDiscordForRecentAnnouncements = jest.fn().mockResolvedValue({
           found: true,
-          foundIn: 'youtube_duplicate_detector',
+          foundIn: 'youtube_duplicate_detector_cache',
           contentId: 'test-video-123',
         });
 
@@ -949,7 +949,7 @@ describe('ContentCoordinator', () => {
 
         expect(result.action).toBe('skip');
         expect(result.reason).toBe('previously_announced');
-        expect(result.foundIn).toBe('youtube_duplicate_detector');
+        expect(result.foundIn).toBe('youtube_duplicate_detector_cache');
         expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
         expect(mockDuplicateDetector.markAsSeenWithFingerprint).toHaveBeenCalled();
       });
