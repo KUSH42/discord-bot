@@ -64,7 +64,7 @@ export class DiscordClientService extends DiscordService {
         }
 
         this.logger.verbose(
-          `📨 Discord messageCreate event - ID: ${message.id}, Handlers: ${this.client.listenerCount('messageCreate')}, Instance: ${this.client._botInstanceId}, Content: "${message.content?.substring(0, 50) || 'empty'}"`
+          `📨 Discord messageCreate event - ID: ${message.id}, Handlers: ${this.client.listenerCount('messageCreate')}, Instance: ${this.client._botInstanceId}, Content: "${message.content?.substring(0, 120) || 'empty'}"`
         );
         handler(message);
       } catch (error) {

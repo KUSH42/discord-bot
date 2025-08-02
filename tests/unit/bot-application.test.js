@@ -628,7 +628,7 @@ describe('BotApplication', () => {
         expect(mockDiscordService.fetchChannel).toHaveBeenCalledWith('youtube-channel-id');
         expect(mockMonitorApplication.duplicateDetector.scanDiscordChannelForVideos).toHaveBeenCalledWith(
           mockChannel,
-          1000
+          100
         );
         // Enhanced Logger produces structured messages, check if any info calls were made
         expect(mockLogger.info).toHaveBeenCalled();

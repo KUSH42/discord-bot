@@ -6,6 +6,16 @@
 import { jest } from '@jest/globals';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
 
+// Import specialized test utilities
+import { createEnhancedLoggerMocks, createMockContentCoordinator } from './enhanced-logger-factory.js';
+import { timerTestUtils } from './timer-test-utils.js';
+import { createPlaywrightMocks, mockPlaywrightModule } from './playwright-mocks.js';
+import {
+  createScraperApplicationMocks,
+  createMonitorApplicationMocks,
+  createContentAnnouncerMocks,
+} from './application-mocks.js';
+
 // Test timing utilities
 export const timing = {
   // Measure execution time of a function
@@ -532,6 +542,18 @@ Coverage:
   },
 };
 
+// Export specialized utilities
+export {
+  createEnhancedLoggerMocks,
+  createMockContentCoordinator,
+  timerTestUtils,
+  createPlaywrightMocks,
+  mockPlaywrightModule,
+  createScraperApplicationMocks,
+  createMonitorApplicationMocks,
+  createContentAnnouncerMocks,
+};
+
 export default {
   timing,
   memory,
@@ -542,4 +564,19 @@ export default {
   logging,
   network,
   reporting,
+  // Add references to new utilities
+  enhanced: {
+    createLoggerMocks: createEnhancedLoggerMocks,
+    createContentCoordinator: createMockContentCoordinator,
+  },
+  timers: timerTestUtils,
+  playwright: {
+    createMocks: createPlaywrightMocks,
+    mockModule: mockPlaywrightModule,
+  },
+  applications: {
+    createScraperMocks: createScraperApplicationMocks,
+    createMonitorMocks: createMonitorApplicationMocks,
+    createAnnouncerMocks: createContentAnnouncerMocks,
+  },
 };

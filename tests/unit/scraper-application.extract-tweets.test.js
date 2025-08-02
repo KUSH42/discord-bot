@@ -66,7 +66,7 @@ describe('ScraperApplication Tweet Extraction', () => {
       discordService: { login: jest.fn() },
       eventBus: { emit: jest.fn(), on: jest.fn(), off: jest.fn() },
       logger: mockLogger,
-      authManager: {
+      xAuthManager: {
         login: jest.fn(),
         clickNextButton: jest.fn(),
         clickLoginButton: jest.fn(),

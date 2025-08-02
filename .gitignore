@@ -26,6 +26,7 @@ pids
 coverage
 reports
 test-results
+test-merger
 coverage-metrics.json
 coverage-summary.json
 
@@ -33,7 +34,7 @@ coverage-summary.json
 lib-cov
 
 # Coverage directory used by tools like istanbul
-coverage
+#coverage
 *.lcov
 
 # nyc test coverage
@@ -179,6 +180,16 @@ enforcer.env
 # npm audit files
 *-audit.json
 
+# Data storage
+./data
+
+# MCP
+mcp.json
+
 # Debugging artifacts
 *.png
 bot-*.log.*
+.fake
+
+# crush
+.crush

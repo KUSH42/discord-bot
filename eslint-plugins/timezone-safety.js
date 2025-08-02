@@ -1,6 +1,8 @@
 /**
  * ESLint plugin for enforcing UTC timezone safety
  * Prevents timezone-related bugs by enforcing UTC timestamp usage
+ *
+ * For more information, see ./docs/ESLINT_TIMEZONE_SAFETY.md
  */
 
 const enforceUtcTimestamps = {

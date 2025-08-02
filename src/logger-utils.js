@@ -19,6 +19,10 @@ export class DiscordTransport extends Transport {
     this.channel = null;
     this.buffer = [];
 
+    // Store debug manager and metrics manager for enhanced logging
+    this.debugManager = opts.debugManager;
+    this.metricsManager = opts.metricsManager;
+
     // Buffering options
     this.flushInterval = opts.flushInterval || 1000; // 1 seconds to match send delay
     this.maxBufferSize = opts.maxBufferSize || 15; // 15 log entries to match burst allowance
@@ -39,12 +43,24 @@ export class DiscordTransport extends Transport {
             verbose: console.debug?.bind(console) || console.log.bind(console),
           };
 
-    // Create enhanced logger for the discord-transport module
-    const logger =
-      opts.debugManager && opts.metricsManager
-        ? createEnhancedLogger('discord-transport', baseLogger, opts.debugManager, opts.metricsManager)
+    // Create enhanced logger for the discord-transport module itself
+    this.logger =
+      this.debugManager && this.metricsManager
+        ? createEnhancedLogger('discord-transport', baseLogger, this.debugManager, this.metricsManager)
+        : {
+            debug: baseLogger.debug,
+            info: baseLogger.info,
+            warn: baseLogger.warn,
+            error: baseLogger.error,
+            verbose: baseLogger.verbose,
+          };
+
+    // Create enhanced logger for DiscordMessageSender
+    const messageSenderLogger =
+      this.debugManager && this.metricsManager
+        ? createEnhancedLogger('discord-message-sender', baseLogger, this.debugManager, this.metricsManager)
         : baseLogger;
-    this.messageSender = new DiscordMessageSender(logger, {
+    this.messageSender = new DiscordMessageSender(messageSenderLogger, {
       baseSendDelay: opts.baseSendDelay || 1000, // 1 second between sends to respect Discord limits
       burstAllowance: opts.burstAllowance || 30, // Allow 30 quick messages per 2 minutes
       burstResetTime: opts.burstResetTime || 60000, // 1 minute burst reset for better recovery
@@ -53,6 +69,7 @@ export class DiscordTransport extends Transport {
       maxBackoffDelay: opts.maxBackoffDelay || 30000, // 30 second max backoff
       testMode: process.env.NODE_ENV === 'test', // Enable test mode in test environment
       autoStart: process.env.NODE_ENV !== 'test', // Don't auto-start in test environment
+      suppressEmbeds: true,
     });
 
     // Don't start periodic flushing in test environment to prevent test timeouts
@@ -86,7 +103,7 @@ export class DiscordTransport extends Transport {
     } catch (error) {
       // Ignore flush errors during shutdown
       if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-        this.safeConsoleError('[DiscordTransport] Error during final flush:', error);
+        this.logError('Error during final flush:', error);
       }
     }
 
@@ -97,7 +114,7 @@ export class DiscordTransport extends Transport {
       } catch (error) {
         // Ignore shutdown errors - they're expected during disconnect
         if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-          this.safeConsoleError('[DiscordTransport] Error during message sender shutdown:', error);
+          this.logError('Error during message sender shutdown:', error);
         }
       }
     }
@@ -161,7 +178,16 @@ export class DiscordTransport extends Transport {
     return shutdownMessages.some(msg => error.message.includes(msg));
   }
 
-  // Safe logging to prevent EPIPE errors on console.error
+  // Enhanced error logging using enhanced logger when available
+  logError(message, error = null) {
+    if (this.logger && typeof this.logger.error === 'function') {
+      this.logger.error(message, error ? { error: error.message, stack: error.stack } : {});
+    } else {
+      this.safeConsoleError(`[DiscordTransport] ${message}`, error);
+    }
+  }
+
+  // Safe logging to prevent EPIPE errors on console.error (fallback)
   safeConsoleError(message, ...args) {
     try {
       console.error(message, ...args);
@@ -190,24 +216,28 @@ export class DiscordTransport extends Transport {
         const fetchedChannel = await this.client.channels.fetch(this.channelId);
         if (fetchedChannel && fetchedChannel.isTextBased()) {
           this.channel = fetchedChannel;
-          // Send initialization message using message sender
-          this.messageSender
-            .sendImmediate(this.channel, '✅ **Winston logging transport initialized for this channel.**')
-            .catch(error => {
-              if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error)) {
-                this.safeConsoleError('[DiscordTransport] Failed to send initialization message:', error);
-              }
-            });
+          // Send initialization message asynchronously (non-blocking) with lower priority
+          setTimeout(() => {
+            this.messageSender
+              .queueMessage(this.channel, '✅ **Winston logging transport initialized for this channel.**', {
+                priority: -1, // Low priority, won't block startup
+              })
+              .catch(error => {
+                if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error)) {
+                  this.logError('Failed to send initialization message:', error);
+                }
+              });
+          }, 2000); // 2 second delay to avoid blocking startup
         } else {
           this.channel = 'errored';
           if (process.env.NODE_ENV !== 'test') {
-            this.safeConsoleError(`[DiscordTransport] Channel ${this.channelId} is not a valid text channel.`);
+            this.logError(`Channel ${this.channelId} is not a valid text channel.`);
           }
         }
       } catch (error) {
         this.channel = 'errored';
         if (process.env.NODE_ENV !== 'test') {
-          this.safeConsoleError(`[DiscordTransport] Failed to fetch channel ${this.channelId}:`, error);
+          this.logError(`Failed to fetch channel ${this.channelId}:`, error);
         }
       }
     }
@@ -247,6 +277,7 @@ export class DiscordTransport extends Transport {
         if (part) {
           await this.messageSender.queueMessage(this.channel, part, {
             priority: 1, // Logging messages have normal priority
+            suppressEmbeds: true, // better for readability in Bot Support Channel
           });
         }
       }
@@ -254,17 +285,28 @@ export class DiscordTransport extends Transport {
       // Only log the error if it's not related to Discord being unavailable during shutdown
       // and we're not in test environment, and not a write error
       if (process.env.NODE_ENV !== 'test' && !this.isWriteError(error) && !this.isShutdownError(error)) {
-        this.safeConsoleError('[DiscordTransport] Failed to flush log buffer to Discord:', error);
+        this.logError('Failed to flush log buffer to Discord:', error);
 
         // Log rate limiting metrics for debugging only if client is still available
         if (!this.isClientUnavailable()) {
           const metrics = this.messageSender.getMetrics();
-          this.safeConsoleError('[DiscordTransport] Message sender metrics:', {
-            successRate: metrics.successRate,
-            rateLimitHits: metrics.rateLimitHits,
-            currentQueueSize: metrics.currentQueueSize,
-            isPaused: metrics.isPaused,
-          });
+          if (this.logger && typeof this.logger.debug === 'function') {
+            this.logger.debug(
+              `Message sender metrics: ${JSON.stringify({
+                successRate: metrics.successRate,
+                rateLimitHits: metrics.rateLimitHits,
+                currentQueueSize: metrics.currentQueueSize,
+                isPaused: metrics.isPaused,
+              })}`
+            );
+          } else {
+            this.safeConsoleError('[DiscordTransport] Message sender metrics:', {
+              successRate: metrics.successRate,
+              rateLimitHits: metrics.rateLimitHits,
+              currentQueueSize: metrics.currentQueueSize,
+              isPaused: metrics.isPaused,
+            });
+          }
         }
       }
 
@@ -287,6 +329,131 @@ export class DiscordTransport extends Transport {
    */
   async setLogLevel(loglevel) {
     this.client.logger.level = loglevel;
+  }
+}
+
+/**
+ * Systemd-safe console transport that handles EPIPE errors gracefully
+ */
+export class SystemdSafeConsoleTransport extends winston.transports.Console {
+  constructor(options) {
+    super(options);
+    this.silent = false;
+    this._setupErrorHandling();
+  }
+
+  _setupErrorHandling() {
+    // Handle errors on the stdout/stderr streams directly
+    if (process.stdout) {
+      process.stdout.on('error', error => {
+        if (this.isWriteError(error)) {
+          this.silent = true;
+          // Silently ignore EPIPE errors
+        }
+      });
+    }
+
+    if (process.stderr) {
+      process.stderr.on('error', error => {
+        if (this.isWriteError(error)) {
+          this.silent = true;
+          // Silently ignore EPIPE errors
+        }
+      });
+    }
+  }
+
+  log(info, callback) {
+    // If already silenced due to EPIPE, skip logging
+    if (this.silent) {
+      setImmediate(() => callback());
+      return true;
+    }
+
+    try {
+      // Override console methods temporarily to catch EPIPE errors
+      const originalConsoleError = console.error;
+      const originalConsoleLog = console.log;
+
+      console.error = (...args) => {
+        try {
+          originalConsoleError.apply(console, args);
+        } catch (error) {
+          if (this.isWriteError(error)) {
+            this.silent = true;
+            return;
+          }
+          throw error;
+        }
+      };
+
+      console.log = (...args) => {
+        try {
+          originalConsoleLog.apply(console, args);
+        } catch (error) {
+          if (this.isWriteError(error)) {
+            this.silent = true;
+            return;
+          }
+          throw error;
+        }
+      };
+
+      // Call the parent log method with wrapped callback
+      const result = super.log(info, error => {
+        // Restore original console methods
+        console.error = originalConsoleError;
+        console.log = originalConsoleLog;
+
+        // Handle callback errors
+        if (error && this.isWriteError(error)) {
+          this.silent = true;
+          callback(); // Don't pass the error to prevent cascade
+        } else {
+          callback(error);
+        }
+      });
+
+      return result;
+    } catch (error) {
+      // Handle EPIPE and other write errors silently
+      if (this.isWriteError(error)) {
+        // Mark transport as silent to prevent further EPIPE errors
+        this.silent = true;
+        // Call callback without error to prevent Winston from crashing
+        setImmediate(() => callback());
+        return true;
+      }
+      // Re-throw non-write errors
+      throw error;
+    }
+  }
+
+  write(chunk, encoding) {
+    // If already silenced due to EPIPE, skip writing
+    if (this.silent) {
+      return true;
+    }
+
+    try {
+      return super.write(chunk, encoding);
+    } catch (error) {
+      // Silently handle write errors to prevent crashing
+      if (this.isWriteError(error)) {
+        this.silent = true;
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  // Check if error is a write error (EPIPE, ECONNRESET, etc.)
+  isWriteError(error) {
+    if (!error) {
+      return false;
+    }
+    const writeErrorCodes = ['EPIPE', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'];
+    return writeErrorCodes.includes(error.code) || (error.message && error.message.includes('write EPIPE'));
   }
 }
 
@@ -330,6 +497,21 @@ export const LoggerUtils = {
       client,
       channelId,
       level: options.level || 'info',
+      debugManager: options.debugManager,
+      metricsManager: options.metricsManager,
+      ...options,
+    });
+  },
+
+  /**
+   * Create systemd-safe console transport that handles EPIPE errors
+   * @param {Object} options - Transport options
+   * @returns {SystemdSafeConsoleTransport} Systemd-safe console transport instance
+   */
+  createSystemdSafeConsoleTransport(options = {}) {
+    return new SystemdSafeConsoleTransport({
+      level: options.level || 'info',
+      format: options.format || this.createConsoleLogFormat(),
       ...options,
     });
   },

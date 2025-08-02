@@ -1,6 +1,6 @@
 # Discord Content Announcement Bot
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/KUSH42/discord-bot/test.yml?branch=fix%2Fbugfix3&style=for-the-badge)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/KUSH42/discord-bot/ci.yml?branch=fix%2Fbugfix3&style=for-the-badge)
 ![Codecov (with branch)](https://img.shields.io/codecov/c/github/KUSH42/discord-bot/dev?style=for-the-badge&link=https%3A%2F%2Fapp.codecov.io%2Fgh%2FKUSH42%2Fdiscord-bot%2Ftree%2Ffix%2Fbugfix3%2F)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=for-the-badge)
 ![Discord.js](https://img.shields.io/badge/discord.js-v14-7289DA?style=for-the-badge)
@@ -221,7 +221,7 @@ The bot uses **Playwright** for X and YouTube web scraping with comprehensive re
 All reliability features are configurable through environment variables (see
 [Configuration](#-configuration) section):
 
-- `MAX_CONTENT_AGE_HOURS=2` - Only announce content newer than 2 hours
+- `MAX_CONTENT_AGE_HOURS=24` - Only announce content newer than 24 hours
 - `ENABLE_CONTENT_FINGERPRINTING=true` - Enable advanced duplicate detection
 - `ENABLE_LIVESTREAM_MONITORING=true` - Enable livestream state tracking
 - `CONTENT_STORAGE_DIR=data` - Directory for persistent storage
@@ -404,8 +404,8 @@ Follow these steps to get the bot running quickly for local development.
 1.  **Clone the repository:**
 
     ```sh
-    git clone https://github.com/KUSH42/discord-youtube-bot.git
-    cd discord-youtube-bot
+    git clone https://github.com/KUSH42/discord-bot.git
+    cd discord-bot
     ```
 
 2.  **Install dependencies:**
@@ -495,6 +495,8 @@ All configuration is managed through the `.env` file.
 | `PSH_PORT`                         | The port for the webhook server to listen on.                              | No       | `3000`                |
 | `X_USER_HANDLE`                    | The handle of the X user to monitor.                                       | **Yes**  |                       |
 | `TWITTER_USERNAME`                 | The username of the X account used for scraping.                           | **Yes**  |                       |
+| `TWITTER_EMAIL`                    | Email address for X account (for unusual login activity challenges).      | No       |                       |
+| `TWITTER_PHONE`                    | Phone number for X account (for unusual login activity challenges).       | No       |                       |
 | `TWITTER_PASSWORD`                 | The password for the scraping account.                                     | **Yes**  |                       |
 | `ALLOWED_USER_IDS`                 | Comma-separated list of Discord user IDs authorized for admin commands.    | **Yes**  |                       |
 | `COMMAND_PREFIX`                   | The prefix for bot commands.                                               | No       | `!`                   |
@@ -513,7 +515,7 @@ All configuration is managed through the `.env` file.
 | `DISCORD_BURST_ALLOWANCE`          | Number of quick Discord messages allowed per burst period.                 | No       | `2`                   |
 | `DISCORD_MAX_BUFFER_SIZE`          | Maximum Discord log message buffer size before flushing.                   | No       | `30`                  |
 | **Content Detection Reliability**  |                                                                            |          |                       |
-| `MAX_CONTENT_AGE_HOURS`            | Maximum age in hours for content to be considered "new" and announced.     | No       | `2`                   |
+| `MAX_CONTENT_AGE_HOURS`            | Maximum age in hours for content to be considered "new" and announced.     | No       | `24`                  |
 | `ENABLE_CONTENT_FINGERPRINTING`    | Enable enhanced duplicate detection using content fingerprinting.          | No       | `true`                |
 | `ENABLE_LIVESTREAM_MONITORING`     | Enable scheduled livestream state monitoring and transitions.              | No       | `true`                |
 | `ENABLE_CROSS_VALIDATION`          | Enable cross-system content validation between detection sources.          | No       | `true`                |
@@ -665,7 +667,7 @@ automatic restarts and process management.
     # Replace 'your_bot_user' with the user the bot runs as
     User=your_bot_user
     # The start-bot.sh script handles finding the correct Node.js path
-    ExecStart=/home/your_bot_user/discord-youtube-bot/scripts/start-bot.sh
+    ExecStart=/home/your_bot_user/discord-bot/scripts/deployment/discord-bot-start.sh
     Restart=on-failure
     RestartSec=10s
     StandardOutput=syslog
@@ -701,8 +703,8 @@ development and production environments.
 1. **Build and run the production image:**
 
    ```sh
-   docker build -t discord-youtube-bot --target production .
-   docker run -d --name bot --env-file .env -p 3000:3000 discord-youtube-bot
+   docker build -t discord-bot --target production .
+   docker run -d --name bot --env-file .env -p 3000:3000 discord-bot
    ```
 
 2. **Using Docker Compose (recommended):**

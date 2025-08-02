@@ -6,15 +6,15 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "setup-encryption": "node scripts/setup-encryption.js",
+    "setup-encryption": "node scripts/development/setup-encryption.js",
     "decrypt": "npx dotenvx run -- node index.js",
-    "validate": "node scripts/test-validation.js",
+    "validate": "node scripts/testing/test-validation.js",
     "prestart": "npm run validate",
     "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest",
     "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
     "test:coverage": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
     "test:unit": "NODE_OPTIONS=\"--experimental-vm-modules\" jest tests/unit",
-    "test:integration": "dotenvx run -f tests/test.env -- jest --config tests/configs/jest.integration.config.js --detectOpenHandles --forceExit --coverage --coverageDirectory=coverage/integration --coverageReporters=text --coverageReporters=lcov",
+    "test:integration": "NODE_OPTIONS=\"--experimental-vm-modules\" dotenvx run -f tests/test.env -- jest --config tests/configs/jest.integration.config.js",
     "test:e2e": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.e2e.config.js",
     "test:performance": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.performance.config.js",
     "test:security": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.security.config.js",
@@ -27,7 +27,12 @@
     "test:silent": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --silent",
     "test:bail": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --bail",
     "test:dev": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.dev.config.js",
+    "test:handles": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config tests/configs/jest.handle-debug.config.js",
     "test:runner": "node tests/test-runner.js",
+    "test:summary": "node scripts/testing/generate-test-summary.js",
+    "debug:handles": "node scripts/debug-handles.js",
+    "debug:handles:monitor": "node scripts/debug-handles.js --monitor",
+    "debug:handles:force-close": "node scripts/debug-handles.js --force-close",
     "lint": "eslint .",
     "format": "prettier --check .",
     "lint:fix": "eslint . --fix",
@@ -60,17 +65,16 @@
     "playwright": "^1.44.1",
     "puppeteer-extra": "^3.3.6",
     "winston": "^3.17.0",
-    "winston-daily-rotate-file": "^5.0.0",
-    "xml2js": "^0.6.2"
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KUSH42/discord-youtube-bot.git"
+    "url": "git+https://github.com/KUSH42/discord-bot.git"
   },
   "bugs": {
-    "url": "https://github.com/KUSH42/discord-youtube-bot/issues"
+    "url": "https://github.com/KUSH42/discord-bot/issues"
   },
-  "homepage": "https://github.com/KUSH42/discord-youtube-bot#readme",
+  "homepage": "https://github.com/KUSH42/discord-bot#readme",
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
@@ -83,9 +87,11 @@
     "@eslint/json": "^0.13.0",
     "@eslint/markdown": "^7.0.0",
     "@jest/globals": "^30.0.4",
+    "@jest/reporters": "^30.0.5",
     "babel-jest": "^30.0.4",
+    "c8": "^10.1.3",
     "core-js": "^3.44.0",
-    "eslint": "^9.31.0",
+    "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-jest": "^29.0.1",
     "eslint-plugin-prettier": "^5.5.1",
@@ -93,9 +99,12 @@
     "husky": "^9.1.7",
     "inquirer": "^12.7.0",
     "jest": "^30.0.5",
+    "jest-json-reporter": "^1.2.2",
+    "jest-junit": "^16.0.0",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
-    "test-exclude": "^7.0.1"
+    "test-exclude": "^7.0.1",
+    "xml2js": "^0.6.2"
   },
   "overrides": {
     "glob": "^9.0.0",

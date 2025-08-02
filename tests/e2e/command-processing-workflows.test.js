@@ -552,6 +552,7 @@ describe('End-to-End Command Processing Workflows', () => {
         'debug-level',
         'metrics',
         'log-pipeline',
+        'delete',
       ]);
 
       expect(stats).toHaveProperty('restrictedCommands', [
@@ -562,6 +563,7 @@ describe('End-to-End Command Processing Workflows', () => {
         'stop-scraper',
         'start-scraper',
         'force-reauth',
+        'delete',
       ]);
       expect(stats).toHaveProperty('allowedUsers', 2); // Two users in ALLOWED_USER_IDS
       expect(stats).toHaveProperty('commandPrefix', '!');

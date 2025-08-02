@@ -1,19 +1,88 @@
+/**
+ * Jest configuration for e2e tests
+ * Tests complete workflows while maintaining reasonable coverage expectations
+ */
 import baseConfig from '../../jest.config.js';
 
 export default {
-  ...baseConfig,
+  testEnvironment: 'node',
+
   rootDir: '../../', // Set root to project root
-  // E2E tests focus on integration behavior, not source code coverage
-  coverageThreshold: {
-    global: {
-      statements: 0,
-      branches: 0,
-      functions: 0,
-      lines: 0,
-    },
+
+  // Transform configuration
+  transform: {
+    '^.+.js$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],
   },
-  // Disable coverage for E2E tests by default since they don't exercise source code directly
-  collectCoverage: false,
-  testMatch: ['<rootDir>/tests/e2e/**/*.test.js', '<rootDir>/tests/e2e/**/*.spec.js'],
-  testTimeout: 60000,
+
+  // Module resolution
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+
+  // Test discovery - only e2e tests
+  testMatch: ['<rootDir>/tests/e2e/**/*.test.js'],
+
+  // Coverage collection - ENABLED for integration tests
+  collectCoverage: true,
+  collectCoverageFrom: [
+    'src/**/*.js',
+    'index.js',
+    'src/x-scraper.js',
+    'src/youtube-monitor.js',
+    '!node_modules/**',
+    '!coverage/**',
+    '!jest.*.config.js',
+    '!scripts/**',
+    '!tests/**',
+    '!src/services/interfaces/**',
+    '!src/setup/**',
+  ],
+
+  // This line tells Jest to run our script before the tests.
+  // <rootDir> is a special Jest variable for the project's root folder.
+  setupFiles: ['<rootDir>/scripts/setup-env.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+
+  coverageDirectory: 'coverage/e2e',
+  coverageReporters: ['text', 'json', 'html'],
+  coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
+
+  // Integration test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'e2e-tests.xml',
+        classNameTemplate: 'E2e.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
+
+  // Integration test specific settings
+  testTimeout: 30000, // 30 seconds for integration tests
+  maxWorkers: 1, // Sequential execution for integration tests
+
+  // Test execution
+  verbose: true,
+  bail: false,
+  forceExit: true,
+  detectOpenHandles: true,
+
+  // Clear mocks between tests
+  clearMocks: true,
+  restoreMocks: true,
+
+  // Integration test optimizations
+  cache: true,
+  cacheDirectory: '<rootDir>/.jest-cache-e2e',
+
+  // Error handling
+  errorOnDeprecated: false,
 };

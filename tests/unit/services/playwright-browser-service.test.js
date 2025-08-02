@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { createEnhancedLoggerMocks } from '../../fixtures/enhanced-logger-factory.js';
 
 // Mock the playwright library
 const mockLaunch = jest.fn();
@@ -12,16 +13,19 @@ jest.unstable_mockModule('playwright', () => ({
 describe('Playwright Browser Service', () => {
   let browserService;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
   let PlaywrightBrowserService;
 
   beforeEach(async () => {
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-    };
+    const loggerMocks = createEnhancedLoggerMocks();
+    mockLogger = loggerMocks.baseLogger;
+    mockDebugManager = loggerMocks.debugManager;
+    mockMetricsManager = loggerMocks.metricsManager;
+
     PlaywrightBrowserService = (await import('../../../src/services/implementations/playwright-browser-service.js'))
       .PlaywrightBrowserService;
-    browserService = new PlaywrightBrowserService({ logger: mockLogger });
+    browserService = new PlaywrightBrowserService(mockLogger, mockDebugManager, mockMetricsManager);
   });
 
   afterEach(async () => {
@@ -33,8 +37,15 @@ describe('Playwright Browser Service', () => {
   });
 
   it('should launch a browser successfully', async () => {
-    const mockPage = { close: jest.fn() };
-    const mockBrowser = { newPage: jest.fn().mockResolvedValue(mockPage), close: mockClose };
+    const mockPage = {
+      close: jest.fn(),
+      isClosed: jest.fn().mockReturnValue(false),
+    };
+    const mockBrowser = {
+      newPage: jest.fn().mockResolvedValue(mockPage),
+      close: mockClose,
+      isConnected: jest.fn().mockReturnValue(true),
+    };
     mockLaunch.mockResolvedValue(mockBrowser);
 
     await browserService.launch();
@@ -45,8 +56,16 @@ describe('Playwright Browser Service', () => {
   });
 
   it('should close the browser successfully', async () => {
-    const mockBrowser = { close: mockClose };
+    const mockPage = {
+      close: jest.fn(),
+      isClosed: jest.fn().mockReturnValue(false),
+    };
+    const mockBrowser = {
+      close: mockClose,
+      isConnected: jest.fn().mockReturnValue(true),
+    };
     browserService.browser = mockBrowser;
+    browserService.page = mockPage;
 
     await browserService.close();
 

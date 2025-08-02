@@ -1,4 +1,4 @@
-// /home/xush/Documents/prog/discord-youtube-bot/tests/integration/startup.test.js
+// /home/xush/Documents/prog/discord-bot/tests/integration/startup.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { DependencyContainer } from '../../src/infrastructure/dependency-container.js';
 import { Configuration } from '../../src/infrastructure/configuration.js';

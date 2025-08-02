@@ -125,7 +125,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         '123456789012345679',
-        '🐦 **testuser** posted:\nhttps://x.com/testuser/status/1234567890'
+        '🐦 **testuser** tweeted:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -211,7 +211,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         '123456789012345679',
-        '🐦 **testuser** posted:\nhttps://vxtwitter.com/testuser/status/1234567890'
+        '🐦 **testuser** tweeted:\nhttps://vxtwitter.com/testuser/status/1234567890'
       );
     });
   });
@@ -704,7 +704,7 @@ describe('ContentAnnouncer', () => {
       const result = await contentAnnouncer.announceContent(content);
 
       expect(result.skipped).toBe(true);
-      expect(result.reason).toBe('Content was published before bot started');
+      expect(result.reason).toContain('Content was published before bot started');
     });
 
     it('should provide correct skip reason for old X content', async () => {

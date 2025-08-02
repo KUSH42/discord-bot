@@ -3,7 +3,7 @@
  * All operations are performed in UTC to avoid timezone issues
  */
 
-import { nowUTC } from './utc-time.js';
+import { nowUTC } from '../utilities/utc-time.js';
 
 /**
  * Parse relative time strings (e.g., "1 hour ago", "2 days ago") into Date objects

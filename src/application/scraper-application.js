@@ -1,8 +1,8 @@
-import { DuplicateDetector } from '../duplicate-detector.js';
 import { delay } from '../utils/delay.js';
 import { nowUTC, toISOStringUTC, daysAgoUTC } from '../utilities/utc-time.js';
 import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+import { getBrowserTweetHelperFunctions } from '../utilities/browser-tweet-helpers.js';
 
 /**
  * X (Twitter) scraping application orchestrator
@@ -11,13 +11,13 @@ import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 export class ScraperApplication {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
+    this.contentCoordinator = dependencies.contentCoordinator;
     this.classifier = dependencies.contentClassifier;
-    this.announcer = dependencies.contentAnnouncer;
     this.config = dependencies.config;
     this.state = dependencies.stateManager;
     this.discord = dependencies.discordService;
     this.eventBus = dependencies.eventBus;
-    this.authManager = dependencies.authManager;
+    this.xAuthManager = dependencies.xAuthManager;
     this.delay = dependencies.delay || delay;
 
     // Create enhanced logger for this module
@@ -30,23 +30,20 @@ export class ScraperApplication {
 
     // Scraper configuration
     this.xUser = this.config.getRequired('X_USER_HANDLE');
-    this.twitterUsername = this.config.getRequired('TWITTER_USERNAME');
-    this.twitterPassword = this.config.getRequired('TWITTER_PASSWORD');
 
     // Polling configuration
     this.minInterval = parseInt(this.config.get('X_QUERY_INTERVAL_MIN', '300000'), 10);
     this.maxInterval = parseInt(this.config.get('X_QUERY_INTERVAL_MAX', '600000'), 10);
 
-    // State management - accept duplicateDetector dependency
-    this.duplicateDetector =
-      dependencies.duplicateDetector ||
-      new DuplicateDetector(
-        dependencies.persistentStorage,
-        dependencies.logger?.child({ service: 'DuplicateDetector' })
-      );
+    // Use injected duplicate detector service
+    this.duplicateDetector = dependencies.duplicateDetector;
+    if (!this.duplicateDetector) {
+      throw new Error('DuplicateDetector dependency is required but not provided');
+    }
     this.isRunning = false;
     this.timerId = null;
     this.currentSession = null;
+    this.retryCount = 0;
 
     // Statistics
     this.stats = {
@@ -59,26 +56,6 @@ export class ScraperApplication {
       lastError: null,
     };
     this.nextPollTimestamp = null;
-
-    // Debug logging sampling configuration to prevent Discord spam
-    this.debugSamplingRate = parseFloat(this.config.get('X_DEBUG_SAMPLING_RATE', '0.1')); // 10% default
-    this.verboseLogSamplingRate = parseFloat(this.config.get('X_VERBOSE_LOG_SAMPLING_RATE', '0.05')); // 5% default
-  }
-
-  /**
-   * Check if debug logging should be sampled to reduce Discord spam
-   * @returns {boolean} True if debug logging should occur
-   */
-  shouldLogDebug() {
-    return Math.random() < this.debugSamplingRate;
-  }
-
-  /**
-   * Check if verbose logging should be sampled to reduce Discord spam
-   * @returns {boolean} True if verbose logging should occur
-   */
-  shouldLogVerbose() {
-    return Math.random() < this.verboseLogSamplingRate;
   }
 
   /**
@@ -92,10 +69,14 @@ export class ScraperApplication {
 
     const operation = this.logger.startOperation('startScraperApplication', {
       xUser: this.xUser,
+      xUsername: this.xUsername,
       pollingInterval: { min: this.minInterval, max: this.maxInterval },
     });
 
     try {
+      // Test enhanced logging is working
+      operation.progress('Enhanced logging system is operational - you should see this message');
+
       operation.progress('Initializing browser for X scraping');
       await this.initializeBrowser();
 
@@ -299,7 +280,7 @@ export class ScraperApplication {
       }
 
       // Check browser health
-      if (this.browser && this.browser.isConnected()) {
+      if (this.browser && this.browser.isHealthy && this.browser.isHealthy()) {
         health.browserHealthy = true;
       } else {
         health.errors.push('Browser not available or closed');
@@ -308,9 +289,8 @@ export class ScraperApplication {
       // Check authentication status
       if (health.browserHealthy) {
         try {
-          const authStatus = await this.authManager.isAuthenticated();
-          health.authenticated = authStatus;
-          if (!authStatus) {
+          health.authenticated = await this.xAuthManager.isAuthenticated();
+          if (!health.authenticated) {
             health.errors.push('Authentication verification failed');
           }
         } catch (error) {
@@ -357,6 +337,52 @@ export class ScraperApplication {
   }
 
   /**
+   * Sort tweets by timestamp (oldest to newest) for chronological processing
+   * @param {Array} tweets - Array of tweet objects
+   * @returns {Array} Sorted tweets array
+   */
+  sortTweetsByTimestamp(tweets) {
+    if (!Array.isArray(tweets) || tweets.length === 0) {
+      return tweets;
+    }
+
+    return tweets.sort((a, b) => {
+      // Handle missing timestamps by putting them at the end
+      if (!a.timestamp && !b.timestamp) {
+        return 0;
+      }
+      if (!a.timestamp) {
+        return 1;
+      }
+      if (!b.timestamp) {
+        return -1;
+      }
+
+      try {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+
+        // Invalid dates go to the end
+        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) {
+          return 0;
+        }
+        if (isNaN(dateA.getTime())) {
+          return 1;
+        }
+        if (isNaN(dateB.getTime())) {
+          return -1;
+        }
+
+        // Sort oldest to newest (ascending)
+        return dateA.getTime() - dateB.getTime();
+      } catch (error) {
+        this.logger.debug(`Error sorting tweets by timestamp: ${error.message}`);
+        return 0;
+      }
+    });
+  }
+
+  /**
    * Delay helper function
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise<void>}
@@ -389,7 +415,7 @@ export class ScraperApplication {
       await this.browser.setUserAgent(userAgent);
 
       operation.success('Browser initialized for X scraping', {
-        userAgent: `${userAgent.substring(0, 50)}...`,
+        userAgent: `${userAgent.substring(0, 120)}...`,
       });
     } catch (error) {
       operation.error(error, 'Failed to initialize browser');
@@ -418,42 +444,6 @@ export class ScraperApplication {
       operation.error(error, 'Failed to close browser');
       throw error;
     }
-  }
-
-  /**
-   * Login to X (Twitter)
-   * @returns {Promise<void>}
-   */
-  async loginToX() {
-    const operation = this.logger.startOperation('loginToX', {
-      xUser: this.xUser,
-    });
-
-    try {
-      operation.progress('Delegating to AuthManager for X login');
-      const result = await this.authManager.login();
-      operation.success('X login completed via AuthManager');
-      return result;
-    } catch (error) {
-      operation.error(error, 'X login failed');
-      throw error;
-    }
-  }
-
-  /**
-   * Clicks the "Next" button during login
-   * @returns {Promise<boolean>}
-   */
-  async clickNextButton() {
-    return this.authManager.clickNextButton();
-  }
-
-  /**
-   * Clicks the "Log in" button
-   * @returns {Promise<boolean>}
-   */
-  async clickLoginButton() {
-    return this.authManager.clickLoginButton();
   }
 
   /**
@@ -498,6 +488,8 @@ export class ScraperApplication {
       this.timerId = null;
       this.nextPollTimestamp = null;
     }
+    // Reset retry count when stopping
+    this.retryCount = 0;
   }
 
   /**
@@ -526,22 +518,47 @@ export class ScraperApplication {
    * Schedule retry after error
    */
   scheduleRetry() {
-    const retryInterval = Math.min(this.maxInterval, this.minInterval * 2);
+    // ✅ FIX: Clear existing timer before creating new one to prevent timer multiplication
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+
+    // Initialize retry count if not exists
+    if (!this.retryCount) {
+      this.retryCount = 0;
+    }
+
+    // ✅ FIX: Add retry limit to prevent infinite recursion and OOM
+    const MAX_RETRIES = 5;
+    if (this.retryCount >= MAX_RETRIES) {
+      this.logger.error(`Max retries (${MAX_RETRIES}) exceeded, stopping scraper to prevent resource exhaustion`);
+      this.stop().catch(error => {
+        this.logger.error('Error stopping scraper after max retries:', error);
+      });
+      return;
+    }
+
+    this.retryCount++;
+    const retryInterval = Math.min(this.maxInterval, this.minInterval * Math.pow(2, this.retryCount - 1));
     this.nextPollTimestamp = Date.now() + retryInterval;
+
     this.timerId = setTimeout(async () => {
       if (!this.isRunning) {
         return;
       }
       try {
         await this.pollXProfile();
-        this.scheduleNextPoll(); // Resume normal scheduling on success
+        // ✅ Success: Reset retry count and resume normal scheduling
+        this.retryCount = 0;
+        this.scheduleNextPoll();
       } catch (error) {
-        this.logger.error('Unhandled error in scheduled retry, rescheduling:', error);
-        this.scheduleRetry(); // Continue retry on failure
+        this.logger.error(`Retry attempt ${this.retryCount}/${MAX_RETRIES} failed:`, error);
+        this.scheduleRetry(); // Continue retry with incremented counter
       }
     }, retryInterval);
 
-    this.logger.info(`Retry scheduled in ${retryInterval}ms`);
+    this.logger.info(`Retry ${this.retryCount}/${MAX_RETRIES} scheduled in ${retryInterval}ms`);
   }
 
   /**
@@ -575,72 +592,110 @@ export class ScraperApplication {
       operation.progress('Verifying authentication before polling');
       await this.verifyAuthentication();
 
-      operation.progress('Navigating to X search page');
+      // ========================================================================
+      // CRITICAL IMPLEMENTATION NOTE: TWO-STEP APPROACH IS MANDATORY
+      // ========================================================================
+      // 1. ADVANCED SEARCH: Get posts AUTHORED by the user (excludes retweets)
+      //    - Uses "from:username" search to find only original posts
+      //    - This is the primary method for detecting new content
+      //
+      // 2. PROFILE TIMELINE: Get ONLY retweets (everything else already covered)
+      //    - Retweets don't appear in "from:username" search results
+      //    - Profile timeline includes both posts AND retweets
+      //    - We filter to process only retweets to avoid duplicates
+      //
+      // DO NOT CHANGE THIS TO USE ONLY ONE METHOD - IT WILL MISS CONTENT
+      // ========================================================================
+
+      operation.progress('STEP 1: Using advanced search for user-authored posts');
       const searchUrl = this.generateSearchUrl(true);
+      operation.progress(`Navigating to search URL: ${searchUrl}`);
       await this.browser.goto(searchUrl);
 
-      operation.progress('Waiting for content to load');
-      const contentSelectors = [
-        'article[data-testid="tweet"]',
-        'article[role="article"]',
-        'div[data-testid="cellInnerDiv"]',
-        'main[role="main"]',
-      ];
-
-      let contentLoaded = false;
-      for (const selector of contentSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          contentLoaded = true;
-          break;
-        } catch {
-          continue;
-        }
+      // Check if we got redirected to home page (login required)
+      const currentUrl = await this.browser.getCurrentUrl();
+      if (currentUrl.includes('/home') || currentUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Authentication failed: redirected to home page instead of search results`),
+          'Redirected to home page - search aborted',
+          { expectedUrl: searchUrl, actualUrl: currentUrl }
+        );
+        throw new Error('Authentication required: redirected to home page');
       }
 
-      if (!contentLoaded) {
-        operation.progress('No content selectors found, proceeding anyway');
+      operation.progress('Waiting for search results to load');
+      await this.browser.waitForSelector('[data-testid="primaryColumn"]', { timeout: 10000 });
+
+      // Additional wait for tweet content to load dynamically
+      operation.progress('Waiting for tweet content to load');
+      try {
+        // Wait for either articles to appear or "No results" message
+        await Promise.race([
+          this.browser.waitForSelector('article[data-testid="tweet"]', { timeout: 5000 }),
+          this.browser.waitForSelector('[data-testid="emptyState"]', { timeout: 5000 }),
+          new Promise(resolve => setTimeout(resolve, 3000)), // 3s fallback timeout
+        ]);
+      } catch (_waitError) {
+        operation.progress('Content wait timeout, proceeding with extraction');
       }
 
-      operation.progress('Scrolling to load additional content');
-      for (let i = 0; i < 3; i++) {
-        /* eslint-disable no-undef */
-        await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        /* eslint-enable no-undef */
-        await this.delay(3000);
+      operation.progress('Extracting tweets from search results');
+      const searchTweets = await this.extractTweets();
+
+      // Validate we're on the correct page before processing results
+      const finalUrl = await this.browser.getCurrentUrl();
+      if (finalUrl.includes('/home') || finalUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Invalid page detected during extraction: on home page instead of search results`),
+          'Home page detected during tweet extraction - aborting',
+          { expectedPattern: 'search?q=', actualUrl: finalUrl }
+        );
+        throw new Error('Invalid page: extracted tweets from home page instead of search');
       }
 
-      operation.progress('Extracting tweets from page');
-      const tweets = await this.extractTweets();
-      this.stats.totalTweetsFound += tweets.length;
+      this.stats.totalTweetsFound += searchTweets.length;
 
-      operation.progress('Filtering for new tweets only');
-      const newTweets = await this.filterNewTweets(tweets);
+      // Enhanced logging for debugging intermittent detection
+      if (searchTweets.length === 0) {
+        const currentUrl = (await this.browser.getUrl?.()) || 'unknown';
+        operation.progress(`No tweets found on search page. URL: ${currentUrl}`);
+      } else {
+        operation.progress(`Found ${searchTweets.length} tweets on search page`);
+      }
 
-      operation.progress(`Processing ${newTweets.length} new tweets`);
-      if (newTweets.length > 0) {
-        for (const tweet of newTweets) {
+      // Sort tweets by timestamp (oldest to newest) for chronological processing
+      const sortedSearchTweets = this.sortTweetsByTimestamp(searchTweets);
+      this.logger.debug(`Sorted ${sortedSearchTweets.length} search tweets by timestamp (oldest to newest)`);
+
+      operation.progress(
+        `Processing ${sortedSearchTweets.length} tweets from search (ContentCoordinator will handle filtering)`
+      );
+      let processedCount = 0;
+      if (sortedSearchTweets.length > 0) {
+        for (const tweet of sortedSearchTweets) {
           try {
             await this.processNewTweet(tweet);
-            this.stats.totalTweetsAnnounced++;
+            processedCount++;
           } catch (error) {
             this.logger.error(`Error processing tweet ${tweet.tweetID}:`, error);
           }
         }
       }
+      this.stats.totalTweetsAnnounced += processedCount;
+
+      // STEP 2: Enhanced retweet detection (MANDATORY - DO NOT SKIP)
+      operation.progress('STEP 2: Performing enhanced retweet detection from profile timeline');
+      await this.performEnhancedRetweetDetection();
 
       this.stats.successfulRuns++;
 
       // Emit poll completion event
       this.eventBus.emit('scraper.poll.completed', {
         timestamp: nowUTC(),
-        tweetsFound: tweets.length,
-        newTweets: newTweets.length,
+        tweetsFound: searchTweets.length,
+        tweetsProcessed: processedCount,
         stats: this.getStats(),
       });
-
-      operation.progress('Performing enhanced retweet detection');
-      await this.performEnhancedRetweetDetection();
 
       const nextInterval = this.getNextInterval();
       const nextRunTime = new Date(Date.now() + nextInterval);
@@ -652,8 +707,8 @@ export class ScraperApplication {
       });
 
       operation.success('X profile polling completed successfully', {
-        tweetsFound: tweets.length,
-        newTweets: newTweets.length,
+        tweetsFound: sortedSearchTweets.length,
+        tweetsProcessed: processedCount,
         nextRunInMs: nextInterval,
         nextRunTime: nextRunTimeFormatted,
       });
@@ -678,8 +733,24 @@ export class ScraperApplication {
   }
 
   /**
-   * Performs a separate check for retweets by navigating to the user's profile.
-   * This is designed to catch retweets that might be missed by the standard search.
+   * CRITICAL: Enhanced retweet detection from profile timeline
+   *
+   * ========================================================================
+   * PURPOSE: ONLY detect and process RETWEETS that are missed by search
+   * ========================================================================
+   *
+   * WHY THIS EXISTS:
+   * - Advanced search (from:username) only returns original posts, NOT retweets
+   * - User retweets are important content that must be announced
+   * - Profile timeline contains both original posts AND retweets
+   *
+   * FILTERING STRATEGY:
+   * - Process ALL content from profile timeline (posts + retweets)
+   * - Duplicate detection will automatically skip posts already processed from search
+   * - Only truly new content (primarily retweets) will be announced
+   *
+   * DO NOT MODIFY THIS TO SKIP RETWEETS OR CHANGE THE APPROACH
+   *
    * @returns {Promise<void>}
    */
   async performEnhancedRetweetDetection() {
@@ -697,40 +768,86 @@ export class ScraperApplication {
       operation.progress('Navigating to user profile timeline for retweet detection');
       await this.navigateToProfileTimeline(this.xUser);
 
-      operation.progress('Extracting tweets from profile page');
-      const tweets = await this.extractTweets();
+      // Verify we're on the correct user profile page
+      const currentUrl = (await this.browser.getCurrentUrl?.()) || 'unknown';
+      const expectedProfileUrl = `https://x.com/${this.xUser}`;
 
-      operation.progress(`Filtering ${tweets.length} potential retweets`);
-      const newTweets = await this.filterNewTweets(tweets);
+      // Check for home page redirect first (authentication issue)
+      if (currentUrl.includes('/home') || currentUrl.includes('twitter.com/home')) {
+        operation.error(
+          new Error(`Authentication failed: redirected to home page instead of user profile`),
+          'Redirected to home page during profile navigation',
+          { expectedUrl: expectedProfileUrl, actualUrl: currentUrl }
+        );
+        throw new Error('Authentication required: redirected to home page during profile access');
+      }
 
-      operation.progress(`Processing ${newTweets.length} new tweets from enhanced detection`);
-      let processedCount = 0;
-      let skippedCount = 0;
+      if (!currentUrl.includes(`x.com/${this.xUser}`) && !currentUrl.includes(`twitter.com/${this.xUser}`)) {
+        operation.error(
+          new Error(`Navigation failed: Expected ${expectedProfileUrl}, but got ${currentUrl}`),
+          'URL verification failed - not on correct user profile',
+          { expectedUrl: expectedProfileUrl, actualUrl: currentUrl }
+        );
+        return;
+      }
 
-      for (const tweet of newTweets) {
-        // Reduce debug frequency for tweet checking
-        if (this.shouldLogDebug()) {
-          this.logger.debug(`Checking tweet ${tweet.tweetID}, category: ${tweet.tweetCategory}`);
+      operation.progress(`URL verification passed: on ${this.xUser} profile (${currentUrl})`);
+
+      // Wait for timeline to load
+      await this.delay(2500);
+
+      // CRITICAL FIX: Extract recent tweets BEFORE scrolling to prevent replacement
+      operation.progress('Extracting recent tweets from initial timeline view');
+      const recentTweets = await this.extractTweets();
+      operation.progress(`Found ${recentTweets.length} recent tweets in initial view`);
+
+      // Then perform enhanced scrolling to load older content
+      operation.progress('Performing enhanced scrolling to load additional timeline content');
+      await this.performEnhancedScrolling();
+
+      // Extract additional tweets loaded by scrolling
+      operation.progress('Extracting additional tweets after scrolling');
+      const additionalTweets = await this.extractTweets();
+      operation.progress(`Found ${additionalTweets.length} tweets after scrolling`);
+
+      // Merge tweets and deduplicate by tweetID to prevent duplicates
+      const allTweets = [...recentTweets];
+      const seenTweetIds = new Set(recentTweets.map(t => t.tweetID));
+
+      for (const tweet of additionalTweets) {
+        if (!seenTweetIds.has(tweet.tweetID)) {
+          allTweets.push(tweet);
+          seenTweetIds.add(tweet.tweetID);
         }
-        if (await this.isNewContent(tweet)) {
-          this.logger.info(`✅ Found new tweet to process: ${tweet.url} (${tweet.tweetCategory})`);
+      }
+
+      operation.progress(
+        `Merged ${recentTweets.length} recent + ${additionalTweets.length - (additionalTweets.length - (allTweets.length - recentTweets.length))} additional tweets = ${allTweets.length} total unique tweets`
+      );
+      const tweets = allTweets;
+
+      // Sort tweets by timestamp (oldest to newest) for chronological processing
+      const sortedTweets = this.sortTweetsByTimestamp(tweets);
+      this.logger.debug(`Sorted ${sortedTweets.length} profile tweets by timestamp (oldest to newest)`);
+
+      operation.progress(
+        `Processing ${sortedTweets.length} tweets from enhanced detection (ContentCoordinator will handle filtering)`
+      );
+      let processedCount = 0;
+
+      for (const tweet of sortedTweets) {
+        this.logger.debug(`Processing tweet ${tweet.tweetID}, category: ${tweet.tweetCategory || 'unknown'}`);
+        try {
           await this.processNewTweet(tweet);
-          this.stats.totalTweetsAnnounced++;
           processedCount++;
-        } else {
-          // Reduce frequency of old tweet skip logs
-          if (this.shouldLogVerbose()) {
-            this.logger.debug(`Skipping tweet ${tweet.tweetID} as it is old.`);
-          }
-          skippedCount++;
+        } catch (error) {
+          this.logger.error(`Error processing tweet ${tweet.tweetID}:`, error);
         }
       }
 
       operation.success('Enhanced retweet detection completed', {
-        totalTweetsFound: tweets.length,
-        newTweetsFound: newTweets.length,
+        totalTweetsFound: sortedTweets.length,
         tweetsProcessed: processedCount,
-        tweetsSkipped: skippedCount,
       });
     } catch (error) {
       operation.error(error, 'Error during enhanced retweet detection', {
@@ -741,172 +858,233 @@ export class ScraperApplication {
   }
 
   /**
-   * Extract tweets from current page
+   * Extract tweets from current page (streamlined)
    * @returns {Promise<Array>} Array of tweet objects
    */
   async extractTweets() {
+    const currentUrl = (await this.browser.getCurrentUrl?.()) || 'unknown';
     const operation = this.logger.startOperation('extractTweets', {
       xUser: this.xUser,
-      pageUrl: 'current_page',
+      pageUrl: currentUrl,
     });
 
-    const monitoredUser = this.xUser; // Pass the monitored user to browser context
+    this.logger.info(`Extracting tweets from URL: ${currentUrl} (expected user: ${this.xUser})`);
+
+    const { xUser } = this; // Pass the monitored user to browser context
     try {
-      operation.progress('Executing tweet extraction script in browser context');
-      const result = await this.browser.evaluate(monitoredUser => {
-        /* eslint-disable no-undef */
+      operation.progress('Injecting helper functions into browser context');
+      await this.browser.evaluate(getBrowserTweetHelperFunctions());
+
+      operation.progress('Executing streamlined tweet extraction script');
+      const result = await this.browser.evaluate(xUser => {
+        /* eslint-disable no-undef, no-console */
         const tweets = [];
 
-        // Try multiple selectors for tweet articles (X keeps changing these)
-        const articleSelectors = [
-          'article[data-testid="tweet"]',
-          'article[role="article"]',
-          'div[data-testid="cellInnerDiv"] article',
-          'article',
-        ];
+        // Enhanced error handling for selector evolution (moved to helper function)
+        function robustQuerySelector(selectors, context = document) {
+          for (const selector of selectors) {
+            try {
+              const elements = context.querySelectorAll(selector);
+              if (elements.length > 0) {
+                console.log(`SUCCESS: Using selector "${selector}" found ${elements.length} elements`);
+                return elements;
+              }
+            } catch (error) {
+              console.log(`FAILED: Selector "${selector}" error:`, error.message);
+            }
+          }
+          return [];
+        }
 
-        let articles = [];
-        for (const selector of articleSelectors) {
-          articles = document.querySelectorAll(selector);
-          if (articles.length > 0) {
-            break;
+        // Use helper function to find articles
+        let { articles, workingSelector } = window.findTweetArticles
+          ? window.findTweetArticles()
+          : (() => {
+              const articleSelectors = [
+                'article[data-testid="tweet"]',
+                'div[data-testid="cellInnerDiv"] article',
+                'article[role="article"]',
+                'article[tabindex="-1"]',
+                'article',
+              ];
+              const foundArticles = robustQuerySelector(articleSelectors);
+              return { articles: foundArticles, workingSelector: foundArticles.length > 0 ? 'robust-selection' : null };
+            })();
+
+        // Handle case where no articles found with debugging
+        if (articles.length === 0) {
+          window.debugNoArticlesFound && window.debugNoArticlesFound();
+
+          console.log('DEBUG: No articles found - checking fallback selectors');
+          const fallbackArticles = window.tryFallbackSelectors ? window.tryFallbackSelectors() : [];
+
+          if (fallbackArticles.length > 0) {
+            articles = fallbackArticles;
+            workingSelector = 'fallback';
+          } else {
+            return tweets;
           }
         }
 
-        if (articles.length === 0) {
-          return tweets;
-        }
-
+        // Process each article to extract basic tweet data
         for (const article of articles) {
           try {
-            // Extract tweet URL with multiple selectors
-            const linkSelectors = ['a[href*="/status/"]', 'time[datetime] + a', 'a[role="link"][href*="/status/"]'];
-
-            let tweetLink = null;
-            for (const selector of linkSelectors) {
-              tweetLink = article.querySelector(selector);
-              if (tweetLink) {
-                break;
-              }
-            }
-
-            if (!tweetLink) {
+            // Extract basic tweet information using helper functions
+            const tweetUrl = window.extractTweetUrl ? window.extractTweetUrl(article) : null;
+            if (!tweetUrl) {
               continue;
             }
 
-            const url = tweetLink.href;
-            const tweetIdMatch = url.match(/status\/(\d+)/);
+            const tweetIdMatch = tweetUrl.match(/status\/(\d+)/);
             if (!tweetIdMatch) {
               continue;
             }
 
             const tweetID = tweetIdMatch[1];
 
-            // Extract author with multiple selectors
-            const authorSelectors = [
-              '[data-testid="User-Name"] a',
-              '[data-testid="User-Names"] a',
-              'a[role="link"][href^="/"]',
-              'div[dir="ltr"] span',
-            ];
+            // Extract author and social context using helper functions
+            const authorData = window.extractAuthorInfo
+              ? window.extractAuthorInfo(article, tweetUrl)
+              : { author: 'Unknown', authorDisplayName: null, retweetedBy: null };
 
-            let author = 'Unknown';
-            for (const selector of authorSelectors) {
-              const authorElement = article.querySelector(selector);
-              if (authorElement && authorElement.textContent.trim()) {
-                author = authorElement.textContent.trim();
-                break;
-              }
+            const { author, authorDisplayName, retweetedBy } = authorData;
+
+            // CRITICAL: Validate author matches monitored user
+            // Skip tweets that aren't from our monitored user (posts/quotes/replies)
+            // or retweeted by our monitored user (retweets)
+            const isFromXUser = author === xUser;
+            const isRetweetByXUser = retweetedBy === xUser;
+
+            if (!isFromXUser && !isRetweetByXUser) {
+              console.log(
+                `SKIP: Tweet ${tweetID} - author '${author}' (retweetedBy: '${retweetedBy}') doesn't match monitored user '${xUser}'`
+              );
+              continue;
             }
 
-            // Extract text content with multiple selectors
-            const textSelectors = ['[data-testid="tweetText"]', '[lang] span', 'div[dir="ltr"]', 'span[dir="ltr"]'];
+            // Extract text content using helper function
+            const text = window.extractTweetText
+              ? window.extractTweetText(article)
+              : (article.querySelector('[data-testid="tweetText"]')?.innerText || '').trim();
 
-            let text = '';
-            for (const selector of textSelectors) {
-              const textElement = article.querySelector(selector);
-              if (textElement && textElement.innerText) {
-                text = textElement.innerText;
-                break;
-              }
-            }
+            // Extract timestamp using helper function
+            const timestamp = window.extractTimestamp
+              ? window.extractTimestamp(article)
+              : article.querySelector('time')?.getAttribute('datetime') || null;
 
-            // Extract timestamp
-            const timeElement = article.querySelector('time');
-            const timestamp = timeElement ? timeElement.getAttribute('datetime') : null;
-
-            // Determine tweet category
-            let tweetCategory = 'Post';
-
-            // Check for reply indicators
-            let isReply = text.startsWith('@');
-            if (!isReply) {
-              // Check for "Replying to" text content in the article
-              const allText = article.innerText || '';
-              isReply = allText.includes('Replying to') || allText.includes('Show this thread');
-            }
-
-            if (isReply) {
-              tweetCategory = 'Reply';
-            }
-
-            // Check for quote tweet
-            const quoteTweetBlock = article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]');
-            if (quoteTweetBlock && quoteTweetBlock.href !== url) {
-              tweetCategory = 'Quote';
-            }
-
-            // Check for retweet - enhanced detection with author comparison
-            let isRetweet = false;
-
-            // Method 1: Check if author is different from monitored user
-            if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
-              isRetweet = true;
-            }
-
-            // Method 2: Check for social context element (modern retweet indicator)
-            if (!isRetweet) {
-              const socialContext = article.querySelector('[data-testid="socialContext"]');
-              if (socialContext && socialContext.innerText.includes('reposted')) {
-                isRetweet = true;
-              }
-            }
-
-            // Method 3: Check for classic RT @ pattern
-            if (!isRetweet && text.startsWith('RT @')) {
-              isRetweet = true;
-            }
-
-            if (isRetweet) {
-              tweetCategory = 'Retweet';
-            }
-
-            tweets.push({
+            // Store raw data for ContentClassifier processing - no inline classification
+            const tweetData = {
               tweetID,
-              url,
+              url: tweetUrl,
               author,
+              authorDisplayName,
               text,
               timestamp,
-              tweetCategory,
-            });
+              // Remove inline classification - let ContentClassifier handle this
+              rawClassificationData: {
+                socialContext: article.querySelector('[data-testid="socialContext"]')?.innerText || null,
+                quoteTweetBlock: !!article.querySelector('div[role="link"][tabindex="0"] a[href*="/status/"]'),
+                retweetedBy,
+                xUser,
+                allText: article.innerText || '',
+                // Provide raw DOM data for ContentClassifier
+                articleHtml: article.outerHTML,
+              },
+            };
+
+            // Add retweetedBy if detected
+            if (retweetedBy === xUser) {
+              tweetData.retweetedBy = xUser;
+            }
+
+            tweets.push(tweetData);
+            // Successfully extracted tweet data
           } catch (_err) {
-            // console.error('Error extracting tweet:', _err);
+            // Error extracting tweet (caught and handled)
           }
+        }
+
+        // Tweet extraction completed
+        console.log(`DEBUG: Extraction completed with selector "${workingSelector}", found ${tweets.length} tweets`);
+        if (tweets.length > 0) {
+          console.log(
+            `DEBUG: Sample tweet IDs: ${tweets
+              .slice(0, 3)
+              .map(t => t.tweetID)
+              .join(', ')}`
+          );
         }
         return tweets;
         /* eslint-enable no-undef */
-      }, monitoredUser);
+      }, xUser);
 
       // Ensure we always return an array, even if browser.evaluate returns undefined
       const tweets = Array.isArray(result) ? result : [];
 
-      operation.success('Tweet extraction completed', {
+      // Create breakdown by category for better logging
+      const stats = {
         tweetsFound: tweets.length,
-        categories: tweets.reduce((acc, tweet) => {
-          acc[tweet.tweetCategory] = (acc[tweet.tweetCategory] || 0) + 1;
-          return acc;
-        }, {}),
-      });
+        breakdown: {
+          post: 0,
+          reply: 0,
+          quote: 0,
+          retweet: 0,
+          unknown: 0,
+        },
+      };
+
+      // Classify tweets for logging breakdown
+      for (const tweet of tweets) {
+        try {
+          const classificationInput = {
+            author: tweet.author,
+            xUser: this.xUser,
+            retweetedBy: tweet.retweetedBy,
+            ...tweet.rawClassificationData,
+          };
+
+          this.logger.debug(
+            `Classifying tweet ${tweet.tweetID}: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}..."`
+          );
+
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
+          const category = classification.type || 'unknown';
+
+          this.logger.debug(
+            `Tweet ${tweet.tweetID} classified as: ${category}, full result: ${JSON.stringify(classification, null, 1).replace(/\n/g, '')}`
+          );
+
+          if (stats.breakdown[category] !== undefined) {
+            stats.breakdown[category]++;
+          } else {
+            stats.breakdown.unknown++;
+          }
+        } catch (error) {
+          this.logger.debug(`Classification failed for tweet ${tweet.tweetID}: ${error.message}`);
+          stats.breakdown.unknown++;
+        }
+      }
+
+      operation.success(`Tweet extraction completed: ${JSON.stringify(stats, null, 1).replace(/\n/g, '')}`);
+
+      // Enhanced logging for debugging intermittent detection in both Step 1 and Step 2
+      if (tweets.length === 0) {
+        const currentUrl = (await this.browser.getUrl?.()) || 'unknown';
+        operation.progress(`No tweets extracted from page. URL: ${currentUrl}`);
+      } else {
+        operation.progress(`Successfully extracted ${tweets.length} tweets from page`);
+      }
+
+      // Log browser console messages for debugging selector issues
+      try {
+        const browserLogs = (await this.browser.getConsoleLogs?.()) || [];
+        const debugLogs = browserLogs.filter(log => log.text && log.text.includes('DEBUG:'));
+        if (debugLogs.length > 0) {
+          operation.progress(`Browser debug messages: ${debugLogs.map(log => log.text).join(' | ')}`);
+        }
+      } catch (_logError) {
+        // Browser console logging not available or failed
+      }
 
       return tweets;
     } catch (error) {
@@ -920,104 +1098,6 @@ export class ScraperApplication {
   }
 
   /**
-   * Filter tweets to only include new ones
-   * @param {Array} tweets - All extracted tweets
-   * @returns {Promise<Array>} New tweets only
-   */
-  async filterNewTweets(tweets) {
-    const operation = this.logger.startOperation('filterNewTweets', {
-      totalTweets: tweets.length,
-    });
-
-    const newTweets = [];
-    let duplicateCount = 0;
-    let oldContentCount = 0;
-
-    try {
-      operation.progress(`Processing ${tweets.length} tweets for filtering`);
-
-      for (const tweet of tweets) {
-        if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
-          // Mark as seen immediately to prevent future duplicates
-          this.duplicateDetector.markAsSeen(tweet.url);
-
-          // Check if tweet is new enough based on bot start time
-          if (await this.isNewContent(tweet)) {
-            newTweets.push(tweet);
-            this.logger.verbose(`Added new tweet: ${tweet.tweetID} - ${tweet.text.substring(0, 50)}...`);
-          } else {
-            oldContentCount++;
-            // Reduce frequency of old tweet filtering logs
-            this.logger.verbose(`Filtered out old tweet: ${tweet.tweetID} - timestamp: ${tweet.timestamp}`);
-          }
-        } else {
-          duplicateCount++;
-          // Reduce frequency of duplicate filtering logs
-          this.logger.verbose(`Filtered out duplicate tweet: ${tweet.tweetID}`);
-        }
-      }
-
-      operation.success('Tweet filtering completed', {
-        newTweets: newTweets.length,
-        duplicates: duplicateCount,
-        oldContent: oldContentCount,
-        filterEfficiency: Math.round(((duplicateCount + oldContentCount) / tweets.length) * 100),
-      });
-
-      return newTweets;
-    } catch (error) {
-      operation.error(error, 'Error filtering tweets');
-      return [];
-    }
-  }
-
-  /**
-   * Check if content is new enough to announce
-   * Uses duplicate detection and reasonable time windows instead of strict bot startup time
-   * @param {Object} tweet - Tweet object
-   * @returns {Promise<boolean>} True if content is new
-   */
-  async isNewContent(tweet) {
-    const announceOldTweets = this.config.getBoolean('ANNOUNCE_OLD_TWEETS', false);
-
-    // If configured to announce old tweets, consider all tweets as new
-    if (announceOldTweets) {
-      this.logger.debug(`ANNOUNCE_OLD_TWEETS=true, considering tweet ${tweet.tweetID} as new`);
-      return true;
-    }
-
-    // Check: Have we seen this tweet before? (Primary duplicate detection)
-    if (tweet.url && (await this.duplicateDetector.isDuplicate(tweet.url))) {
-      this.logger.debug(`Tweet ${tweet.tweetID} already known (duplicate), not new`);
-      return false;
-    }
-
-    // Check: Is the content too old based on configurable backoff duration?
-    const backoffHours = this.config.get('MAX_CONTENT_AGE_HOURS', '2'); // Default 2 hours
-    const backoffMs = parseInt(backoffHours) * 60 * 60 * 1000;
-    const cutoffTime = new Date(Date.now() - backoffMs);
-
-    if (tweet.timestamp) {
-      const tweetTime = new Date(tweet.timestamp);
-      if (tweetTime < cutoffTime) {
-        this.logger.debug(
-          `Tweet ${tweet.tweetID} is too old (${tweetTime.toISOString()} < ${cutoffTime.toISOString()}), not new`
-        );
-        return false;
-      }
-    }
-
-    // If no timestamp available, assume it's new (but will be caught by duplicate detection if seen again)
-    if (!tweet.timestamp) {
-      this.logger.debug(`No timestamp for tweet ${tweet.tweetID}, considering as new`);
-      return true;
-    }
-
-    this.logger.debug(`Tweet ${tweet.tweetID} passed all checks, considering as new`);
-    return true;
-  }
-
-  /**
    * Check if enhanced retweet processing should be enabled
    * @returns {boolean} True if retweet processing is enabled
    */
@@ -1026,106 +1106,126 @@ export class ScraperApplication {
   }
 
   /**
-   * Process a new tweet
-   * @param {Object} tweet - Tweet object
+   * Process a new tweet (streamlined to delegate to ContentCoordinator)
+   * @param {Object} tweet - Tweet object with raw classification data
    * @returns {Promise<void>}
    */
   async processNewTweet(tweet) {
     const operation = this.logger.startOperation('processNewTweet', {
       tweetId: tweet.tweetID,
       author: tweet.author,
-      category: tweet.tweetCategory,
-      monitoredUser: this.xUser,
+      xUser: this.xUser,
     });
 
     try {
-      // Prepare metadata for classification
-      const metadata = {
-        timestamp: tweet.timestamp,
-        author: tweet.author,
-        monitoredUser: this.xUser,
-      };
+      // Determine if this is a retweet by checking retweetedBy field
+      const isRetweet = tweet.retweetedBy === this.xUser;
 
-      // Add retweet metadata if available from enhanced detection
-      if (tweet.retweetMetadata) {
-        metadata.isRetweet = tweet.tweetCategory === 'Retweet';
-        metadata.retweetDetection = tweet.retweetMetadata;
+      // For retweets, use current time as publishedAt (when the monitored user retweeted)
+      // This ensures retweets are checked against MAX_CONTENT_AGE based on retweet time, not original tweet time
+      // For original posts, use the original timestamp
+      const publishedAt = isRetweet ? nowUTC().toISOString() : tweet.timestamp;
+
+      if (isRetweet) {
+        operation.progress(
+          `Retweet detected: Using current time (${publishedAt}) instead of original timestamp (${tweet.timestamp}) for MAX_CONTENT_AGE comparison`
+        );
       }
 
-      operation.progress('Classifying tweet content');
-      // Check if this is a retweet based on author comparison (bypass classifier)
-      let classification;
-      if (
-        tweet.tweetCategory === 'Retweet' &&
-        tweet.author !== this.xUser &&
-        tweet.author !== `@${this.xUser}` &&
-        tweet.author !== 'Unknown'
-      ) {
-        // Bypass classifier for author-based retweets - send directly to retweet channel
-        classification = {
-          type: 'retweet',
-          confidence: 0.99,
-          platform: 'x',
-          details: {
-            statusId: tweet.tweetID,
-            author: tweet.author,
-            detectionMethod: 'author-based',
-          },
-        };
-      } else {
-        // Use classifier for other tweets
-        classification = this.classifier.classifyXContent(tweet.url, tweet.text, metadata);
-      }
-
-      operation.progress('Creating content object for announcement');
-      // Create content object for announcement
+      // Create streamlined content object - let ContentCoordinator handle classification
       const content = {
         platform: 'x',
-        type: classification.type,
+        type: 'post', // ContentClassifier will determine actual type
         id: tweet.tweetID,
         url: tweet.url,
-        author: classification.type === 'retweet' ? this.xUser : tweet.author,
-        originalAuthor: tweet.author, // Store original author for retweets
+        author: tweet.author,
+        authorDisplayName: tweet.authorDisplayName,
+        retweetedBy: tweet.retweetedBy,
         text: tweet.text,
-        timestamp: tweet.timestamp,
-        isOld: !(await this.isNewContent(tweet)),
+        timestamp: tweet.timestamp, // Original tweet timestamp (preserved for reference)
+        publishedAt, // Retweet time for retweets, original time for posts
+        originalPublishedAt: tweet.timestamp, // Always preserve the original timestamp
+        // Pass raw classification data for ContentClassifier
+        rawClassificationData: tweet.rawClassificationData,
+        xUser: this.xUser,
       };
 
-      operation.progress('Announcing content to Discord');
-      const result = await this.announcer.announceContent(content);
-
-      operation.progress('Marking tweet as seen to prevent reprocessing');
+      const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
       if (tweet.url) {
         this.duplicateDetector.markAsSeen(tweet.url);
       }
 
-      // Emit tweet processed event
+      // Emit processing event for monitoring
       this.eventBus.emit('scraper.tweet.processed', {
         tweet: content,
-        classification,
         result,
         timestamp: nowUTC(),
       });
 
-      if (result.success) {
-        operation.success(`Announced ${classification.type} from @${tweet.author}`, {
+      // Log result based on ContentCoordinator response
+      if (result.action === 'announced') {
+        const authorInfo = tweet.retweetedBy ? `@${tweet.retweetedBy}` : `@${tweet.author}`;
+        operation.success(`Successfully processed content from ${authorInfo}`, {
           tweetId: tweet.tweetID,
-          classificationType: classification.type,
-          announcementResult: result,
+          result: result.reason || 'announced',
         });
-      } else if (result.skipped) {
-        operation.success(`Skipped ${classification.type} - ${result.reason}`, {
-          tweetId: tweet.tweetID,
-          skipReason: result.reason,
-        });
-      } else {
+      } else if (result.action === 'skip') {
+        // Get tweet category for enhanced logging
+        let category = 'unknown';
+        try {
+          const classificationInput = {
+            author: tweet.author,
+            xUser: this.xUser,
+            retweetedBy: tweet.retweetedBy,
+            ...tweet.rawClassificationData,
+          };
+
+          this.logger.debug(
+            `Classifying tweet for logging: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}..."`
+          );
+
+          const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
+          category = classification.type || 'unknown';
+
+          this.logger.debug(`Classification result: ${JSON.stringify(classification, null, 1).replace(/\n/g, '')}`);
+        } catch (error) {
+          this.logger.debug(`Classification failed: ${error.message}`);
+          // Keep default category if classification fails
+        }
+
+        // Get first 50 characters of tweet text
+        const textPreview = (tweet.text || '').substring(0, 120);
+        const textSuffix = (tweet.text || '').length > 50 ? '...' : '';
+
+        operation.success(
+          `Skipping content: ${category} too old - published ${tweet.timestamp}\n${textPreview}${textSuffix}`,
+          {
+            tweetId: tweet.tweetID,
+            skipReason: result.reason,
+            publishedAt: tweet.timestamp,
+            category,
+            textPreview: `${textPreview}${textSuffix}`,
+          }
+        );
+      } else if (result.action === 'failed') {
         operation.error(
-          new Error(result.reason || 'Unknown announcement failure'),
-          `Failed to announce ${classification.type}`,
+          new Error(result.reason || 'ContentCoordinator processing failed'),
+          'Content processing failed',
           {
             tweetId: tweet.tweetID,
             author: tweet.author,
-            classificationType: classification.type,
+            reason: result.reason,
+          }
+        );
+      } else {
+        // Handle unexpected result format
+        operation.error(
+          new Error(`Unexpected ContentCoordinator result: ${JSON.stringify(result, null, 1).replace(/\n/g, '')}`),
+          'Unexpected processing result format',
+          {
+            tweetId: tweet.tweetID,
+            author: tweet.author,
+            result: JSON.stringify(result),
           }
         );
       }
@@ -1133,90 +1233,7 @@ export class ScraperApplication {
       operation.error(error, `Error processing tweet ${tweet.tweetID}`, {
         tweetId: tweet.tweetID,
         author: tweet.author,
-        category: tweet.tweetCategory,
       });
-      throw error;
-    }
-  }
-
-  /**
-   * Handle email verification screen
-   * @returns {Promise<void>}
-   */
-  async handleEmailVerification() {
-    try {
-      this.logger.info('Handling email verification screen...');
-
-      // Get email from configuration
-      const email = this.config.get('TWITTER_EMAIL') || this.config.get('TWITTER_USERNAME');
-      if (!email || !email.includes('@')) {
-        this.logger.warn('No valid email found in configuration for email verification');
-        throw new Error('Email verification required but no email configured');
-      }
-
-      // Look for email input field - X uses a generic text input for email/phone
-      const emailInputSelectors = [
-        'input[data-testid="ocfEnterTextTextInput"]', // X's email verification input
-        'input[name="text"]', // Fallback generic text input
-        'input[name="email"]',
-        'input[type="email"]',
-        'input[placeholder*="email" i]',
-      ];
-
-      let emailInput = null;
-      for (const selector of emailInputSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          emailInput = selector;
-          this.logger.debug(`Found email input with selector: ${selector}`);
-          break;
-        } catch {
-          this.logger.debug(`Email input selector failed: ${selector}`);
-          continue;
-        }
-      }
-
-      if (!emailInput) {
-        this.logger.warn('Could not find email input field, proceeding anyway');
-        return;
-      }
-
-      // Enter email
-      await this.browser.type(emailInput, email);
-      this.logger.info(`Entered email: ${email}`);
-
-      // Look for and click continue/next button
-      const continueButtonSelectors = [
-        'div[role="button"]:has-text("Next")',
-        'button:has-text("Next")',
-        'div[role="button"]:has-text("Continue")',
-        'button:has-text("Continue")',
-        '[data-testid="ocf_submit_button"]',
-        'button[type="submit"]',
-      ];
-
-      let continueClicked = false;
-      for (const selector of continueButtonSelectors) {
-        try {
-          await this.browser.waitForSelector(selector, { timeout: 5000 });
-          await this.browser.click(selector);
-          this.logger.info(`Clicked continue button using selector: ${selector}`);
-          continueClicked = true;
-          break;
-        } catch {
-          this.logger.debug(`Continue button selector failed: ${selector}`);
-          continue;
-        }
-      }
-
-      if (!continueClicked) {
-        this.logger.warn('Could not find continue button after email entry');
-      }
-
-      // Wait a bit for the next screen to load
-      await this.delay(3000);
-    } catch (error) {
-      this.logger.error('Error handling email verification:', error.message);
       throw error;
     }
   }
@@ -1231,64 +1248,14 @@ export class ScraperApplication {
     });
 
     try {
-      operation.progress('Checking authentication status with AuthManager');
-      const isAuthenticated = await this.authManager.isAuthenticated();
-
-      if (isAuthenticated) {
-        operation.success('Authentication verified successfully', {
-          authStatus: 'valid',
-        });
-        return;
-      }
-
-      operation.progress('Authentication check failed, re-authenticating');
-      await this.ensureAuthenticated();
-      operation.success('Re-authentication completed after verification failure');
-    } catch (error) {
-      operation.error(error, 'Authentication verification failed, attempting recovery');
-
-      try {
-        operation.progress('Attempting recovery authentication after verification failure');
+      const isAuthenticated = await this.xAuthManager.isAuthenticated();
+      if (!isAuthenticated) {
+        operation.progress('Authentication check failed, re-authenticating');
         await this.ensureAuthenticated();
-        operation.success('Recovery authentication successful');
-      } catch (recoveryError) {
-        operation.error(recoveryError, 'Recovery authentication also failed');
-        throw recoveryError;
       }
-    }
-  }
-
-  /**
-   * Refresh authentication cookies
-   * @returns {Promise<void>}
-   */
-  async refreshAuth() {
-    const operation = this.logger.startOperation('refreshAuth', {
-      currentUrl: 'unknown',
-    });
-
-    try {
-      operation.progress('Navigating to X home page for session refresh');
-      await this.browser.goto('https://x.com/home');
-
-      operation.progress('Checking if user is still logged in');
-      const isLoggedIn = await this.browser.evaluate(() => {
-        /* eslint-disable no-undef */
-        return !document.querySelector('[data-testid="login"]');
-        /* eslint-enable no-undef */
-      });
-
-      if (!isLoggedIn) {
-        operation.progress('Authentication expired, performing full login');
-        await this.loginToX();
-      }
-
-      operation.success('Authentication refreshed successfully', {
-        wasLoggedIn: isLoggedIn,
-        actionTaken: isLoggedIn ? 'session_refresh' : 'full_login',
-      });
+      operation.success('Authentication verification completed');
     } catch (error) {
-      operation.error(error, 'Failed to refresh authentication');
+      operation.error(error, 'Authentication verification failed');
       throw error;
     }
   }
@@ -1324,13 +1291,107 @@ export class ScraperApplication {
    * @returns {Promise<void>}
    */
   async performEnhancedScrolling() {
+    this.logger.debug('Starting enhanced scrolling for comprehensive content loading');
+
     // Scroll down multiple times to load more content for retweet detection
-    for (let i = 0; i < 5; i++) {
-      /* eslint-disable no-undef */
-      await this.browser.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      /* eslint-enable no-undef */
-      await this.delay(1500); // Wait for content to load
+    // Increased iterations and improved timing for better content loading
+    for (let i = 0; i < 3; i++) {
+      try {
+        // Check if page context is still valid before evaluating
+        if (!this.browser.page || this.browser.page.isClosed()) {
+          this.logger.warn('Page context lost during scrolling, aborting');
+          return;
+        }
+
+        this.logger.debug(`Enhanced scroll iteration ${i + 1}/3: Scrolling to bottom`);
+
+        // Get current scroll position and tweet count before scrolling
+        /* eslint-disable no-undef */
+        const beforeScrollData = await this.browser.evaluate(() => {
+          return {
+            scrollHeight: document.body.scrollHeight,
+            scrollTop: window.pageYOffset,
+            tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+          };
+        });
+        /* eslint-enable no-undef */
+
+        /* eslint-disable no-undef */
+        await this.browser.evaluate(() => {
+          // Smooth scroll to bottom instead of instant jump
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth',
+          });
+        });
+        /* eslint-enable no-undef */
+
+        // Wait longer for content to load and network requests to complete
+        await this.delay(2500); // Increased from 1500ms to 2500ms
+
+        // Check if new content was actually loaded
+        /* eslint-disable no-undef */
+        const afterScrollData = await this.browser.evaluate(() => {
+          return {
+            scrollHeight: document.body.scrollHeight,
+            scrollTop: window.pageYOffset,
+            tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+          };
+        });
+        /* eslint-enable no-undef */
+
+        const newTweets = afterScrollData.tweetCount - beforeScrollData.tweetCount;
+        const scrollHeightChanged = afterScrollData.scrollHeight > beforeScrollData.scrollHeight;
+
+        this.logger.debug(
+          `Scroll ${i + 1} results: ${newTweets} new tweets loaded, scroll height changed: ${scrollHeightChanged}`
+        );
+
+        // If no new content loaded after scroll, wait a bit longer and try once more
+        if (!scrollHeightChanged && newTweets === 0 && i < 7) {
+          this.logger.debug('No new content detected, waiting longer for potential lazy loading');
+          await this.delay(3000); // Extra wait for lazy loading
+
+          // Check again after extended wait
+          /* eslint-disable no-undef */
+          const finalCheck = await this.browser.evaluate(() => {
+            return {
+              scrollHeight: document.body.scrollHeight,
+              tweetCount: document.querySelectorAll('article[data-testid="tweet"]').length,
+            };
+          });
+          /* eslint-enable no-undef */
+
+          if (
+            finalCheck.tweetCount === beforeScrollData.tweetCount &&
+            finalCheck.scrollHeight === beforeScrollData.scrollHeight
+          ) {
+            this.logger.debug('No new content after extended wait, may have reached end of timeline');
+            // Continue with remaining scrolls in case there's more content
+          }
+        }
+
+        // Additional wait between scrolls to avoid overwhelming the page
+        if (i < 7) {
+          await this.delay(1000);
+        }
+      } catch (error) {
+        if (
+          error.message.includes('Execution context was destroyed') ||
+          error.message.includes('Target closed') ||
+          error.message.includes('Page closed')
+        ) {
+          this.logger.warn(`Page navigation interrupted scrolling at step ${i + 1}`, { error: error.message });
+          return; // Gracefully exit instead of failing
+        }
+        this.logger.warn(`Error during scroll iteration ${i + 1}:`, error.message);
+        // Continue with next iteration instead of throwing
+      }
     }
+
+    // Final wait to ensure all lazy-loaded content is fully rendered
+    this.logger.debug('Enhanced scrolling completed, final wait for content stabilization');
+    await this.delay(2000);
   }
 
   /**
@@ -1340,55 +1401,52 @@ export class ScraperApplication {
    */
   async navigateToProfileTimeline(username) {
     const profileUrl = `https://x.com/${username}`;
+    this.logger.info(`Navigating to profile timeline: ${profileUrl} (username: ${username})`);
     await this.browser.goto(profileUrl);
 
     // Wait for timeline to load
     await this.browser.waitForSelector('[data-testid="primaryColumn"]');
 
-    // Perform deeper scrolling for retweets
-    await this.performEnhancedScrolling();
+    // Additional wait for tweet content to load dynamically on profile page
+    try {
+      // Wait for either articles to appear or profile content to load
+      await Promise.race([
+        this.browser.waitForSelector('article[data-testid="tweet"]', { timeout: 5000 }),
+        this.browser.waitForSelector('[aria-label*="Timeline"]', { timeout: 5000 }),
+        new Promise(resolve => setTimeout(resolve, 3000)), // 3s fallback timeout
+      ]);
+    } catch (_waitError) {
+      // Continue even if wait fails - some profiles may be empty
+    }
+
+    // Brief delay to ensure page is fully stabilized before scrolling
+    await this.delay(500);
+
+    // Perform deeper scrolling for retweets with error handling
+    try {
+      await this.performEnhancedScrolling();
+    } catch (error) {
+      this.logger.warn('Enhanced scrolling failed, continuing without it', {
+        username,
+        error: error.message,
+      });
+      // Don't throw - this is not critical to the scraping process
+    }
   }
 
   /**
-   * Ensure user is authenticated (alias for loginToX)
+   * Ensure user is authenticated
    * @returns {Promise<void>}
    */
   async ensureAuthenticated(options = {}) {
-    const defaultOptions = {
-      maxRetries: 3,
-      baseDelay: 2000,
-      ...options,
-    };
-
-    try {
-      await this.authManager.ensureAuthenticated(defaultOptions);
-    } catch (err) {
-      this.logger.error('Authentication failed after all retry attempts:', err);
-      throw err;
-    }
+    return this.xAuthManager.ensureAuthenticated(options);
   }
 
   /**
-   * Validate cookie format
-   * @param {Array} cookies - Array of cookie objects
-   * @returns {boolean} True if cookies are valid
+   * Helper functions for tweet extraction (to be moved to browser context if needed)
+   * These functions can be injected into the browser context for cleaner extraction
    */
-  validateCookieFormat(cookies) {
-    if (!cookies || !Array.isArray(cookies) || cookies.length === 0) {
-      return false;
-    }
 
-    return cookies.every(cookie => {
-      return (
-        cookie && typeof cookie === 'object' && typeof cookie.name === 'string' && typeof cookie.value === 'string'
-      );
-    });
-  }
-
-  /**
-   * Dispose of resources
-   * @returns {Promise<void>}
-   */
   /**
    * Generate X search URL
    * @param {boolean} includeDate - Whether to include the since date parameter
@@ -1422,6 +1480,16 @@ export class ScraperApplication {
     });
 
     try {
+      this.logger.info('Initializing with recent content to prevent old post announcements...');
+
+      // First, scan Discord channels for already announced content to avoid duplicates
+      const discordScanResults = await this.scanDiscordChannelsForContent();
+      let markedAsSeen = discordScanResults.totalMarked;
+      this.logger.info(
+        `Discord channel scan: marked ${discordScanResults.totalMarked} content items from ${discordScanResults.channelsScanned} unique channels`
+      );
+
+      // Then navigate to user's profile to get recent content from X directly
       operation.progress('Navigating to user profile for recent content scan');
       await this.navigateToProfileTimeline(this.xUser);
 
@@ -1429,7 +1497,6 @@ export class ScraperApplication {
       const tweets = await this.extractTweets();
 
       operation.progress(`Marking recent tweets as seen within ${initializationHours}h window`);
-      let markedAsSeen = 0;
       for (const tweet of tweets) {
         // Only mark tweets that are within our initialization window
         const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
@@ -1437,7 +1504,7 @@ export class ScraperApplication {
         if (tweetTime && tweetTime >= cutoffTime) {
           // Mark as seen by adding to duplicate detector
           if (tweet.url) {
-            this.duplicateDetector.markAsSeen(tweet.url);
+            await this.duplicateDetector.markAsSeen(tweet.url);
             markedAsSeen++;
             this.logger.debug(`Marked tweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
           }
@@ -1453,8 +1520,8 @@ export class ScraperApplication {
             const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
 
             if (tweetTime && tweetTime >= cutoffTime && tweet.url) {
-              if (!this.duplicateDetector.isDuplicate(tweet.url)) {
-                this.duplicateDetector.markAsSeen(tweet.url);
+              if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
+                await this.duplicateDetector.markAsSeen(tweet.url);
                 markedAsSeen++;
                 this.logger.debug(`Marked retweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
               }
@@ -1478,6 +1545,120 @@ export class ScraperApplication {
       });
       // Don't throw - this is a best-effort initialization
     }
+  }
+
+  /**
+   * Scan Discord channels for already announced content to mark as seen
+   * Prevents duplicate announcements by checking Discord channel history
+   * @returns {Promise<Object>} Scan results with channelsScanned and totalMarked counts
+   */
+  async scanDiscordChannelsForContent() {
+    const results = {
+      channelsScanned: 0,
+      totalMarked: 0,
+      errors: [],
+    };
+
+    try {
+      if (!this.discord?.client) {
+        this.logger.warn('Discord client not available for channel scanning');
+        return results;
+      }
+
+      // Get unique channel IDs to scan (avoid duplicates)
+      const channelIds = this.getUniqueDiscordChannelIds();
+      this.logger.info(`Scanning ${channelIds.length} unique Discord channels for existing content...`);
+
+      // Scan limit per channel (configurable)
+      const scanLimit = parseInt(this.config.get('DISCORD_SCAN_LIMIT', '200'), 10);
+
+      for (const channelId of channelIds) {
+        try {
+          const channel = await this.discord.client.channels.fetch(channelId);
+          if (!channel) {
+            this.logger.warn(`Could not fetch Discord channel ${channelId}`);
+            continue;
+          }
+
+          this.logger.debug(`Scanning Discord channel ${channelId} (${channel.name || 'unnamed'}) for X content...`);
+
+          // Scan for tweet URLs
+          const tweetScanResults = await this.duplicateDetector.scanDiscordChannelForTweets(channel, scanLimit);
+          results.totalMarked += tweetScanResults.tweetIdsAdded;
+          results.channelsScanned++;
+
+          this.logger.debug(
+            `Channel ${channelId}: found ${tweetScanResults.tweetIdsFound.length} tweets, marked ${tweetScanResults.tweetIdsAdded} new ones`
+          );
+
+          if (tweetScanResults.errors.length > 0) {
+            results.errors.push({
+              channelId,
+              type: 'tweet_scan_errors',
+              errors: tweetScanResults.errors,
+            });
+          }
+
+          // Rate limiting between channels
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          this.logger.warn(`Error scanning Discord channel ${channelId}:`, error.message);
+          results.errors.push({
+            channelId,
+            type: 'channel_access_error',
+            message: error.message,
+          });
+        }
+      }
+
+      this.logger.info(
+        `Discord channel scan complete: ${results.channelsScanned} channels scanned, ${results.totalMarked} content items marked as seen`
+      );
+    } catch (error) {
+      this.logger.error('Error during Discord channel scanning:', error);
+      results.errors.push({
+        type: 'general_scan_error',
+        message: error.message,
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get unique Discord channel IDs to prevent scanning the same channel multiple times
+   * @returns {Array<string>} Array of unique channel IDs
+   */
+  getUniqueDiscordChannelIds() {
+    const channelIds = new Set();
+
+    // Add X-related channels (these are the ones that would have X content)
+    const xPostsChannelId = this.config.get('DISCORD_X_POSTS_CHANNEL_ID');
+    const xRepliesChannelId = this.config.get('DISCORD_X_REPLIES_CHANNEL_ID');
+    const xQuotesChannelId = this.config.get('DISCORD_X_QUOTES_CHANNEL_ID');
+    const xRetweetsChannelId = this.config.get('DISCORD_X_RETWEETS_CHANNEL_ID');
+
+    if (xPostsChannelId) {
+      channelIds.add(xPostsChannelId);
+    }
+    if (xRepliesChannelId) {
+      channelIds.add(xRepliesChannelId);
+    }
+    if (xQuotesChannelId) {
+      channelIds.add(xQuotesChannelId);
+    }
+    if (xRetweetsChannelId) {
+      channelIds.add(xRetweetsChannelId);
+    }
+
+    // If retweets channel not configured, it defaults to posts channel (already added above)
+
+    this.logger.debug(
+      `Identified ${channelIds.size} unique Discord channels for X content scanning:`,
+      Array.from(channelIds)
+    );
+
+    return Array.from(channelIds);
   }
 
   async dispose() {

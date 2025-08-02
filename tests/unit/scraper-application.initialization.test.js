@@ -83,7 +83,9 @@ describe('ScraperApplication Initialization', () => {
     mockDependencies = {
       browserService: mockBrowserService,
       contentClassifier: mockClassifier,
-      contentAnnouncer: mockAnnouncer,
+      contentCoordinator: {
+        processContent: jest.fn().mockResolvedValue({ action: 'announced' }),
+      },
       config: mockConfig,
       stateManager: mockStateManager,
       discordService: {},
@@ -91,7 +93,15 @@ describe('ScraperApplication Initialization', () => {
       logger: mockLogger,
       debugManager: mockDebugManager,
       metricsManager: mockMetricsManager,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
+      duplicateDetector: (() => {
+        const seenUrls = new Set();
+        return {
+          isDuplicate: jest.fn().mockImplementation(url => seenUrls.has(url)),
+          markAsSeen: jest.fn().mockImplementation(url => seenUrls.add(url)),
+          getStats: jest.fn().mockReturnValue({ totalSeen: 0, totalChecked: 0 }),
+        };
+      })(),
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
@@ -264,60 +274,5 @@ describe('ScraperApplication Initialization', () => {
     });
   });
 
-  describe('isNewContent with improved logic', () => {
-    it('should return false for already known tweets', async () => {
-      const tweet = {
-        tweetID: '1234567890123456789',
-        timestamp: new Date().toISOString(),
-        url: 'https://x.com/testuser/status/1234567890123456789',
-      };
-
-      // Mark tweet as seen
-      scraperApp.duplicateDetector.markAsSeen('https://x.com/testuser/status/1234567890123456789');
-
-      expect(await scraperApp.isNewContent(tweet)).toBe(false);
-    });
-
-    it('should return false for very old tweets', async () => {
-      const oldDate = new Date(timestampUTC() - 8 * 24 * 60 * 60 * 1000); // 8 days ago
-      const tweet = { tweetID: '1111111111111111111', timestamp: oldDate.toISOString() };
-
-      expect(await scraperApp.isNewContent(tweet)).toBe(false);
-    });
-
-    it('should return true for recent unknown tweets', async () => {
-      const recentDate = new Date(timestampUTC() - 90 * 60 * 1000); // 1.5 hours ago (within 2h backoff)
-      const tweet = { tweetID: '2222222222222222222', timestamp: recentDate.toISOString() };
-
-      expect(await scraperApp.isNewContent(tweet)).toBe(true);
-    });
-
-    it('should be permissive for tweets during bot startup period', async () => {
-      const botStartTime = new Date();
-      const tweetBeforeStart = new Date(botStartTime.getTime() - 30 * 60 * 1000); // 30 mins before bot start
-
-      mockStateManager.get.mockReturnValue(botStartTime);
-
-      const tweet = { tweetID: '3333333333333333333', timestamp: tweetBeforeStart.toISOString() };
-
-      // Should be permissive since bot just started
-      expect(await scraperApp.isNewContent(tweet)).toBe(true);
-    });
-
-    it('should respect ANNOUNCE_OLD_TWEETS setting', async () => {
-      mockConfig.getBoolean.mockImplementation(key => {
-        if (key === 'ANNOUNCE_OLD_TWEETS') {
-          return true;
-        }
-        return false;
-      });
-
-      const veryOldTweet = {
-        tweetID: '4444444444444444444',
-        timestamp: new Date(timestampUTC() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-      };
-
-      expect(await scraperApp.isNewContent(veryOldTweet)).toBe(true);
-    });
-  });
+  // NOTE: isNewContent method was removed as redundant - ContentStateManager.isNewContent now handles all content age filtering
 });

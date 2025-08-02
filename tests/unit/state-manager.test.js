@@ -285,8 +285,9 @@ describe('StateManager', () => {
     });
 
     it('should handle unsubscribing non-existent key gracefully', () => {
-      stateManager.unsubscribe('nonExistent', mockCallback1);
-      // Should not throw
+      expect(() => {
+        stateManager.unsubscribe('nonExistent', mockCallback1);
+      }).not.toThrow();
     });
 
     it('should handle unsubscribing non-existent callback gracefully', () => {

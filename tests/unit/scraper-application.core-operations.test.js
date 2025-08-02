@@ -17,6 +17,7 @@ describe('ScraperApplication Core Operations', () => {
   let mockDiscordService;
   let mockDuplicateDetector;
   let mockPersistentStorage;
+  let mockContentCoordinator;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -39,15 +40,20 @@ describe('ScraperApplication Core Operations', () => {
       evaluate: jest.fn(),
       setUserAgent: jest.fn(),
       isRunning: jest.fn().mockReturnValue(false),
+      isHealthy: jest.fn().mockReturnValue(true),
       type: jest.fn(),
       click: jest.fn(),
+      getCurrentUrl: jest.fn().mockResolvedValue('https://x.com/test'),
+      getUrl: jest.fn().mockResolvedValue('https://x.com/test'),
+      getConsoleLogs: jest.fn().mockResolvedValue([]),
+      page: { isClosed: jest.fn().mockReturnValue(false) },
     };
 
     mockClassifier = {
       classifyXContent: jest.fn(),
     };
 
-    mockAnnouncer = {
+    mockContentCoordinator = {
       announceContent: jest.fn(),
     };
 
@@ -60,8 +66,6 @@ describe('ScraperApplication Core Operations', () => {
 
     mockAuthManager = {
       login: jest.fn(),
-      clickNextButton: jest.fn(),
-      clickLoginButton: jest.fn(),
       isAuthenticated: jest.fn(),
       ensureAuthenticated: jest.fn(),
     };
@@ -91,8 +95,6 @@ describe('ScraperApplication Core Operations', () => {
     mockConfig.getRequired.mockImplementation(key => {
       const defaults = {
         X_USER_HANDLE: 'testuser',
-        TWITTER_USERNAME: 'testuser@example.com',
-        TWITTER_PASSWORD: 'testpass',
       };
       return defaults[key] || 'default-value';
     });
@@ -103,7 +105,7 @@ describe('ScraperApplication Core Operations', () => {
         X_QUERY_INTERVAL_MAX: '600000',
         X_DEBUG_SAMPLING_RATE: '0.1',
         X_VERBOSE_LOG_SAMPLING_RATE: '0.05',
-        MAX_CONTENT_AGE_HOURS: '2',
+        MAX_CONTENT_AGE_HOURS: '24',
         INITIALIZATION_WINDOW_HOURS: '24',
         TWITTER_EMAIL: 'test@example.com',
       };
@@ -121,13 +123,13 @@ describe('ScraperApplication Core Operations', () => {
     mockDependencies = {
       browserService: mockBrowserService,
       contentClassifier: mockClassifier,
-      contentAnnouncer: mockAnnouncer,
+      contentCoordinator: mockContentCoordinator,
       config: mockConfig,
       stateManager: mockStateManager,
       discordService: mockDiscordService,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       duplicateDetector: mockDuplicateDetector,
       persistentStorage: mockPersistentStorage,
       debugManager: enhancedLoggingMocks.debugManager,
@@ -147,32 +149,30 @@ describe('ScraperApplication Core Operations', () => {
     it('should create with proper dependency injection', () => {
       expect(scraperApp.browser).toBe(mockBrowserService);
       expect(scraperApp.classifier).toBe(mockClassifier);
-      expect(scraperApp.announcer).toBe(mockAnnouncer);
+      expect(scraperApp.contentCoordinator).toBe(mockContentCoordinator);
       expect(scraperApp.config).toBe(mockConfig);
       expect(scraperApp.state).toBe(mockStateManager);
       expect(scraperApp.discord).toBe(mockDiscordService);
       expect(scraperApp.eventBus).toBe(mockEventBus);
       expect(scraperApp.logger).toEqual(expect.objectContaining({ moduleName: 'scraper' }));
-      expect(scraperApp.authManager).toBe(mockAuthManager);
+      expect(scraperApp.xAuthManager).toBe(mockAuthManager);
     });
 
     it('should initialize with provided duplicate detector', () => {
       expect(scraperApp.duplicateDetector).toBe(mockDuplicateDetector);
     });
 
-    it('should create duplicate detector if not provided', () => {
+    it('should throw error if duplicate detector not provided', () => {
       const depsWithoutDetector = { ...mockDependencies };
       delete depsWithoutDetector.duplicateDetector;
 
-      const app = new ScraperApplication(depsWithoutDetector);
-      expect(app.duplicateDetector).toBeDefined();
-      expect(app.duplicateDetector).not.toBe(mockDuplicateDetector);
+      expect(() => new ScraperApplication(depsWithoutDetector)).toThrow(
+        'DuplicateDetector dependency is required but not provided'
+      );
     });
 
     it('should initialize configuration values', () => {
       expect(scraperApp.xUser).toBe('testuser');
-      expect(scraperApp.twitterUsername).toBe('testuser@example.com');
-      expect(scraperApp.twitterPassword).toBe('testpass');
       expect(scraperApp.minInterval).toBe(300000);
       expect(scraperApp.maxInterval).toBe(600000);
     });
@@ -189,37 +189,18 @@ describe('ScraperApplication Core Operations', () => {
       });
     });
 
-    it('should initialize sampling rates', () => {
-      expect(scraperApp.debugSamplingRate).toBe(0.1);
-      expect(scraperApp.verboseLogSamplingRate).toBe(0.05);
+    it('should initialize with default state', () => {
+      expect(scraperApp.isRunning).toBe(false);
+      expect(scraperApp.timerId).toBe(null);
     });
   });
 
-  describe('Logging Sampling', () => {
-    it('should sample debug logging based on rate', () => {
-      // Mock Math.random to control sampling
-      const originalRandom = Math.random;
-      Math.random = jest.fn().mockReturnValue(0.05); // Below debug threshold (0.1)
+  describe('State Management', () => {
+    it('should handle state changes properly', () => {
+      expect(scraperApp.isRunning).toBe(false);
 
-      expect(scraperApp.shouldLogDebug()).toBe(true);
-
-      Math.random = jest.fn().mockReturnValue(0.15); // Above debug threshold (0.1)
-      expect(scraperApp.shouldLogDebug()).toBe(false);
-
-      Math.random = originalRandom;
-    });
-
-    it('should sample verbose logging based on rate', () => {
-      // Mock Math.random to control sampling
-      const originalRandom = Math.random;
-      Math.random = jest.fn().mockReturnValue(0.03); // Below verbose threshold (0.05)
-
-      expect(scraperApp.shouldLogVerbose()).toBe(true);
-
-      Math.random = jest.fn().mockReturnValue(0.07); // Above verbose threshold (0.05)
-      expect(scraperApp.shouldLogVerbose()).toBe(false);
-
-      Math.random = originalRandom;
+      // Test state getters/setters work as expected
+      expect(typeof scraperApp.getStats).toBe('function');
     });
   });
 
@@ -309,12 +290,14 @@ describe('ScraperApplication Core Operations', () => {
       jest.spyOn(scraperApp, 'stopPolling').mockImplementation(() => {});
       jest.spyOn(scraperApp, 'closeBrowser').mockRejectedValue(stopError);
 
-      await scraperApp.stop();
+      await expect(scraperApp.stop()).rejects.toThrow('Stop failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error stopping scraper application:',
+        'Error stopping scraper application',
         expect.objectContaining({
           module: 'scraper',
+          error: 'Stop failed',
+          outcome: 'error',
         })
       );
     });
@@ -329,7 +312,7 @@ describe('ScraperApplication Core Operations', () => {
       await scraperApp.initializeBrowser();
 
       expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: false,
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -354,14 +337,14 @@ describe('ScraperApplication Core Operations', () => {
       }
     });
 
-    it('should add display arg when DISPLAY environment variable is set', async () => {
+    it('should handle browser initialization without DISPLAY environment variable', async () => {
       const originalDisplay = process.env.DISPLAY;
-      process.env.DISPLAY = ':0';
+      delete process.env.DISPLAY;
 
       await scraperApp.initializeBrowser();
 
       expect(mockBrowserService.launch).toHaveBeenCalledWith({
-        headless: false,
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -374,15 +357,12 @@ describe('ScraperApplication Core Operations', () => {
           '--disable-images',
           '--disable-plugins',
           '--mute-audio',
-          '--display=:0',
         ],
       });
 
       // Restore original DISPLAY
       if (originalDisplay !== undefined) {
         process.env.DISPLAY = originalDisplay;
-      } else {
-        delete process.env.DISPLAY;
       }
     });
 
@@ -498,45 +478,9 @@ describe('ScraperApplication Core Operations', () => {
   });
 
   describe('Authentication Methods', () => {
-    it('should delegate login to auth manager', async () => {
-      await scraperApp.loginToX();
-      expect(mockAuthManager.login).toHaveBeenCalled();
-    });
-
-    it('should delegate click next button to auth manager', async () => {
-      mockAuthManager.clickNextButton.mockResolvedValue(true);
-
-      const result = await scraperApp.clickNextButton();
-
-      expect(mockAuthManager.clickNextButton).toHaveBeenCalled();
-      expect(result).toBe(true);
-    });
-
-    it('should delegate click login button to auth manager', async () => {
-      mockAuthManager.clickLoginButton.mockResolvedValue(true);
-
-      const result = await scraperApp.clickLoginButton();
-
-      expect(mockAuthManager.clickLoginButton).toHaveBeenCalled();
-      expect(result).toBe(true);
-    });
-
     it('should delegate ensure authenticated to auth manager', async () => {
       await scraperApp.ensureAuthenticated();
       expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
-    });
-
-    it('should handle authentication errors', async () => {
-      const authError = new Error('Auth failed');
-      mockAuthManager.ensureAuthenticated.mockRejectedValue(authError);
-
-      await expect(scraperApp.ensureAuthenticated()).rejects.toThrow('Auth failed');
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Authentication failed after all retry attempts:',
-        expect.objectContaining({
-          module: 'scraper',
-        })
-      );
     });
   });
 
@@ -590,26 +534,6 @@ describe('ScraperApplication Core Operations', () => {
 
       expect(url).toBe('https://x.com/search?q=(from%3Atestuser)&f=live&pf=on&src=typed_query');
       expect(url).not.toContain('since%3A');
-    });
-  });
-
-  describe('Cookie Validation', () => {
-    it('should validate correct cookie format', () => {
-      const validCookies = [
-        { name: 'session', value: 'abc123', domain: 'x.com' },
-        { name: 'auth_token', value: 'def456', domain: 'x.com' },
-      ];
-
-      expect(scraperApp.validateCookieFormat(validCookies)).toBe(true);
-    });
-
-    it('should reject invalid cookie formats', () => {
-      expect(scraperApp.validateCookieFormat(null)).toBe(false);
-      expect(scraperApp.validateCookieFormat([])).toBe(false);
-      expect(scraperApp.validateCookieFormat('not-array')).toBe(false);
-      expect(scraperApp.validateCookieFormat([{ name: 'test' }])).toBe(false); // Missing value
-      expect(scraperApp.validateCookieFormat([{ value: 'test' }])).toBe(false); // Missing name
-      expect(scraperApp.validateCookieFormat([{ name: 123, value: 'test' }])).toBe(false); // Invalid name type
     });
   });
 

@@ -154,6 +154,16 @@ export class BrowserService {
   }
 
   /**
+   * Wait for a function to return truthy value
+   * @param {Function} fn - Function to evaluate in page context
+   * @param {Object} options - Wait options
+   * @returns {Promise<*>} Function result
+   */
+  async waitForFunction(_fn, _options = {}) {
+    throw new Error('Abstract method: waitForFunction must be implemented');
+  }
+
+  /**
    * Get page content/HTML
    * @returns {Promise<string>} Page HTML content
    */

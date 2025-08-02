@@ -1,14 +1,23 @@
 // /home/xush/Documents/prog/discord-youtube-bot/tests/unit/playwright-browser-service.test.js
 import { PlaywrightBrowserService } from '../../src/services/implementations/playwright-browser-service.js';
 import { jest } from '@jest/globals';
+import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 
 describe('PlaywrightBrowserService', () => {
   let browserService;
   let mockPage;
   let mockBrowser;
+  let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
 
   beforeEach(() => {
-    browserService = new PlaywrightBrowserService();
+    const loggerMocks = createEnhancedLoggerMocks();
+    mockLogger = loggerMocks.baseLogger;
+    mockDebugManager = loggerMocks.debugManager;
+    mockMetricsManager = loggerMocks.metricsManager;
+
+    browserService = new PlaywrightBrowserService(mockLogger, mockDebugManager, mockMetricsManager);
     mockPage = {
       goto: jest.fn(),
       waitForTimeout: jest.fn().mockResolvedValue(),

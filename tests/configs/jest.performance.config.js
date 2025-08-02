@@ -18,7 +18,12 @@ export default {
   },
 
   // Test discovery - only performance tests
-  testMatch: ['<rootDir>/tests/performance/**/*.test.js'],
+  testMatch: [
+    '<rootDir>/tests/unit/duplicate_detection.test.js',
+    '<rootDir>/tests/unit/infrastructure.configuration.test.js',
+    '<rootDir>/tests/unit/rate-limiting.test.js',
+    '<rootDir>/tests/unit/regex_pattern.test.js',
+  ],
 
   // Performance-specific settings
   testTimeout: 120000, // 2 minutes for performance tests
@@ -40,8 +45,27 @@ export default {
     '!src/setup/**',
   ],
 
-  coverageDirectory: 'coverage/performance',
-  coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageDirectory: 'coverage/performance-tests',
+  coverageReporters: ['text', 'json', 'html'],
+  coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
+
+  // Performance test reporters
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: 'test-results',
+        outputName: 'performance-tests.xml',
+        classNameTemplate: 'Performance.{classname}',
+        titleTemplate: '{title}',
+        ancestorSeparator: ' › ',
+        usePathForSuiteName: true,
+        addFileAttribute: true,
+        includeConsoleOutput: true,
+      },
+    ],
+  ],
 
   // No coverage thresholds for performance tests
   // They contribute to overall coverage but don't enforce minimums

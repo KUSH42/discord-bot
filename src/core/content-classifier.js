@@ -117,6 +117,22 @@ export class ContentClassifier {
       return true;
     }
 
+    // Check social context for reply indicators (most reliable for modern X/Twitter)
+    if (metadata && metadata.socialContext) {
+      const socialContext = metadata.socialContext.toLowerCase();
+      if (socialContext.includes('replying to') || socialContext.includes('reply to')) {
+        return true;
+      }
+    }
+
+    // Check all text content for reply indicators
+    if (metadata && metadata.allText) {
+      const fullText = metadata.allText.toLowerCase();
+      if (fullText.includes('replying to') || fullText.includes('reply to')) {
+        return true;
+      }
+    }
+
     // Check text patterns
     if (typeof text === 'string') {
       // Starts with @username pattern
@@ -141,12 +157,19 @@ export class ContentClassifier {
    */
   isRetweet(text, metadata) {
     // Primary check: Author-based detection (most reliable)
-    if (metadata && metadata.author && metadata.monitoredUser) {
+    if (metadata && metadata.author && metadata.xUser) {
       const { author } = metadata;
-      const { monitoredUser } = metadata;
+      const { xUser } = metadata;
 
       // If author differs from monitored user, it's a retweet
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
+        return true;
+      }
+    }
+
+    // Check retweetedBy field as backup detection method
+    if (metadata && metadata.retweetedBy && metadata.xUser) {
+      if (metadata.retweetedBy === metadata.xUser) {
         return true;
       }
     }
@@ -192,7 +215,20 @@ export class ContentClassifier {
       return true;
     }
 
-    // Check for embedded tweet URL pattern
+    // Check for quote tweet block from DOM analysis (most reliable for modern X/Twitter)
+    if (metadata && metadata.quoteTweetBlock === true) {
+      return true;
+    }
+
+    // Check for embedded tweet URL pattern in all text content
+    if (metadata && metadata.allText) {
+      const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
+      if (quoteTweetPattern.test(metadata.allText)) {
+        return true;
+      }
+    }
+
+    // Check for embedded tweet URL pattern in main text
     if (typeof text === 'string') {
       const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
       if (quoteTweetPattern.test(text)) {
@@ -212,8 +248,24 @@ export class ContentClassifier {
   getReplyIndicators(text, metadata) {
     const indicators = [];
 
-    if (metadata.inReplyTo) {
+    if (metadata && metadata.inReplyTo) {
       indicators.push(`Reply to ${metadata.inReplyTo}`);
+    }
+
+    // Check social context for reply indicators
+    if (metadata && metadata.socialContext) {
+      const socialContext = metadata.socialContext.toLowerCase();
+      if (socialContext.includes('replying to') || socialContext.includes('reply to')) {
+        indicators.push(`Social context: ${metadata.socialContext}`);
+      }
+    }
+
+    // Check all text content for reply indicators
+    if (metadata && metadata.allText) {
+      const fullText = metadata.allText.toLowerCase();
+      if (fullText.includes('replying to') || fullText.includes('reply to')) {
+        indicators.push('Contains reply text in full content');
+      }
     }
 
     if (typeof text === 'string') {
@@ -408,8 +460,22 @@ export class ContentClassifier {
   getQuoteIndicators(text, metadata) {
     const indicators = [];
 
-    if (metadata.quotedStatus) {
+    if (metadata && metadata.quotedStatus) {
       indicators.push('Has quoted status metadata');
+    }
+
+    // Check for quote tweet block from DOM analysis
+    if (metadata && metadata.quoteTweetBlock === true) {
+      indicators.push('Quote tweet block detected in DOM');
+    }
+
+    // Check for embedded tweet URL in all text content
+    if (metadata && metadata.allText) {
+      const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
+      const match = metadata.allText.match(quoteTweetPattern);
+      if (match) {
+        indicators.push(`Contains embedded tweet URL in full content: ${match[0]}`);
+      }
     }
 
     if (typeof text === 'string') {

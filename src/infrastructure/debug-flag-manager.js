@@ -131,11 +131,22 @@ export class DebugFlagManager {
    * @returns {boolean} True if message should be logged
    */
   shouldLog(module, messageLevel) {
+    // Always allow errors and warnings regardless of debug flag status
+    if (messageLevel <= 2) {
+      return true;
+    }
+
+    // For info level (3), allow it regardless of debug flag if module level permits
+    const moduleLevel = this.getLevel(module);
+    if (messageLevel === 3) {
+      return messageLevel <= moduleLevel;
+    }
+
+    // For debug and verbose (4-5), require debug flag to be enabled
     if (!this.isEnabled(module)) {
       return false;
     }
 
-    const moduleLevel = this.getLevel(module);
     return messageLevel <= moduleLevel;
   }
 
@@ -153,7 +164,7 @@ export class DebugFlagManager {
 
     this.stateManager.set('debugFlags', newFlags);
 
-    this.logger?.info('Debug flag changed', {
+    this.logger?.info(`Debug flag changed: ${module} ${enabled}`, {
       module,
       enabled,
       previousState: currentFlags[module],

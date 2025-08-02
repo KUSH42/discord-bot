@@ -1,0 +1,1215 @@
+name: Comprehensive Test Suite
+
+# Add permissions for GitHub Actions
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  packages: write
+
+on:
+  push:
+    branches:
+      #- 'master' # Production branch
+      #- 'develop' # Main development branch
+      #- 'dev' # Development branch
+      - '*'
+  #pull_request:
+    #branches:
+      # - '*' # PRs targeting any branch
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - e2e
+          - performance
+          - security
+
+env:
+  NODE_VERSION: '20'
+  CACHE_KEY_PREFIX: 'discord-bot-test'
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  # Pre-flight checks
+  pre-flight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      should-run-tests: ${{ steps.check.outputs.should-run }}
+      test-matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tests should run
+        id: check
+        run: |
+          set -e
+
+          # Validate inputs for security
+          if [[ "${{ github.event_name }}" == "push" ]] && [[ -n "${{ github.event.before }}" ]]; then
+            if ! [[ "${{ github.event.before }}" =~ ^[a-f0-9]{7,40}$ ]]; then
+              echo "Invalid before SHA format, running tests for safety"
+              echo "should-run=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Always run tests on PRs
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            # Run tests if relevant files changed
+            if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '\.(js|json|yml|yaml)$' >/dev/null 2>&1; then
+              echo "should-run=true" >> $GITHUB_OUTPUT
+            else
+              echo "should-run=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should-run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate test matrix
+        id: matrix
+        run: |
+          if [[ "${{ github.event.inputs.test_type }}" == "unit" ]]; then
+            echo 'matrix={"test-type": ["unit"]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.test_type }}" == "integration" ]]; then
+            echo 'matrix={"test-type": ["integration"]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.test_type }}" == "e2e" ]]; then
+            echo 'matrix={"test-type": ["e2e"]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.test_type }}" == "performance" ]]; then
+            echo 'matrix={"test-type": ["performance"]}' >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.test_type }}" == "security" ]]; then
+            echo 'matrix={"test-type": ["security"]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"test-type": ["unit", "integration", "e2e", "performance", "security"]}' >> $GITHUB_OUTPUT
+          fi
+
+  # Code quality and linting
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    if: needs.pre-flight.outputs.should-run-tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-lint-${{ hashFiles('**/package-lock.json') }}-v2
+          restore-keys: |
+            ${{ runner.os }}-lint-${{ hashFiles('**/package-lock.json') }}-v2
+            ${{ runner.os }}-lint-
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run ESLint
+        run: |
+          if [ -f eslint.config.mjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
+            npm run lint
+          else
+            echo "No ESLint configuration found, skipping lint check"
+          fi
+
+      - name: Run Prettier check
+        run: |
+          if [ -f .prettierrc ] || [ -f .prettierrc.json ]; then
+            npx prettier --check "**/*.{js,json,md,yml,yaml}"
+          else
+            echo "No Prettier configuration found, skipping format check"
+          fi
+
+      - name: Check for security vulnerabilities
+        run: npm audit --audit-level=moderate
+
+      - name: Validate package.json
+        run: npm ls --depth=0
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    needs: [pre-flight, lint]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'unit')
+    strategy:
+      matrix:
+        node-version: ['18', '20']
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Cache Jest
+        uses: actions/cache@v4
+        with:
+          path: .jest-cache
+          key: ${{ runner.os }}-jest-node${{ matrix.node-version }}-${{ hashFiles('jest.config.js', 'package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-jest-node${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run unit tests
+        env:
+          NODE_VERSION: ${{ matrix.node-version }}
+        run: |
+          mkdir -p test-results
+          mkdir -p logs
+          mkdir -p coverage/unit-tests-node${{ matrix.node-version }}
+          set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
+          NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
+          npm run test:unit -- \
+            --config=tests/configs/jest.unit.config.js \
+            --coverage \
+            --coverageReporters=json \
+            --coverageDirectory=coverage/unit-tests-node${{ matrix.node-version }} \
+            --maxWorkers=1 \
+            --testTimeout=10000 \
+            --forceExit \
+            --detectOpenHandles \
+            --verbose=true \
+            2>&1 | tee logs/unit-tests-node${{ matrix.node-version }}.log
+          mv ./coverage/unit-tests-node${{ matrix.node-version }}/coverage-final.json ./coverage/unit-tests-node${{ matrix.node-version }}-coverage-final.json
+            
+      - name: Store unit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-tests-node${{ matrix.node-version }}
+          path: |
+            coverage/
+            test-results/
+            logs/
+            reports/
+          retention-days: 7
+
+# Build and Push Docker Image
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [pre-flight]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'integration')
+    outputs:
+      image_name: ghcr.io/${{ steps.string.outputs.repo_lc }}
+      image_tag: ${{ steps.final-image.outputs.image_tag_final }}
+      image_digest: ${{ steps.build.outputs.digest || steps.force-build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set repo to lowercase
+        id: string
+        run: echo "repo_lc=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Check if Docker build is needed
+        id: docker-changes
+        run: |
+          # For PRs and first push, always build
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "docker_changed=true" >> $GITHUB_OUTPUT
+            echo "Building Docker image for PR or initial push"
+            exit 0
+          fi
+
+          # Check if Docker-related files changed since last commit
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^(Dockerfile|\.dockerignore|package\.json|package-lock\.json|src/|tests/)$'; then
+            echo "docker_changed=true" >> $GITHUB_OUTPUT
+            echo "Docker-related files changed, will build new image"
+          else
+            echo "docker_changed=false" >> $GITHUB_OUTPUT
+            echo "No Docker-related changes detected, will try to use cached image"
+          fi
+
+      - name: Generate Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.string.outputs.repo_lc }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-,enable={{is_default_branch}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=Discord Bot
+            org.opencontainers.image.description=Integration test environment
+            org.opencontainers.image.vendor=discord-bot
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: build
+        if: steps.docker-changes.outputs.docker_changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/amd64
+          target: test-runner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Use existing image if no changes
+        id: existing-image
+        if: steps.docker-changes.outputs.docker_changed == 'false'
+        run: |
+          # Try to pull the latest image to use as fallback
+          LATEST_TAG="ghcr.io/${{ steps.string.outputs.repo_lc }}:${{ github.ref_name }}-${{ github.sha }}"
+          FALLBACK_TAG="ghcr.io/${{ steps.string.outputs.repo_lc }}:${{ github.ref_name }}"
+
+          # Check if the exact SHA-based image exists
+          if docker manifest inspect "$LATEST_TAG" >/dev/null 2>&1; then
+            echo "Using existing image: $LATEST_TAG"
+            echo "image_tag_raw=$LATEST_TAG" >> $GITHUB_OUTPUT
+          elif docker manifest inspect "$FALLBACK_TAG" >/dev/null 2>&1; then
+            echo "Using fallback image: $FALLBACK_TAG"
+            echo "image_tag_raw=$FALLBACK_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "No existing image found, forcing rebuild"
+            echo "force_rebuild=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Force rebuild if no cached image available
+        id: force-build
+        if: steps.docker-changes.outputs.docker_changed == 'false' && steps.existing-image.outputs.force_rebuild == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/amd64
+          target: test-runner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Set final image tag
+        id: final-image
+        run: |
+          FINAL_TAG=""
+          if [[ "${{ steps.docker-changes.outputs.docker_changed }}" == "true" ]] || [[ "${{ steps.existing-image.outputs.force_rebuild }}" == "true" ]]; then
+            # A new image was built (or force-rebuilt). Use the first tag from the metadata action.
+            FINAL_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+          else
+            # Use the tag for the existing image.
+            FINAL_TAG="${{ steps.existing-image.outputs.image_tag_raw }}"
+          fi
+          echo "image_tag_final=${FINAL_TAG}" >> $GITHUB_OUTPUT
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    #container:
+    #  image: ${{ needs.build-and-push-docker.outputs.image_tag }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #needs: [pre-flight, lint, build-and-push-docker]
+    needs: [pre-flight, lint]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'integration')
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Set up test environment
+        run: |
+          cat > .env.test << 'EOF'
+          NODE_ENV=test
+          DISCORD_BOT_TOKEN=test-token-placeholder
+          YOUTUBE_API_KEY=test-api-key-placeholder
+          YOUTUBE_CHANNEL_ID=UCtest123456789012345678
+          DISCORD_YOUTUBE_CHANNEL_ID=123456789012345678
+          PSH_CALLBACK_URL=https://test.example.com/webhook
+          X_USER_HANDLE=testuser
+          DISCORD_X_POSTS_CHANNEL_ID=234567890123456789
+          DISCORD_X_REPLIES_CHANNEL_ID=345678901234567890
+          DISCORD_X_QUOTES_CHANNEL_ID=456789012345678901
+          DISCORD_X_RETWEETS_CHANNEL_ID=567890123456789012
+          TWITTER_USERNAME=testuser
+          TWITTER_PASSWORD=testpassword
+          DISCORD_BOT_SUPPORT_LOG_CHANNEL=678901234567890123
+          PSH_SECRET=test-webhook-secret-for-integration-testing
+          REDIS_URL=redis://localhost:6379
+          EOF
+
+      - name: Run integration tests
+        timeout-minutes: 10
+        env:
+          NODE_ENV: test
+        run: |
+          mkdir -p test-results
+          mkdir -p logs
+          mkdir -p reports
+          mkdir -p coverage/integration-tests
+          set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
+          NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
+          npm run test:integration -- \
+            --coverage \
+            --coverageReporters=json \
+            --coverageDirectory=coverage/integration-tests \
+            --testTimeout=15000 \
+            --forceExit \
+            --detectOpenHandles \
+            --verbose=true \
+            2>&1 | tee logs/integration-tests-output.log
+          mv ./coverage/integration-tests/coverage-final.json ./coverage/integration-tests-coverage-final.json
+          rm -r ./coverage/integration-tests 
+
+      - name: Store integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-tests
+          path: |
+            coverage/integration-tests/
+            test-results/integration-tests.xml
+            reports/
+            logs/
+          retention-days: 14
+
+  # End-to-end tests
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 20
+    needs: [pre-flight, lint]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'e2e')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Set up E2E test environment
+        run: |
+          cat > .env.e2e << 'EOF'
+          NODE_ENV=test
+          LOG_LEVEL=error
+          DISCORD_BOT_TOKEN=test-bot-token-e2e-placeholder
+          YOUTUBE_API_KEY=test-youtube-api-key-placeholder
+          YOUTUBE_CHANNEL_ID=UCtest123456789012345678
+          DISCORD_YOUTUBE_CHANNEL_ID=123456789012345678
+          PSH_CALLBACK_URL=https://test-e2e.example.com/webhook
+          PSH_PORT=3001
+          X_USER_HANDLE=testuser
+          DISCORD_X_POSTS_CHANNEL_ID=234567890123456789
+          DISCORD_X_REPLIES_CHANNEL_ID=345678901234567890
+          DISCORD_X_QUOTES_CHANNEL_ID=456789012345678901
+          DISCORD_X_RETWEETS_CHANNEL_ID=567890123456789012
+          TWITTER_USERNAME=testuser
+          TWITTER_PASSWORD=testpassword
+          DISCORD_BOT_SUPPORT_LOG_CHANNEL=678901234567890123
+          PSH_SECRET=e2e-test-webhook-secret
+          ANNOUNCEMENT_ENABLED=true
+          X_VX_TWITTER_CONVERSION=false
+          ALLOWED_USER_IDS=123456789012345678,987654321098765432
+          EOF
+
+      - name: Run E2E tests
+        env:
+          NODE_ENV: test
+        run: |
+          mkdir -p test-results
+          mkdir -p logs
+          mkdir -p reports
+          mkdir -p coverage/e2e-tests
+          set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
+          NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
+          npm run test:e2e -- \
+            --coverage \
+            --coverageReporters=json \
+            --coverageDirectory=coverage/e2e-tests \
+            --testTimeout=30000 \
+            --forceExit \
+            --detectOpenHandles \
+            --verbose=true \
+            2>&1 | tee logs/e2e-tests-output.log
+          mv ./coverage/e2e-tests/coverage-final.json ./coverage/e2e-tests-coverage-final.json
+          rm -r ./coverage/e2e-tests 
+
+      - name: Store E2E test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-tests
+          path: |
+            coverage/
+            test-results/
+            logs/
+            reports/
+            screenshots/
+            .env.e2e
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Performance tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    needs: [pre-flight, lint]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'performance')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run performance tests
+        run: |
+          mkdir -p test-results
+          mkdir -p logs
+          mkdir -p reports
+          mkdir -p coverage/performance-tests
+          set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
+          NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=6144" \
+          npm run test:performance -- \
+            --coverage \
+            --coverageReporters=json \
+            --coverageDirectory=coverage/performance-tests \
+            --maxWorkers=1 \
+            --testTimeout=60000 \
+            --forceExit \
+            --detectOpenHandles \
+            --verbose=true \
+            2>&1 | tee logs/performance-tests-output.log
+          mv ./coverage/performance-tests/coverage-final.json ./coverage/performance-tests-coverage-final.json
+          rm -r ./coverage/performance-tests 
+
+
+      - name: Generate performance report
+        run: |
+          mkdir -p reports
+          echo "# Performance Test Report" > reports/performance.md
+          echo "Generated on: $(date)" >> reports/performance.md
+          echo "Node.js version: $(node --version)" >> reports/performance.md
+          echo "Platform: ${{ runner.os }}" >> reports/performance.md
+          echo "" >> reports/performance.md
+
+          # Extract performance metrics from test output
+          echo "## Performance Metrics" >> reports/performance.md
+          echo "" >> reports/performance.md
+
+          # Parse Jest output for timing information
+          if [ -f coverage/performance-tests-output.log ]; then
+            echo "### Test Execution Times" >> reports/performance.md
+            grep -E "Test completed in [0-9]+\.[0-9]+ms" coverage/performance-tests-output.log | head -10 >> reports/performance.md || echo "No timing data found" >> reports/performance.md
+            echo "" >> reports/performance.md
+            
+            echo "### Throughput Metrics" >> reports/performance.md
+            grep -E "(messages per second|URLs per second|webhooks per second)" coverage/performance-tests-output.log | head -10 >> reports/performance.md || echo "No throughput data found" >> reports/performance.md
+            echo "" >> reports/performance.md
+          fi
+
+          # Add system performance info
+          echo "### System Performance" >> reports/performance.md
+          echo "- **CPU Info**: $(nproc) cores" >> reports/performance.md
+          echo "- **Memory**: $(free -h | grep '^Mem:' | awk '{print $2}')" >> reports/performance.md
+          echo "- **Test Duration**: $(date -d @$SECONDS -u '+%M:%S')" >> reports/performance.md
+          echo "" >> reports/performance.md
+
+          # Create metrics summary JSON
+          cat > performance-metrics.json << EOF
+          {
+            "timestamp": "$(date -Iseconds)",
+            "node_version": "$(node --version)",
+            "platform": "${{ runner.os }}",
+            "cpu_cores": $(nproc),
+            "memory_total": "$(free -h | grep '^Mem:' | awk '{print $2}')",
+            "test_duration_seconds": $SECONDS
+          }
+          EOF
+
+      - name: Store performance test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-tests
+          path: |
+            coverage/
+            test-results/
+            logs/
+            reports/
+            performance-metrics.json
+          retention-days: 14
+
+  # Security tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [pre-flight, lint]
+    if: needs.pre-flight.outputs.should-run-tests == 'true' && contains(fromJson(needs.pre-flight.outputs.test-matrix).test-type, 'security')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+          
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run security tests
+        run: |
+          mkdir -p test-results
+          mkdir -p reports
+          mkdir -p coverage
+          mkdir -p logs/security-tests
+          set -e  # Exit on first error
+          set -o pipefail  # Fail pipeline if any command in pipe fails
+          NODE_OPTIONS="--experimental-vm-modules --max-old-space-size=4096" \
+          npx jest --config tests/configs/jest.security.config.js \
+            --maxWorkers=1 \
+            --testTimeout=20000 \
+            --coverage \
+            --coverageReporters=json \
+            --coverageDirectory=coverage/security-tests \
+            --forceExit \
+            --detectOpenHandles \
+            2>&1 | tee logs/security-tests-output.log
+          mv ./coverage/security-tests/coverage-final.json ./coverage/security-tests-coverage-final.json
+          rm -r ./coverage/security-tests 
+
+      - name: Run security audit
+        run: |
+          npm audit --audit-level=moderate --json > security-audit.json || true
+
+          # Check for high/critical vulnerabilities
+          HIGH_VULNS=$(cat security-audit.json | jq '.metadata.vulnerabilities.high // 0')
+          CRITICAL_VULNS=$(cat security-audit.json | jq '.metadata.vulnerabilities.critical // 0')
+
+          echo "High vulnerabilities: $HIGH_VULNS"
+          echo "Critical vulnerabilities: $CRITICAL_VULNS"
+
+          if [ "$CRITICAL_VULNS" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities found!"
+            exit 1
+          elif [ "$HIGH_VULNS" -gt 0 ]; then
+            echo "⚠️ High vulnerabilities found!"
+          fi
+
+      - name: Check for secrets
+        run: |
+          # Simple check for potential secrets in code
+          echo "Checking for potential secrets..."
+
+          # Check for potential API keys, tokens, etc.
+          SECRET_PATTERNS=(
+            "api[_-]?key"
+            "secret[_-]?key"
+            "access[_-]?token"
+            "auth[_-]?token"
+            "discord[_-]?token"
+            "password"
+          )
+
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if git grep -i "$pattern" -- '*.js' '*.json' | grep -v test | grep -v mock | grep -v example; then
+              echo "⚠️ Potential secret found: $pattern"
+            fi
+          done
+
+      - name: Store security test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-tests
+          path: |
+            coverage/
+            test-results/
+            logs/
+            reports/
+            security-audit.json
+            security-report.json
+          retention-days: 14
+
+  # Aggregate results and report
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      [
+        unit-tests,
+        integration-tests,
+        e2e-tests,
+        performance-tests,
+        security-tests,
+      ]
+    if: always() && needs.pre-flight.outputs.should-run-tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: |
+          echo "Current working directory: $(pwd)"
+
+          # Install with retry logic for corrupted tarball handling
+          # Configure npm settings for better reliability
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set registry https://registry.npmjs.org/
+
+          for i in {1..3}; do
+            echo "Attempt $i to install dependencies..."
+            if npm ci --prefer-offline --no-audit; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Failed attempt $i"
+              if [ $i -lt 3 ]; then
+                echo "Clearing npm cache and retrying..."
+                npm cache clean --force
+                rm -rf node_modules package-lock.json
+                npm cache verify
+                echo "Waiting $((i * 5)) seconds before retry..."
+                sleep $((i * 5))
+              else
+                echo "All npm install attempts failed"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: '*-test*'
+          merge-multiple: true
+          path: .
+
+      - name: Enhanced coverage merging and analysis
+        id: coverage
+        run: |
+          echo "Starting coverage merge process..."
+          
+          # Create coverage directory structure
+          mkdir -p coverage/merged
+          
+          # Find all coverage files
+          echo "Looking for coverage files..."
+          find . -name "*coverage-final.json" -type f | head -10
+          
+          # Check if any coverage files exist
+          if ! find . -name "*coverage-final.json" -type f | head -1 | grep -q .; then
+            echo "No coverage files found - skipping coverage merge"
+            echo "status=missing" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Use c8 for coverage merging and reporting
+          echo "Merging coverage files with c8..."
+          
+          # Create temp directory for c8
+          mkdir -p .c8_output
+          
+          # Copy all coverage files to a common location for c8
+          for file in $(find . -name "*coverage-final.json" -type f); do
+            filename=$(basename "$file" .json)
+            cp "$file" ".c8_output/${filename}-$(date +%s).json"
+            echo "Copied $file to .c8_output/"
+          done
+          
+          # Merge coverage files using c8
+          echo "Merging with c8..."
+          npx c8 report \
+            --temp-directory=.c8_output \
+            --reports-dir=coverage/merged \
+            --reporter=html \
+            --reporter=lcov \
+            --reporter=json \
+            --reporter=text \
+            --src=./src \
+            --all || {
+              echo "c8 merge failed, attempting manual merge..."
+              
+              # Fallback to manual merge
+              node -e "
+              const fs = require('fs');
+              const { glob } = require('glob');
+              
+              async function mergeCoverage() {
+                try {
+                  const coverageFiles = await glob('**/*coverage-final.json');
+                  console.log('Found coverage files:', coverageFiles);
+                  
+                  if (coverageFiles.length === 0) {
+                    console.log('No coverage files found');
+                    process.exit(1);
+                  }
+                  
+                  const merged = {};
+                  
+                  for (const file of coverageFiles) {
+                    try {
+                      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+                      console.log(\`Processing \${file} with \${Object.keys(data).length} files\`);
+                      Object.assign(merged, data);
+                    } catch (err) {
+                      console.error(\`Error processing \${file}:\`, err.message);
+                    }
+                  }
+                  
+                  console.log(\`Final merged coverage has \${Object.keys(merged).length} files\`);
+                  
+                  // Write merged coverage
+                  fs.mkdirSync('coverage/merged', { recursive: true });
+                  fs.writeFileSync('./coverage/merged/coverage-final.json', JSON.stringify(merged, null, 2));
+                  console.log('Manual coverage merge completed');
+                  
+                } catch (err) {
+                  console.error('Error in coverage merge:', err.message);
+                  process.exit(1);
+                }
+              }
+              
+              mergeCoverage();
+              "
+            }
+          
+          # Check if we have merged coverage data
+          if [ -f "./coverage/merged/coverage-final.json" ] || [ -f "./coverage/merged/lcov.info" ]; then
+            echo "status=available" >> $GITHUB_OUTPUT
+            echo "Coverage merge completed successfully"
+          else
+            echo "status=missing" >> $GITHUB_OUTPUT
+            echo "No merged coverage generated"
+          fi
+
+
+      - name: Generate comprehensive test report
+        env:
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          E2E_TESTS_RESULT: ${{ needs.e2e-tests.result }}
+          PERFORMANCE_TESTS_RESULT: ${{ needs.performance-tests.result }}
+          SECURITY_TESTS_RESULT: ${{ needs.security-tests.result }}
+        run: |
+          node scripts/testing/generate-test-summary.js
+
+      - name: Validate coverage quality
+        run: |
+          if [ -f coverage-metrics.json ]; then
+            COVERAGE=$(jq -r '.coverage.lines // 0' coverage-metrics.json)
+            echo "Current coverage: ${COVERAGE}%"
+            
+            # Set coverage quality gates
+            if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+              echo "❌ Coverage critically low: $COVERAGE%"
+              echo "coverage_status=critical" >> $GITHUB_ENV
+            elif (( $(echo "$COVERAGE < 75" | bc -l) )); then
+              echo "⚠️ Coverage below minimum: $COVERAGE%"
+              echo "coverage_status=warning" >> $GITHUB_ENV
+            else
+              echo "✅ Coverage meets target: $COVERAGE%"
+              echo "coverage_status=good" >> $GITHUB_ENV
+            fi
+          else
+            echo "No coverage data available"
+            echo "coverage_status=missing" >> $GITHUB_ENV
+          fi
+
+      - name: Upload merged coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: steps.coverage.outputs.status == 'available'
+        with:
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Store final test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-report-${{ github.run_id }}
+          path: |
+            coverage/
+            test-results/
+            reports/
+            logs/
+            coverage-summary.json
+            coverage-metrics.json
+            security-audit.json
+            security-report.json
+            performance-metrics.json
+          retention-days: 14
+
+      - name: Upload LCOV HTML Report Artifact
+        if: steps.coverage.outputs.status == 'available'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-html-report
+          path: coverage/merged/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Comment commit with test results
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'reports/test-summary.md';
+
+            if (fs.existsSync(path)) {
+              try {
+                const body = fs.readFileSync(path, 'utf8');
+                
+                await github.rest.repos.createCommitComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  commit_sha: context.sha,
+                  body: body
+                });
+                console.log('Commit comment created successfully');
+              } catch (error) {
+                console.log('Failed to create commit comment:', error.message);
+              }
+            } else {
+              console.log('Test summary file not found');
+            }
+
+      - name: Update status check
+        if: always()
+        run: |
+          # Check individual job statuses and fail if any critical test failed
+          UNIT_STATUS="${{ needs.unit-tests.result }}"
+          INTEGRATION_STATUS="${{ needs.integration-tests.result }}"
+          E2E_STATUS="${{ needs.e2e-tests.result }}"
+          PERFORMANCE_STATUS="${{ needs.performance-tests.result }}"
+          SECURITY_STATUS="${{ needs.security-tests.result }}"
+
+          echo "Unit tests: $UNIT_STATUS"
+          echo "Integration tests: $INTEGRATION_STATUS" 
+          echo "E2E tests: $E2E_STATUS"
+          echo "Performance tests: $PERFORMANCE_STATUS"
+          echo "Security tests: $SECURITY_STATUS"
+
+          # Count failures and successes
+          FAILED_COUNT=0
+          SUCCESS_COUNT=0
+          
+          # Check each test result and count failures
+          for status in "$UNIT_STATUS" "$INTEGRATION_STATUS" "$E2E_STATUS" "$PERFORMANCE_STATUS" "$SECURITY_STATUS"; do
+            if [[ "$status" == "failure" ]]; then
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+            elif [[ "$status" == "success" ]]; then
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+            fi
+          done
+
+          echo "Failed test suites: $FAILED_COUNT"
+          echo "Successful test suites: $SUCCESS_COUNT"
+
+          # Fail if ANY test job failed
+          if [[ $FAILED_COUNT -gt 0 ]]; then
+            echo "❌ $FAILED_COUNT test suite(s) failed - failing the build"
+            exit 1
+          elif [[ $SUCCESS_COUNT -gt 0 ]]; then
+            echo "✅ All $SUCCESS_COUNT executed test suites completed successfully"
+          else
+            echo "⚠️ All tests were skipped - this might indicate a configuration issue"
+            exit 1
+          fi
+
+  # Cleanup job to remove old artifacts
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Delete old artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 14); // Keep artifacts for 14 days
+
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            for (const artifact of artifacts.data.artifacts) {
+              if (new Date(artifact.created_at) < cutoff) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                console.log(`Deleted artifact: ${artifact.name}`);
+              }
+            }
