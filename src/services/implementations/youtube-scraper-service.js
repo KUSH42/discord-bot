@@ -411,7 +411,7 @@ export class YouTubeScraperService {
 
         // First try the regular live page approach (most comprehensive metadata)
         const liveStream = await this.browserService.evaluate(
-          ({ xUser, _liveStreamUrl }) => {
+          ({ xUser }) => {
             /* eslint-disable no-undef */
 
             // ENHANCED: Check for YouTube metadata first for more accurate results
@@ -583,24 +583,20 @@ export class YouTubeScraperService {
             if (metadataExtracted && youtubeMetadata && youtubeMetadata.videoId) {
               debugInfo.strategiesAttempted.push('youtube-metadata-extraction');
 
-              if (
-                youtubeMetadata.isLive ||
-                youtubeMetadata.badges.some(badge => badge && badge.toLowerCase().includes('live'))
-              ) {
-                return {
-                  id: youtubeMetadata.videoId,
-                  title: youtubeMetadata.title || 'Live Stream',
-                  url: `https://www.youtube.com/watch?v=${youtubeMetadata.videoId}`,
-                  type: 'livestream',
-                  platform: 'youtube',
-                  isCurrentlyLive: true,
-                  publishedAt: new Date().toISOString(),
-                  scrapedAt: new Date().toISOString(),
-                  detectionMethod: 'youtube-metadata-live',
-                  debugInfo,
-                  badges: youtubeMetadata.badges,
-                };
-              }
+              // Always return the video if we extracted it from ytInitialPlayerResponse - assume it's live since we're on /live page
+              return {
+                id: youtubeMetadata.videoId,
+                title: youtubeMetadata.title || 'Live Stream',
+                url: `https://www.youtube.com/watch?v=${youtubeMetadata.videoId}`,
+                type: 'livestream',
+                platform: 'youtube',
+                isCurrentlyLive: true,
+                publishedAt: new Date().toISOString(),
+                scrapedAt: new Date().toISOString(),
+                detectionMethod: 'youtube-metadata-live',
+                debugInfo,
+                badges: youtubeMetadata.badges,
+              };
             }
 
             // Continue with DOM-based detection strategies if metadata fails...
@@ -823,7 +819,6 @@ export class YouTubeScraperService {
           },
           {
             xUser: this.channelHandle,
-            embedLiveUrl: this.embedLiveUrl,
           }
         );
 
