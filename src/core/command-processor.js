@@ -63,6 +63,7 @@ export class CommandProcessor {
       'stop-scraper',
       'start-scraper',
       'force-reauth',
+      'delete',
     ];
 
     if (restrictedCommands.includes(command)) {
@@ -223,6 +224,47 @@ export class CommandProcessor {
       }
     }
 
+    // Delete command validation
+    if (command === 'delete' && args.length > 0) {
+      // Single message ID format
+      if (args.length === 1) {
+        const messageId = args[0];
+        if (!/^\d{17,19}$/.test(messageId)) {
+          return {
+            success: false,
+            error: 'Invalid message ID format. Message IDs should be 17-19 digits.',
+          };
+        }
+      }
+      // Channel ID + count format
+      else if (args.length === 2) {
+        const channelId = args[0];
+        const countStr = args[1];
+
+        if (!/^\d{17,19}$/.test(channelId)) {
+          return {
+            success: false,
+            error: 'Invalid channel ID format. Channel IDs should be 17-19 digits.',
+          };
+        }
+
+        const count = parseInt(countStr, 10);
+        if (isNaN(count) || count < 1 || count > 50) {
+          return {
+            success: false,
+            error: 'Count must be a number between 1 and 50.',
+          };
+        }
+      }
+      // Invalid format
+      else {
+        return {
+          success: false,
+          error: `Invalid delete command format. Use \`${this.commandPrefix}delete <CHANNEL_ID> <count>\` or \`${this.commandPrefix}delete <MESSAGE_ID>\`.`,
+        };
+      }
+    }
+
     return { success: true };
   }
 
@@ -355,6 +397,9 @@ export class CommandProcessor {
 
         case 'log-pipeline':
           return await this.handleLogPipeline();
+
+        case 'delete':
+          return await this.handleDelete(args, userId);
 
         default:
           result = {
@@ -569,6 +614,8 @@ export class CommandProcessor {
       `**${this.commandPrefix}stop-scraper**: Stops the X scraper application.`,
       `**${this.commandPrefix}start-scraper**: Starts the X scraper application.`,
       `**${this.commandPrefix}force-reauth**: Forces re-authentication with X, clearing saved cookies.`,
+      `**${this.commandPrefix}delete <CHANNEL_ID> <count>**: Deletes the bot's most recent messages (1-50) from the specified channel.`,
+      `**${this.commandPrefix}delete <MESSAGE_ID>**: Deletes a specific message by its ID.`,
     ];
 
     const readmeMessage = `**Discord Bot Message Commands**\n\nThese commands can only be used in the configured support channel.\n\n**General Commands:**\n${generalCommands.join('\n')}\n\n**Admin Commands** (require \`ALLOWED_USER_IDS\` authorization):\n${adminCommands.join('\n')}`;
@@ -1073,6 +1120,74 @@ export class CommandProcessor {
   }
 
   /**
+   * Handle delete command
+   * @param {Array<string>} args - Command arguments
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Command result
+   */
+  async handleDelete(args, userId) {
+    if (args.length === 0) {
+      return {
+        success: false,
+        message: `❌ Invalid usage. Use:\n• \`${this.commandPrefix}delete <CHANNEL_ID> <count>\` - Delete bot's recent messages (1-50)\n• \`${this.commandPrefix}delete <MESSAGE_ID>\` - Delete specific message`,
+        requiresRestart: false,
+      };
+    }
+
+    // Check if it's a single message ID (Discord message IDs are 17-19 digits)
+    if (args.length === 1 && /^\d{17,19}$/.test(args[0])) {
+      return {
+        success: true,
+        message: null, // No message here - deleteMessages will send its own messages
+        requiresRestart: false,
+        deleteAction: 'single',
+        messageId: args[0],
+        userId,
+      };
+    }
+
+    // Check if it's channel ID + count
+    if (args.length === 2) {
+      const channelId = args[0];
+      const count = parseInt(args[1], 10);
+
+      // Validate channel ID format
+      if (!/^\d{17,19}$/.test(channelId)) {
+        return {
+          success: false,
+          message: '❌ Invalid channel ID format. Channel IDs should be 17-19 digits.',
+          requiresRestart: false,
+        };
+      }
+
+      // Validate count
+      if (isNaN(count) || count < 1 || count > 50) {
+        return {
+          success: false,
+          message: '❌ Count must be a number between 1 and 50.',
+          requiresRestart: false,
+        };
+      }
+
+      return {
+        success: true,
+        message: null, // No message here - deleteMessages will send its own messages
+        requiresRestart: false,
+        deleteAction: 'bulk',
+        channelId,
+        count,
+        userId,
+      };
+    }
+
+    return {
+      success: false,
+      message: `❌ Invalid usage. Use:\n• \`${this.commandPrefix}delete <CHANNEL_ID> <count>\` - Delete bot's recent messages (1-50)\n• \`${this.commandPrefix}delete <MESSAGE_ID>\` - Delete specific message`,
+      requiresRestart: false,
+    };
+  }
+
+  /**
    * Handle log-pipeline command
    */
   async handleLogPipeline() {
@@ -1140,6 +1255,7 @@ export class CommandProcessor {
         'debug-level',
         'metrics',
         'log-pipeline',
+        'delete',
       ],
       restrictedCommands: [
         'restart',
@@ -1149,6 +1265,7 @@ export class CommandProcessor {
         'stop-scraper',
         'start-scraper',
         'force-reauth',
+        'delete',
       ],
       allowedUsers: this.getAllowedUserIds().length,
       commandPrefix: this.commandPrefix,

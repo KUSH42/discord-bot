@@ -127,6 +127,77 @@ describe('ContentClassifier', () => {
       });
     });
 
+    describe('Enhanced Reply Detection', () => {
+      it('should detect reply from socialContext metadata', () => {
+        const result = classifier.analyzeXContentType('This is a tweet', {
+          socialContext: 'Replying to @username',
+          xUser: 'testuser',
+        });
+        expect(result.type).toBe('reply');
+        expect(result.confidence).toBeGreaterThan(0.8);
+      });
+
+      it('should detect reply from allText metadata', () => {
+        const result = classifier.analyzeXContentType('This is a tweet', {
+          allText: 'Replying to @username\nThis is a tweet',
+          xUser: 'testuser',
+        });
+        expect(result.type).toBe('reply');
+        expect(result.confidence).toBeGreaterThan(0.8);
+      });
+
+      it('should include socialContext in reply indicators', () => {
+        const indicators = classifier.getReplyIndicators('Some text', {
+          socialContext: 'Replying to @testuser',
+        });
+        expect(indicators).toContain('Social context: Replying to @testuser');
+      });
+
+      it('should detect reply with case-insensitive social context', () => {
+        const result = classifier.analyzeXContentType('This is a tweet', {
+          socialContext: 'REPLYING TO @username',
+          xUser: 'testuser',
+        });
+        expect(result.type).toBe('reply');
+      });
+    });
+
+    describe('Enhanced Quote Detection', () => {
+      it('should detect quote from quoteTweetBlock metadata', () => {
+        const result = classifier.analyzeXContentType('My comment about this tweet', {
+          quoteTweetBlock: true,
+          xUser: 'testuser',
+        });
+        expect(result.type).toBe('quote');
+        expect(result.confidence).toBeGreaterThan(0.8);
+      });
+
+      it('should detect quote from embedded URL in allText', () => {
+        const result = classifier.analyzeXContentType('My comment', {
+          allText: 'My comment https://x.com/other/status/123456789',
+          xUser: 'testuser',
+        });
+        expect(result.type).toBe('quote');
+        expect(result.confidence).toBeGreaterThan(0.8);
+      });
+
+      it('should include quoteTweetBlock in quote indicators', () => {
+        const indicators = classifier.getQuoteIndicators('Some text', {
+          quoteTweetBlock: true,
+        });
+        expect(indicators).toContain('Quote tweet block detected in DOM');
+      });
+
+      it('should include embedded URL from allText in indicators', () => {
+        const indicators = classifier.getQuoteIndicators('Some text', {
+          allText: 'Some text https://x.com/user/status/123',
+        });
+        expect(indicators.some(indicator => indicator.includes('Contains embedded tweet URL in full content'))).toBe(
+          true
+        );
+      });
+    });
+
     describe('Author-based Retweet Detection', () => {
       it('should detect retweet when author differs from monitored user', () => {
         const result = classifier.classifyXContent('https://x.com/user/status/1234567890', 'Some tweet content', {

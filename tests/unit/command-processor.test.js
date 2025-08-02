@@ -124,6 +124,46 @@ describe('CommandProcessor', () => {
       result = processor.validateCommand('loglevel', [''], '123456789012345678');
       expect(result.success).toBe(false);
     });
+
+    it('should validate delete command arguments', () => {
+      // Valid message ID
+      let result = processor.validateCommand('delete', ['123456789012345678'], '123456789012345678');
+      expect(result.success).toBe(true);
+
+      // Valid channel ID + count
+      result = processor.validateCommand('delete', ['987654321098765432', '10'], '123456789012345678');
+      expect(result.success).toBe(true);
+
+      // Invalid message ID format
+      result = processor.validateCommand('delete', ['invalid'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid message ID format');
+
+      // Invalid channel ID format
+      result = processor.validateCommand('delete', ['invalid', '5'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid channel ID format');
+
+      // Count too low
+      result = processor.validateCommand('delete', ['123456789012345678', '0'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Count must be a number between 1 and 50');
+
+      // Count too high
+      result = processor.validateCommand('delete', ['123456789012345678', '51'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Count must be a number between 1 and 50');
+
+      // Non-numeric count
+      result = processor.validateCommand('delete', ['123456789012345678', 'abc'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Count must be a number between 1 and 50');
+
+      // Too many arguments
+      result = processor.validateCommand('delete', ['123456789012345678', '5', 'extra'], '123456789012345678');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid delete command format');
+    });
   });
 
   describe('Command Processing', () => {
@@ -358,6 +398,112 @@ describe('CommandProcessor', () => {
       expect(result.success).toBe(false);
       expect(result.message).toContain('Unknown command');
     });
+
+    describe('Delete Command', () => {
+      it('should process delete command with message ID successfully', async () => {
+        const messageId = '123456789012345678';
+        const result = await processor.processCommand('delete', [messageId], '123456789012345678');
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBeNull(); // No message - deleteMessages will send its own messages
+        expect(result.deleteAction).toBe('single');
+        expect(result.messageId).toBe(messageId);
+        expect(result.userId).toBe('123456789012345678');
+      });
+
+      it('should process delete command with channel ID and count successfully', async () => {
+        const channelId = '987654321098765432';
+        const count = '5';
+        const result = await processor.processCommand('delete', [channelId, count], '123456789012345678');
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBeNull(); // No message - deleteMessages will send its own messages
+        expect(result.deleteAction).toBe('bulk');
+        expect(result.channelId).toBe(channelId);
+        expect(result.count).toBe(5);
+        expect(result.userId).toBe('123456789012345678');
+      });
+
+      it('should reject delete command for unauthorized user', async () => {
+        const result = await processor.processCommand('delete', ['123456789012345678'], '999888777666555444');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('not authorized');
+      });
+
+      it('should reject delete command with no arguments', async () => {
+        const result = await processor.processCommand('delete', [], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Invalid usage');
+        expect(result.message).toContain('delete <CHANNEL_ID> <count>');
+        expect(result.message).toContain('delete <MESSAGE_ID>');
+      });
+
+      it('should reject delete command with invalid message ID format', async () => {
+        const result = await processor.processCommand('delete', ['invalid'], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Invalid message ID format');
+      });
+
+      it('should reject delete command with invalid channel ID format', async () => {
+        const result = await processor.processCommand('delete', ['invalid', '5'], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Invalid channel ID format');
+      });
+
+      it('should reject delete command with count too low', async () => {
+        const result = await processor.processCommand('delete', ['123456789012345678', '0'], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Count must be a number between 1 and 50');
+      });
+
+      it('should reject delete command with count too high', async () => {
+        const result = await processor.processCommand('delete', ['123456789012345678', '51'], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Count must be a number between 1 and 50');
+      });
+
+      it('should reject delete command with non-numeric count', async () => {
+        const result = await processor.processCommand('delete', ['123456789012345678', 'abc'], '123456789012345678');
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Count must be a number between 1 and 50');
+      });
+
+      it('should reject delete command with too many arguments', async () => {
+        const result = await processor.processCommand(
+          'delete',
+          ['123456789012345678', '5', 'extra'],
+          '123456789012345678'
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Invalid delete command format');
+      });
+
+      it('should validate delete command with minimum valid message ID length', async () => {
+        const messageId = '12345678901234567'; // 17 digits
+        const result = await processor.processCommand('delete', [messageId], '123456789012345678');
+
+        expect(result.success).toBe(true);
+        expect(result.deleteAction).toBe('single');
+        expect(result.messageId).toBe(messageId);
+      });
+
+      it('should validate delete command with maximum valid message ID length', async () => {
+        const messageId = '1234567890123456789'; // 19 digits
+        const result = await processor.processCommand('delete', [messageId], '123456789012345678');
+
+        expect(result.success).toBe(true);
+        expect(result.deleteAction).toBe('single');
+        expect(result.messageId).toBe(messageId);
+      });
+    });
   });
 
   describe('State Validators', () => {
@@ -389,8 +535,10 @@ describe('CommandProcessor', () => {
       expect(stats.availableCommands).toContain('kill');
       expect(stats.availableCommands).toContain('restart');
       expect(stats.availableCommands).toContain('health');
+      expect(stats.availableCommands).toContain('delete');
       expect(stats.restrictedCommands).toContain('kill');
       expect(stats.restrictedCommands).toContain('restart');
+      expect(stats.restrictedCommands).toContain('delete');
       expect(stats.allowedUsers).toBe(3);
       expect(stats.commandPrefix).toBe('!');
     });
