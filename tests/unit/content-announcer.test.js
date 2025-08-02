@@ -125,7 +125,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         '123456789012345679',
-        '🐦 **testuser** posted:\nhttps://x.com/testuser/status/1234567890'
+        '🐦 **testuser** tweeted:\nhttps://x.com/testuser/status/1234567890'
       );
     });
 
@@ -211,7 +211,7 @@ describe('ContentAnnouncer', () => {
       expect(result.success).toBe(true);
       expect(mockDiscordService.sendMessage).toHaveBeenCalledWith(
         '123456789012345679',
-        '🐦 **testuser** posted:\nhttps://vxtwitter.com/testuser/status/1234567890'
+        '🐦 **testuser** tweeted:\nhttps://vxtwitter.com/testuser/status/1234567890'
       );
     });
   });

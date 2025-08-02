@@ -781,7 +781,7 @@ describe('ContentCoordinator', () => {
       });
     });
 
-    describe('checkDiscordForRecentAnnouncements', () => {
+    describe('checkForPreviouslyAnnouncedContent', () => {
       beforeEach(() => {
         coordinator = new ContentCoordinator(
           mockContentStateManager,
@@ -809,7 +809,7 @@ describe('ContentCoordinator', () => {
 
         mockDuplicateDetector.isVideoIdKnown.mockReturnValue(true);
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
         expect(result.foundIn).toBe('youtube_duplicate_detector');
@@ -827,7 +827,7 @@ describe('ContentCoordinator', () => {
 
         mockDuplicateDetector.isTweetIdKnown.mockReturnValue(true);
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
         expect(result.foundIn).toBe('x_duplicate_detector');
@@ -844,7 +844,7 @@ describe('ContentCoordinator', () => {
 
         mockDuplicateDetector.isDuplicateByUrl.mockResolvedValue(true);
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(true);
         expect(result.foundIn).toBe('url_duplicate_detector');
@@ -862,7 +862,7 @@ describe('ContentCoordinator', () => {
           url: 'https://www.youtube.com/watch?v=new-video-123',
         };
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(false);
         expect(mockDuplicateDetector.isVideoIdKnown).toHaveBeenCalledWith('new-video-123');
@@ -880,7 +880,7 @@ describe('ContentCoordinator', () => {
           type: 'video',
         };
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(false);
         expect(result.reason).toBe('no_duplicate_detector');
@@ -897,7 +897,7 @@ describe('ContentCoordinator', () => {
           throw new Error('Database connection failed');
         });
 
-        const result = await coordinator.checkDiscordForRecentAnnouncements(contentData);
+        const result = await coordinator.checkForPreviouslyAnnouncedContent(contentData);
 
         expect(result.found).toBe(false);
         expect(result.error).toBe('Database connection failed');
@@ -948,7 +948,7 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.processContent(contentId, source, contentData);
 
         expect(result.action).toBe('skip');
-        expect(result.reason).toBe('recent_discord_announcement');
+        expect(result.reason).toBe('previously_announced');
         expect(result.foundIn).toBe('youtube_duplicate_detector');
         expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
         expect(mockDuplicateDetector.markAsSeenWithFingerprint).toHaveBeenCalled();
