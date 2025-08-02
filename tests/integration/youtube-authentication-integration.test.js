@@ -31,6 +31,7 @@ describe('YouTube Authentication Integration Tests', () => {
           YOUTUBE_SCRAPER_RETRY_DELAY_MS: 5000,
           YOUTUBE_SCRAPER_TIMEOUT_MS: 30000,
           YOUTUBE_AUTH_ENABLED: 'true',
+          YOUTUBE_AUTHENTICATION_ENABLED: 'true',
           YOUTUBE_USERNAME: 'test@example.com',
           YOUTUBE_PASSWORD: 'testpassword123',
         };
@@ -38,6 +39,7 @@ describe('YouTube Authentication Integration Tests', () => {
       }),
       getBoolean: jest.fn((key, defaultValue) => {
         const config = {
+          YOUTUBE_AUTH_ENABLED: true,
           YOUTUBE_AUTHENTICATION_ENABLED: true,
         };
         return config[key] !== undefined ? config[key] : defaultValue;
@@ -158,6 +160,9 @@ describe('YouTube Authentication Integration Tests', () => {
       const authError = new Error('Network timeout during authentication');
       jest.spyOn(authManager, 'authenticateWithYouTube').mockRejectedValue(authError);
 
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
+
       const result = await authManager.ensureAuthenticated();
 
       // Verify error handling and state
@@ -224,6 +229,9 @@ describe('YouTube Authentication Integration Tests', () => {
       // Mock authenticateWithYouTube to return false (authentication failed)
       jest.spyOn(authManager, 'authenticateWithYouTube').mockResolvedValue(false);
 
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
+
       const result = await authManager.ensureAuthenticated();
 
       expect(result).toBe(false);
@@ -237,6 +245,9 @@ describe('YouTube Authentication Integration Tests', () => {
       // Mock authenticateWithYouTube to return false (authentication failed due to 2FA)
       jest.spyOn(authManager, 'authenticateWithYouTube').mockResolvedValue(false);
 
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
+
       const result = await authManager.ensureAuthenticated();
 
       expect(result).toBe(false);
@@ -249,6 +260,9 @@ describe('YouTube Authentication Integration Tests', () => {
 
       // Mock authenticateWithYouTube to return false (authentication failed due to CAPTCHA)
       jest.spyOn(authManager, 'authenticateWithYouTube').mockResolvedValue(false);
+
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
 
       const result = await authManager.ensureAuthenticated();
 
@@ -324,6 +338,9 @@ describe('YouTube Authentication Integration Tests', () => {
       // Mock authenticateWithYouTube to return false (verification failed)
       jest.spyOn(authManager, 'authenticateWithYouTube').mockResolvedValue(false);
 
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
+
       const result = await authManager.ensureAuthenticated();
 
       expect(result).toBe(false);
@@ -367,6 +384,9 @@ describe('YouTube Authentication Integration Tests', () => {
       const authError = new Error('Authentication failed with credentials testpassword123');
       jest.spyOn(authManager, 'authenticateWithYouTube').mockRejectedValue(authError);
 
+      // Mock delay to avoid timeout issues
+      jest.spyOn(authManager, 'delay').mockResolvedValue();
+
       const result = await authManager.ensureAuthenticated();
 
       expect(result).toBe(false);
@@ -377,7 +397,7 @@ describe('YouTube Authentication Integration Tests', () => {
   describe('Authentication Integration with Service Initialization', () => {
     it('should seamlessly integrate authentication with service initialization', async () => {
       // Mock authentication check on the scraper service's auth manager
-      const authSpy = jest.spyOn(scraperService.youtubeAuthManager, 'ensureAuthenticated').mockResolvedValue(true);
+      const authSpy = jest.spyOn(scraperService.authManager, 'authenticateWithYouTube').mockResolvedValue(true);
 
       // Mock scraper service evaluate calls for initialization content detection
       mockBrowserService.evaluate.mockResolvedValue({
@@ -411,7 +431,7 @@ describe('YouTube Authentication Integration Tests', () => {
 
     it('should handle authentication failure during initialization gracefully', async () => {
       // Mock authentication failure on the scraper service's auth manager
-      const authSpy = jest.spyOn(scraperService.youtubeAuthManager, 'ensureAuthenticated').mockResolvedValue(false);
+      const authSpy = jest.spyOn(scraperService.authManager, 'authenticateWithYouTube').mockResolvedValue(false);
 
       // Mock scraper service evaluate calls for initialization
       mockBrowserService.evaluate.mockResolvedValue({
