@@ -541,6 +541,14 @@ export class BotApplication {
         result.scraperAction = null; // Consume the flag to prevent duplicate processing
         await this.handleScraperAction(scraperAction, userId, message);
       }
+
+      // Handle delete actions (consume the flag)
+      if (result.deleteAction) {
+        const { deleteAction } = result;
+        const { userId } = result;
+        result.deleteAction = null; // Consume the flag to prevent duplicate processing
+        await this.handleDeleteAction(deleteAction, result, message);
+      }
     } catch (error) {
       this.logger.error('Error handling command result:', error);
     }
@@ -1151,6 +1159,125 @@ export class BotApplication {
     } catch (error) {
       this.logger.error(`Error handling scraper action ${action}:`, error);
       await message.channel.send('❌ An error occurred while processing the scraper command.');
+    }
+  }
+
+  /**
+   * Handle delete message actions
+   * @param {string} action - The delete action type ('single' or 'bulk')
+   * @param {Object} result - Command result containing delete parameters
+   * @param {Object} message - The Discord message object
+   * @returns {Promise<void>}
+   */
+  async handleDeleteAction(action, result, message) {
+    try {
+      switch (action) {
+        case 'single':
+          await this.deleteSingleMessage(result.messageId, message);
+          break;
+        case 'bulk':
+          await this.deleteBulkMessages(result.channelId, result.count, message);
+          break;
+        default:
+          await message.channel.send(`❓ Unknown delete action: ${action}`);
+          this.logger.warn(`Unknown delete action requested: ${action} by user ${result.userId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error handling delete action ${action}:`, error);
+      await message.channel.send('❌ An error occurred while processing the delete command.');
+    }
+  }
+
+  /**
+   * Delete a single message by ID
+   * @param {string} messageId - Discord message ID to delete
+   * @param {Object} commandMessage - The original command message
+   * @returns {Promise<void>}
+   */
+  async deleteSingleMessage(messageId, commandMessage) {
+    try {
+      // Try to fetch and delete the message
+      const targetMessage = await commandMessage.channel.messages.fetch(messageId).catch(() => null);
+
+      if (!targetMessage) {
+        await commandMessage.reply('❌ Message not found. It may have already been deleted or is too old.');
+        return;
+      }
+
+      // Check if the message is from this bot
+      if (targetMessage.author.id !== this.discord.client.user.id) {
+        await commandMessage.reply('❌ Can only delete messages sent by this bot.');
+        return;
+      }
+
+      await targetMessage.delete();
+      await commandMessage.reply(`✅ Deleted message \`${messageId}\`.`);
+
+      this.logger.info(`Deleted single message ${messageId} in channel ${commandMessage.channel.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete message ${messageId}:`, error);
+      await commandMessage.reply(`❌ Failed to delete message: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete multiple recent messages from the bot in a channel
+   * @param {string} channelId - Discord channel ID
+   * @param {number} count - Number of messages to delete (1-50)
+   * @param {Object} commandMessage - The original command message
+   * @returns {Promise<void>}
+   */
+  async deleteBulkMessages(channelId, count, commandMessage) {
+    try {
+      // Fetch the target channel
+      const targetChannel = await this.discord.client.channels.fetch(channelId).catch(() => null);
+
+      if (!targetChannel) {
+        await commandMessage.reply('❌ Channel not found or not accessible.');
+        return;
+      }
+
+      // Fetch recent messages from the channel
+      const messages = await targetChannel.messages.fetch({ limit: 100 });
+
+      // Filter to only bot messages and get the most recent ones
+      const botMessages = messages
+        .filter(msg => msg.author.id === this.discord.client.user.id)
+        .sort((a, b) => b.createdTimestamp - a.createdTimestamp)
+        .first(count);
+
+      if (botMessages.length === 0) {
+        await commandMessage.reply(`❌ No bot messages found in channel <#${channelId}>.`);
+        return;
+      }
+
+      // Delete messages one by one (Discord.js handles rate limiting)
+      let deletedCount = 0;
+      const errors = [];
+
+      for (const msg of botMessages) {
+        try {
+          await msg.delete();
+          deletedCount++;
+        } catch (error) {
+          errors.push(`${msg.id}: ${error.message}`);
+        }
+      }
+
+      // Send result message
+      let resultMessage = `✅ Deleted ${deletedCount}/${count} bot messages from <#${channelId}>.`;
+      if (errors.length > 0 && errors.length <= 3) {
+        resultMessage += `\n⚠️ Errors: ${errors.join(', ')}`;
+      } else if (errors.length > 3) {
+        resultMessage += `\n⚠️ ${errors.length} messages failed to delete (too old or other errors).`;
+      }
+
+      await commandMessage.reply(resultMessage);
+
+      this.logger.info(`Deleted ${deletedCount} bot messages from channel ${channelId} (requested: ${count})`);
+    } catch (error) {
+      this.logger.error(`Failed to delete bulk messages from channel ${channelId}:`, error);
+      await commandMessage.reply(`❌ Failed to delete messages: ${error.message}`);
     }
   }
 
