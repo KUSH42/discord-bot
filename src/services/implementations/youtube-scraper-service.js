@@ -398,7 +398,11 @@ export class YouTubeScraperService {
       try {
         // Look for channel name in page header/title areas
         const channelNameSelectors = [
-          'yt-formatted-string#text.ytd-channel-name', // Main channel name
+          'h1.dynamic-text-view-model-wiz__h1', // YouTube channel page main heading (most reliable)
+          'ytd-channel-name yt-formatted-string#text a', // Main channel name link (most specific)
+          'ytd-channel-name yt-formatted-string#text', // Main channel name text container
+          '.ytd-channel-name yt-formatted-string#text a', // Alternative class-based selector
+          '.ytd-channel-name yt-formatted-string#text', // Alternative class-based text container
           '#channel-name #text', // Alternative channel name selector
           'ytd-channel-name #text', // Channel name in header
           '#owner-name a', // Channel name in video owner section
@@ -414,12 +418,16 @@ export class YouTubeScraperService {
           }
         }
 
-        // If still not found, try extracting from page title
-        if (!extractedDisplayName && document.title) {
-          // YouTube page titles often follow format "Channel Name - YouTube"
+        // If still not found, try extracting from page title (only for channel pages)
+        if (!extractedDisplayName && document.title && window.location.href.includes('/videos')) {
+          // YouTube channel page titles follow format "Channel Name - YouTube"
           const titleMatch = document.title.match(/^(.+?)\s*-\s*YouTube$/);
           if (titleMatch) {
-            extractedDisplayName = titleMatch[1].trim();
+            const potentialChannelName = titleMatch[1].trim();
+            // Additional validation: ensure it doesn't look like a video title
+            if (potentialChannelName.length < 50 && !potentialChannelName.includes(':')) {
+              extractedDisplayName = potentialChannelName;
+            }
           }
         }
       } catch (error) {
