@@ -225,16 +225,22 @@ export class ContentCoordinator {
 
       // Classify content for proper handling (especially for X retweets)
       operation.progress('🔍 Classifying content for proper handling');
+      const originalType = contentData.type;
       const classification = await this.classifyContent(contentData);
       if (classification) {
         contentData.classification = classification;
         // Update content type based on classification for proper channel routing
         if (classification.type && classification.type !== 'unknown') {
+          operation.progress(
+            `🔄 Updating content type from '${originalType}' to '${classification.type}' based on classification`
+          );
           contentData.type = classification.type;
         }
         const classificationInfo = {
-          type: classification.type,
+          originalType,
+          classifiedType: classification.type,
           confidence: classification.confidence,
+          finalType: contentData.type,
         };
         operation.progress(
           `✅ Content classification completed: ${JSON.stringify(classificationInfo, null, 1).replace(/\n/g, '')}`
@@ -459,11 +465,17 @@ export class ContentCoordinator {
    * @returns {string} Content type
    */
   determineContentType(contentData) {
+    // Use current type first (should be classified type after classification step)
+    if (contentData.type && contentData.type !== 'post') {
+      return contentData.type;
+    }
+
     // Use classification result if available (for X content)
     if (contentData.classification && contentData.classification.type) {
       return contentData.classification.type;
     }
 
+    // If still 'post' or no type, try to infer from content data
     if (contentData.type) {
       return contentData.type;
     }
@@ -474,7 +486,7 @@ export class ContentCoordinator {
       }
 
       if (contentData.url.includes('x.com') || contentData.url.includes('twitter.com')) {
-        return 'x_tweet';
+        return 'post'; // Default for X content
       }
     }
 
@@ -563,6 +575,8 @@ export class ContentCoordinator {
       source,
       detectionTime: nowUTC(),
       contentType: this.determineContentType(contentData),
+      // Ensure the classified type is used for announcement
+      type: contentData.type, // This should now contain the classified type
     };
 
     return await this.contentAnnouncer.announceContent(announcementData);

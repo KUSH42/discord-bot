@@ -372,6 +372,16 @@ export class ContentAnnouncer {
   formatYouTubeMessage(content, options) {
     const { title, url, type, channelTitle } = content;
 
+    // Debug logging if channel title is missing
+    if (!channelTitle) {
+      this.logger.warn('YouTube content missing channelTitle', {
+        contentId: content.id,
+        url: content.url,
+        title: content.title?.substring(0, 100),
+        availableFields: Object.keys(content),
+      });
+    }
+
     let emoji = '📺';
     let typeText = 'video';
 
@@ -397,7 +407,7 @@ export class ContentAnnouncer {
       return {
         embeds: [
           {
-            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Channel'} is now live!`,
+            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Unknown Channel'} is now live!`,
             description: this.sanitizeContent(title),
             url,
             color: 0xff0000, // Red for live
@@ -414,7 +424,9 @@ export class ContentAnnouncer {
       };
     }
 
-    return `${emoji} **${this.sanitizeContent(channelTitle) || 'Channel'}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
+    // Use better fallback that shows we're missing the channel name
+    const displayChannelTitle = this.sanitizeContent(channelTitle) || 'Unknown Channel';
+    return `${emoji} **${displayChannelTitle}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
   }
 
   /**

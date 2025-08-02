@@ -1044,7 +1044,7 @@ export class ScraperApplication {
           };
 
           this.logger.debug(
-            `Classifying tweet ${tweet.tweetID}: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}...", metadata=${JSON.stringify(classificationInput)}`
+            `Classifying tweet ${tweet.tweetID}: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}..."`
           );
 
           const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
@@ -1181,7 +1181,7 @@ export class ScraperApplication {
           };
 
           this.logger.debug(
-            `Classifying tweet for logging: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}...", input=${JSON.stringify(classificationInput)}`
+            `Classifying tweet for logging: URL=${tweet.url}, text="${(tweet.text || '').substring(0, 100)}..."`
           );
 
           const classification = this.classifier.classifyXContent(tweet.url, tweet.text, classificationInput);
@@ -1295,7 +1295,7 @@ export class ScraperApplication {
 
     // Scroll down multiple times to load more content for retweet detection
     // Increased iterations and improved timing for better content loading
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       try {
         // Check if page context is still valid before evaluating
         if (!this.browser.page || this.browser.page.isClosed()) {
@@ -1303,7 +1303,7 @@ export class ScraperApplication {
           return;
         }
 
-        this.logger.debug(`Enhanced scroll iteration ${i + 1}/4: Scrolling to bottom`);
+        this.logger.debug(`Enhanced scroll iteration ${i + 1}/3: Scrolling to bottom`);
 
         // Get current scroll position and tweet count before scrolling
         /* eslint-disable no-undef */

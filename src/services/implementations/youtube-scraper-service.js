@@ -602,7 +602,7 @@ export class YouTubeScraperService {
 
             // CRITICAL: Verify we're on the correct channel's page to prevent cross-channel detection
             const currentUrl = window.location.href;
-            const expectedChannelPattern = `${channelHandle}/streams`;
+            const expectedChannelPattern = `${channelHandle}/live`;
             const isOnCorrectChannelPage =
               (currentUrl.includes(`@${channelHandle}`) ||
                 currentUrl.includes(`youtube.com/${channelHandle}`) ||
