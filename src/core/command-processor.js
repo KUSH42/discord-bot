@@ -5,6 +5,7 @@
 
 import { nowUTC as _nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+import { ProcessCleanup } from '../utilities/process-cleanup.js';
 
 export class CommandProcessor {
   constructor(config, stateManager, debugFlagManager = null, metricsManager = null, baseLogger = null) {
@@ -383,6 +384,9 @@ export class CommandProcessor {
         case 'x-health':
           return await this.handleXHealth(appStats);
 
+        case 'browser-health':
+          return await this.handleBrowserHealth();
+
         case 'debug':
           return await this.handleDebugToggle(args);
 
@@ -601,6 +605,7 @@ export class CommandProcessor {
       `**${this.commandPrefix}health-detailed**: Shows detailed health status for all components.`,
       `**${this.commandPrefix}youtube-health**: Shows detailed YouTube monitor health status.`,
       `**${this.commandPrefix}x-health**: Shows detailed X scraper health status.`,
+      `**${this.commandPrefix}browser-health**: Shows browser process memory usage and health status.`,
       `**${this.commandPrefix}auth-status**: Shows X authentication status.`,
       `**${this.commandPrefix}scraper-health**: Shows X scraper health status.`,
       `**${this.commandPrefix}readme**: Displays this command information.`,
@@ -769,6 +774,40 @@ export class CommandProcessor {
       healthData: appStats,
       healthType: 'x-scraper',
     };
+  }
+
+  /**
+   * Handle browser health command
+   */
+  async handleBrowserHealth() {
+    try {
+      const processCleanup = new ProcessCleanup(this.logger);
+      const health = await processCleanup.checkBrowserHealth();
+
+      const healthData = {
+        browserProcessCount: health.processCount,
+        memoryUsageMB: Math.round(health.memoryMB),
+        healthy: health.healthy,
+        warnings: health.warnings,
+        timestamp: toISOStringUTC(),
+      };
+
+      return {
+        success: true,
+        message: health.healthy
+          ? 'Browser processes are healthy'
+          : `Browser health issues detected: ${health.warnings.join(', ')}`,
+        requiresRestart: false,
+        healthData,
+        healthType: 'browser',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to check browser health: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
   }
 
   /**

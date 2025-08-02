@@ -11,6 +11,7 @@ export class PlaywrightBrowserService extends BrowserService {
     super();
     this.browser = null;
     this.page = null;
+    this.isClosing = false; // Prevent multiple close operations
 
     // Create enhanced logger for browser operations
     this.logger = createEnhancedLogger('browser', baseLogger, debugManager, metricsManager);
@@ -410,40 +411,52 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async close() {
-    // Close page first, with error handling for disconnected state
-    if (this.page) {
-      try {
-        if (!this.page.isClosed()) {
-          await this.page.close();
-        }
-      } catch (error) {
-        // Ignore errors when page is already closed or disconnected
-        if (
-          !error.message.includes('Target page, context or browser has been closed') &&
-          !error.message.includes('Browser connection lost')
-        ) {
-          throw error;
-        }
-      }
-      this.page = null;
+    // Prevent multiple concurrent close operations
+    if (this.isClosing) {
+      this.logger.debug('Browser close already in progress, skipping');
+      return;
     }
 
-    // Close browser with error handling for disconnected state
-    if (this.browser) {
-      try {
-        if (this.browser.isConnected()) {
-          await this.browser.close();
+    this.isClosing = true;
+
+    try {
+      // Close page first, with error handling for disconnected state
+      if (this.page) {
+        try {
+          if (!this.page.isClosed()) {
+            await this.page.close();
+          }
+        } catch (error) {
+          // Ignore errors when page is already closed or disconnected
+          if (
+            !error.message.includes('Target page, context or browser has been closed') &&
+            !error.message.includes('Browser connection lost')
+          ) {
+            throw error;
+          }
         }
-      } catch (error) {
-        // Ignore errors when browser is already closed or disconnected
-        if (
-          !error.message.includes('Target page, context or browser has been closed') &&
-          !error.message.includes('Browser connection lost')
-        ) {
-          throw error;
-        }
+        this.page = null;
       }
-      this.browser = null;
+
+      // Close browser with error handling for disconnected state
+      if (this.browser) {
+        try {
+          if (this.browser.isConnected()) {
+            await this.browser.close();
+          }
+        } catch (error) {
+          // Ignore errors when browser is already closed or disconnected
+          if (
+            !error.message.includes('Target page, context or browser has been closed') &&
+            !error.message.includes('Browser connection lost')
+          ) {
+            throw error;
+          }
+        }
+        this.browser = null;
+      }
+    } finally {
+      this.isClosing = false;
     }
   }
 
@@ -452,7 +465,23 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {boolean} True if browser is running
    */
   isRunning() {
-    return this.browser !== null;
+    return this.browser !== null && this.browser.isConnected();
+  }
+
+  /**
+   * Check if browser is connected
+   * @returns {boolean} True if browser is connected
+   */
+  isConnected() {
+    return this.browser !== null && this.browser.isConnected();
+  }
+
+  /**
+   * Check if browser is closed
+   * @returns {boolean} True if browser is closed
+   */
+  isClosed() {
+    return this.browser === null || !this.browser.isConnected();
   }
 
   /**
@@ -491,6 +520,26 @@ export class PlaywrightBrowserService extends BrowserService {
       return this.browser && this.browser.isConnected() && this.page && !this.page.isClosed();
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Dispose of resources (for dependency container cleanup)
+   * @returns {Promise<void>}
+   */
+  async dispose() {
+    const operation = this.logger.startOperation('dispose', {
+      browserRunning: this.isRunning(),
+      pageAvailable: !!this.page,
+    });
+
+    try {
+      operation.progress('Disposing browser service resources');
+      await this.close();
+      operation.success('Browser service disposed successfully');
+    } catch (error) {
+      operation.error(error, 'Failed to dispose browser service');
+      throw error;
     }
   }
 }

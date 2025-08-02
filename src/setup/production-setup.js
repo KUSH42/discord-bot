@@ -44,6 +44,7 @@ import { MonitorApplication } from '../application/monitor-application.js';
 
 // Utils
 import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../logger-utils.js';
+import { ProcessCleanup } from '../utilities/process-cleanup.js';
 const { createFileLogFormat, createSystemdSafeConsoleTransport } = LoggerUtils;
 
 /**
@@ -620,6 +621,22 @@ export function createShutdownHandler(container) {
         hasError = true;
       }
 
+      // Explicitly dispose browser services first
+      try {
+        const xBrowserService = container.resolve('xBrowserService');
+        const youtubeBrowserService = container.resolve('youtubeBrowserService');
+
+        safeLog('info', 'Disposing browser services...');
+        await Promise.race([
+          Promise.all([xBrowserService.dispose(), youtubeBrowserService.dispose()]),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Browser dispose timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Browser services disposed successfully');
+      } catch (error) {
+        safeLog('warn', 'Error disposing browser services:', error.message);
+        hasError = true;
+      }
+
       // Dispose of container resources with timeout
       try {
         await Promise.race([
@@ -630,6 +647,16 @@ export function createShutdownHandler(container) {
       } catch (error) {
         safeLog('warn', 'Error disposing container:', error.message);
         hasError = true;
+      }
+
+      // Clean up zombie browser processes
+      try {
+        const logger = container.resolve('logger');
+        const processCleanup = new ProcessCleanup(logger);
+        await processCleanup.killZombieBrowsers();
+        safeLog('info', 'Zombie browser cleanup completed');
+      } catch (error) {
+        safeLog('warn', 'Could not cleanup zombie browsers:', error.message);
       }
 
       // Clean up lockfile if it exists

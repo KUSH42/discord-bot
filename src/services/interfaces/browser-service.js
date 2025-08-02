@@ -222,6 +222,22 @@ export class BrowserService {
   }
 
   /**
+   * Check if browser is connected
+   * @returns {boolean} True if browser is connected
+   */
+  isConnected() {
+    throw new Error('Abstract method: isConnected must be implemented');
+  }
+
+  /**
+   * Check if browser is closed
+   * @returns {boolean} True if browser is closed
+   */
+  isClosed() {
+    throw new Error('Abstract method: isClosed must be implemented');
+  }
+
+  /**
    * Dispose of resources
    * @returns {Promise<void>}
    */
