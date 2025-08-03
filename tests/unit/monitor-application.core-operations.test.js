@@ -75,6 +75,8 @@ describe('MonitorApplication - Core Operations', () => {
 
     mockStateManager = {
       get: jest.fn(),
+      set: jest.fn(),
+      delete: jest.fn(),
     };
 
     mockEventBus = {

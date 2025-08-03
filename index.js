@@ -69,12 +69,12 @@ async function checkForExistingInstances() {
           safeConsoleLog('   Kill existing instance with: kill', lockPid);
           safeConsoleLog('   Or remove stale lockfile with: rm .bot-running.lock');
           process.exit(1);
-        } catch (error) {
+        } catch (_error) {
           // Process doesn't exist, remove stale lockfile
           safeConsoleLog('🧹 Removing stale lockfile from PID:', lockPid);
           fs.unlinkSync(lockFile);
         }
-      } catch (error) {
+      } catch (_error) {
         // Corrupted lockfile, remove it
         safeConsoleLog('🧹 Removing corrupted lockfile');
         fs.unlinkSync(lockFile);

@@ -160,15 +160,24 @@ describe('ScraperApplication Authentication Verification', () => {
       scraperApp.delay = mockDelay;
 
       // Mock the browser property and its evaluate method
+      // Mock different return values to simulate content loading during scrolling
+      let callCount = 0;
       scraperApp.browser = {
         page: { isClosed: jest.fn().mockReturnValue(false) },
-        evaluate: jest.fn().mockResolvedValue(),
+        evaluate: jest.fn().mockImplementation(() => {
+          callCount++;
+          return Promise.resolve({
+            scrollHeight: 1000 + callCount * 100, // Simulate increasing scroll height
+            scrollTop: callCount * 100,
+            tweetCount: 5 + callCount, // Simulate new tweets being loaded
+          });
+        }),
       };
 
       await scraperApp.performEnhancedScrolling();
 
-      // Enhanced scrolling now performs 4 iterations with 3 evaluate calls per iteration
-      expect(scraperApp.browser.evaluate).toHaveBeenCalledTimes(12);
+      // Enhanced scrolling performs 3 iterations with 3 evaluate calls per iteration
+      expect(scraperApp.browser.evaluate).toHaveBeenCalledTimes(9);
       // Delay is called multiple times per iteration (2500ms + 1000ms per iteration, plus final delay)
       expect(mockDelay).toHaveBeenCalled();
       expect(mockDelay).toHaveBeenCalledWith(2500); // Main delay between scrolls

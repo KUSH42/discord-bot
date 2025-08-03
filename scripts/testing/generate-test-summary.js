@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import xml2js from 'xml2js';
+import { nowUTC, toISOStringUTC } from '../../src/utilities/utc-time.js';
 
 class TestSummaryGenerator {
   constructor() {
@@ -590,7 +591,7 @@ class TestSummaryGenerator {
           results.push(fullPath);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Directory doesn't exist or not accessible
     }
 
@@ -798,7 +799,7 @@ class TestSummaryGenerator {
           report.push('```');
           report.push(excerpt);
           report.push('```');
-        } catch (error) {
+        } catch (_error) {
           report.push(`⚠️ Could not read log file: ${result.logs}`);
         }
       } else {

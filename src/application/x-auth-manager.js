@@ -660,18 +660,23 @@ export class XAuthManager {
     const originalEmail = this.config.get('TWITTER_EMAIL');
     const originalPhone = this.config.get('TWITTER_PHONE');
 
+    // Helper function to escape regex special characters
+    const escapeRegex = str => {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
     // Replace credentials with placeholders
     if (originalPassword) {
-      sanitized = sanitized.replace(new RegExp(originalPassword, 'g'), '[REDACTED_PASSWORD]');
+      sanitized = sanitized.replace(new RegExp(escapeRegex(originalPassword), 'g'), '[REDACTED_PASSWORD]');
     }
     if (originalUsername) {
-      sanitized = sanitized.replace(new RegExp(originalUsername, 'g'), '[REDACTED_USERNAME]');
+      sanitized = sanitized.replace(new RegExp(escapeRegex(originalUsername), 'g'), '[REDACTED_USERNAME]');
     }
     if (originalEmail) {
-      sanitized = sanitized.replace(new RegExp(originalEmail, 'g'), '[REDACTED_EMAIL]');
+      sanitized = sanitized.replace(new RegExp(escapeRegex(originalEmail), 'g'), '[REDACTED_EMAIL]');
     }
     if (originalPhone) {
-      sanitized = sanitized.replace(new RegExp(originalPhone, 'g'), '[REDACTED_PHONE]');
+      sanitized = sanitized.replace(new RegExp(escapeRegex(originalPhone), 'g'), '[REDACTED_PHONE]');
     }
 
     return sanitized;

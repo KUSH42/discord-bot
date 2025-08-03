@@ -142,8 +142,10 @@ describe('XAuthManager', () => {
         { name: 'ct0', value: 'valid_ct0_token' },
       ]);
 
-      // Mock successful navigation to home page
-      mockBrowserService.getUrl.mockResolvedValue('https://x.com/home');
+      // Mock current URL not on home page, so navigation will occur
+      mockBrowserService.getUrl
+        .mockResolvedValueOnce('https://x.com/i/flow/login') // First call - not on home page
+        .mockResolvedValueOnce('https://x.com/home'); // Second call - after navigation
 
       const result = await xAuthManager.isAuthenticated();
 
@@ -153,7 +155,7 @@ describe('XAuthManager', () => {
         timeout: 10000,
         waitUntil: 'domcontentloaded',
       });
-      expect(mockBrowserService.getUrl).toHaveBeenCalled();
+      expect(mockBrowserService.getUrl).toHaveBeenCalledTimes(2);
     });
 
     it('should return false when valid cookies are not present', async () => {
@@ -300,10 +302,15 @@ describe('XAuthManager', () => {
       jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
       jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
       jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
+      jest
+        .spyOn(xAuthManager, 'waitForSelectorWithFallback')
+        .mockResolvedValueOnce('input[name="text"]')
+        .mockResolvedValueOnce('input[name="password"]');
+      jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
 
       await expect(xAuthManager.loginToX()).rejects.toThrow('Authentication failed');
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Credential-based login failed.',
+        'Credential-based login failed after multiple verification attempts.',
         expect.objectContaining({
           module: 'auth',
         })
@@ -468,7 +475,7 @@ describe('XAuthManager', () => {
       jest.spyOn(xAuthManager, 'isAuthenticated').mockResolvedValue(false);
       mockBrowserService.waitForSelector.mockRejectedValue(new Error('Timeout'));
 
-      await expect(xAuthManager.loginToX()).rejects.toThrow('Timeout');
+      await expect(xAuthManager.loginToX()).rejects.toThrow('Could not find element with any of the selectors');
     });
 
     it('should handle network errors during navigation', async () => {

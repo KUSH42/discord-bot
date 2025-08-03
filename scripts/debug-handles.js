@@ -9,6 +9,7 @@
  *   node scripts/debug-handles.js --force-close
  */
 
+import { nowUTC } from '../src/utilities/utc-time.js';
 import detector from '../tests/utils/open-handle-detector.js';
 
 const args = process.argv.slice(2);

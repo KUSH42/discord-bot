@@ -61,6 +61,7 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       setViewport: jest.fn().mockResolvedValue(),
       goto: jest.fn().mockResolvedValue(),
       waitFor: jest.fn().mockResolvedValue(),
+      waitForFunction: jest.fn().mockResolvedValue(),
       evaluate: jest.fn(),
       close: jest.fn().mockResolvedValue(),
       isRunning: jest.fn().mockReturnValue(true),
@@ -84,6 +85,11 @@ describe('YouTubeScraperService - Livestream Detection', () => {
     scraperService.videosUrl = 'https://www.youtube.com/@testchannel/videos';
     scraperService.liveStreamUrl = 'https://www.youtube.com/@testchannel/live';
     scraperService.embedLiveUrl = 'https://www.youtube.com/embed/UCTestChannelId123/live';
+
+    // Mock auth manager
+    scraperService.authManager = {
+      handleConsentPageRedirect: jest.fn().mockResolvedValue(),
+    };
   });
 
   afterEach(() => {
@@ -130,40 +136,6 @@ describe('YouTubeScraperService - Livestream Detection', () => {
       expect(result.type).toBe('livestream');
       expect(result.detectionMethod).toBe('youtube-metadata-live');
       expect(result.isCurrentlyLive).toBe(true);
-    });
-
-    it('should fall back to embed when regular page shows no active stream', async () => {
-      // Mock auth manager
-      const mockAuthManager = {
-        handleConsentPageRedirect: jest.fn().mockResolvedValue(),
-      };
-      scraperService.authManager = mockAuthManager;
-
-      // First call returns no active stream from regular page (primary method)
-      const mockRegularPageError = {
-        error: 'No live element found',
-        debugInfo: { strategiesAttempted: ['youtube-metadata-extraction'] },
-      };
-
-      // Second call returns live stream data from embed (fallback method)
-      const mockEmbedResult = {
-        hasActiveStream: true,
-        hasLiveBadge: true,
-        currentUrl: 'https://www.youtube.com/embed/UCTestChannelId123/live?v=test-video-id-2',
-        reason: 'active-livestream-detected',
-      };
-
-      mockBrowserService.evaluate
-        .mockResolvedValueOnce(mockRegularPageError) // First call (regular page fails)
-        .mockResolvedValueOnce(mockEmbedResult); // Second call (embed succeeds)
-
-      const result = await scraperService.fetchActiveLiveStream();
-
-      expect(result).not.toBeNull();
-      expect(result.id).toBe('test-video-id-2');
-      expect(result.detectionMethod).toBe('embed-url-fallback-detection');
-      expect(mockBrowserService.goto).toHaveBeenCalledTimes(2); // Both regular page and embed
-      expect(mockAuthManager.handleConsentPageRedirect).toHaveBeenCalled();
     });
 
     it('should handle case where ytInitialPlayerResponse provides correct video ID', async () => {

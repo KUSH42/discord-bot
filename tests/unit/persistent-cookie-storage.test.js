@@ -30,6 +30,13 @@ describe('Persistent Cookie Storage', () => {
             TWITTER_PASSWORD: 'testpassword',
           })[key]
       ),
+      get: jest.fn(
+        key =>
+          ({
+            TWITTER_EMAIL: 'test@example.com',
+            TWITTER_PHONE: '+1234567890',
+          })[key]
+      ),
     };
 
     mockStateManager = {

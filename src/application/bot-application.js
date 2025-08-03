@@ -545,7 +545,6 @@ export class BotApplication {
       // Handle delete actions (consume the flag)
       if (result.deleteAction) {
         const { deleteAction } = result;
-        const { userId } = result;
         result.deleteAction = null; // Consume the flag to prevent duplicate processing
         await this.handleDeleteAction(deleteAction, result, message);
       }

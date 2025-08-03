@@ -47,6 +47,8 @@ describe('MonitorApplication', () => {
     mockConfig.get.mockReturnValue('test-secret');
     mockStateManager = {
       get: jest.fn(),
+      set: jest.fn(),
+      delete: jest.fn(),
     };
     mockEventBus = {
       emit: jest.fn(),

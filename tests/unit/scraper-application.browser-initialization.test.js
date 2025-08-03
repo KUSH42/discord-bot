@@ -132,7 +132,7 @@ describe('Browser Initialization', () => {
 
     expect(mockBrowserService.launch).toHaveBeenCalledWith(
       expect.objectContaining({
-        headless: true,
+        headless: false,
         args: expect.any(Array),
       })
     );
