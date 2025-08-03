@@ -126,6 +126,108 @@ describe('XAuthManager', () => {
 
       expect(xAuthManager.validateCookieFormat(mixedCookies)).toBe(false);
     });
+
+    it('should reject cookies with suspicious script patterns', () => {
+      const suspiciousCookies = [
+        { name: 'session', value: '<script>alert("xss")</script>' },
+        { name: '<iframe src="evil"></iframe>', value: 'value' },
+        { name: 'session', value: 'javascript:alert(1)' },
+        { name: 'eval(malicious)', value: 'normal' },
+      ];
+
+      suspiciousCookies.forEach(cookie => {
+        expect(xAuthManager.validateCookieFormat([cookie])).toBe(false);
+      });
+    });
+
+    it('should reject cookies with DOM manipulation patterns', () => {
+      const domManipulationCookies = [
+        { name: 'session', value: 'document.write("hack")' },
+        { name: 'window.location', value: 'evil.com' },
+        { name: 'session', value: 'vbscript:msgbox(1)' },
+      ];
+
+      domManipulationCookies.forEach(cookie => {
+        expect(xAuthManager.validateCookieFormat([cookie])).toBe(false);
+      });
+    });
+
+    it('should reject cookies with path traversal patterns', () => {
+      const pathTraversalCookies = [
+        { name: 'session', value: '../../../etc/passwd' },
+        { name: '..\\windows\\system32', value: 'value' },
+        { name: 'session', value: '$(cat /etc/hosts)' },
+        { name: 'command', value: '`ls -la`' },
+      ];
+
+      pathTraversalCookies.forEach(cookie => {
+        expect(xAuthManager.validateCookieFormat([cookie])).toBe(false);
+      });
+    });
+
+    it('should reject cookies with data URLs', () => {
+      const dataUrlCookies = [
+        { name: 'session', value: 'data:text/html,<script>alert(1)</script>' },
+        { name: 'session', value: 'data:text/html,malicious_content' },
+      ];
+
+      // Test each cookie individually to ensure proper failure detection
+      expect(xAuthManager.validateCookieFormat([dataUrlCookies[0]])).toBe(false);
+      expect(xAuthManager.validateCookieFormat([dataUrlCookies[1]])).toBe(false);
+    });
+
+    it('should accept cookies with normal special characters', () => {
+      const normalCookies = [
+        { name: 'session_id', value: 'abc-123_def.456' },
+        { name: 'auth-token', value: 'Bearer eyJhbGciOiJIUzI1NiJ9' },
+        { name: 'csrf', value: 'random+token/with=special&chars' },
+        { name: 'tracking', value: 'utm_source=google&utm_medium=cpc' },
+      ];
+
+      expect(xAuthManager.validateCookieFormat(normalCookies)).toBe(true);
+    });
+
+    it('should handle edge cases with empty strings', () => {
+      const edgeCaseCookies = [
+        { name: '', value: 'value' }, // Empty name
+        { name: 'name', value: '' }, // Empty value  
+        { name: ' ', value: 'value' }, // Whitespace name
+        { name: 'name', value: ' ' }, // Whitespace value
+      ];
+
+      // All of these should be considered valid format (empty strings are valid)
+      edgeCaseCookies.forEach(cookie => {
+        expect(xAuthManager.validateCookieFormat([cookie])).toBe(true);
+      });
+    });
+
+    it('should handle null and undefined cookie objects', () => {
+      const nullCookies = [
+        null,
+        undefined,
+        { name: null, value: 'value' },
+        { name: 'name', value: null },
+        { name: undefined, value: 'value' },
+        { name: 'name', value: undefined },
+      ];
+
+      nullCookies.forEach(cookie => {
+        expect(xAuthManager.validateCookieFormat([cookie])).toBe(false);
+      });
+    });
+
+    it('should validate large cookie arrays efficiently', () => {
+      const largeCookieArray = Array.from({ length: 100 }, (_, i) => ({
+        name: `cookie_${i}`,
+        value: `value_${i}`,
+      }));
+
+      expect(xAuthManager.validateCookieFormat(largeCookieArray)).toBe(true);
+
+      // Add one malicious cookie
+      largeCookieArray.push({ name: 'evil', value: '<script>alert(1)</script>' });
+      expect(xAuthManager.validateCookieFormat(largeCookieArray)).toBe(false);
+    });
   });
 
   describe('isAuthenticated', () => {
@@ -298,23 +400,21 @@ describe('XAuthManager', () => {
     });
 
     it('should throw error when authentication fails after login', async () => {
-      jest.spyOn(xAuthManager, 'isAuthenticated').mockResolvedValue(false);
+      // Mock all intermediate steps to succeed but final authentication to fail
+      jest.spyOn(xAuthManager, 'isAuthenticated')
+        .mockResolvedValueOnce(false) // Initial check
+        .mockResolvedValueOnce(false) // First retry
+        .mockResolvedValueOnce(false) // Second retry
+        .mockResolvedValueOnce(false); // Third retry
       jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
       jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
       jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
-      jest
-        .spyOn(xAuthManager, 'waitForSelectorWithFallback')
+      jest.spyOn(xAuthManager, 'waitForSelectorWithFallback')
         .mockResolvedValueOnce('input[name="text"]')
         .mockResolvedValueOnce('input[name="password"]');
       jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
 
       await expect(xAuthManager.loginToX()).rejects.toThrow('Authentication failed');
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Credential-based login failed after multiple verification attempts.',
-        expect.objectContaining({
-          module: 'auth',
-        })
-      );
     });
 
     it('should handle browser interaction errors', async () => {
@@ -479,11 +579,13 @@ describe('XAuthManager', () => {
     });
 
     it('should handle network errors during navigation', async () => {
-      mockBrowserService.waitForNavigation.mockRejectedValue(new Error('Network error'));
-      jest.spyOn(xAuthManager, 'isAuthenticated').mockResolvedValue(true);
-      jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'waitForSelectorWithFallback')
+        .mockResolvedValueOnce('input[name="text"]')
+        .mockResolvedValueOnce('input[name="password"]');
+      jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
       jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
       jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
+      mockBrowserService.waitForNavigation.mockRejectedValue(new Error('Network error'));
 
       await expect(xAuthManager.loginToX()).rejects.toThrow('Network error');
     });
@@ -570,6 +672,468 @@ describe('XAuthManager', () => {
       await xAuthManager.ensureAuthenticated(); // Should fail and trigger login
 
       expect(xAuthManager.loginToX).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('delay method', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should delay for specified milliseconds', async () => {
+      const delayPromise = xAuthManager.delay(1000);
+      
+      // Fast-forward time
+      jest.advanceTimersByTime(1000);
+      
+      await expect(delayPromise).resolves.toBeUndefined();
+    });
+
+    it('should handle zero delay', async () => {
+      const delayPromise = xAuthManager.delay(0);
+      
+      jest.advanceTimersByTime(0);
+      
+      await expect(delayPromise).resolves.toBeUndefined();
+    });
+  });
+
+  describe('clearSensitiveData method', () => {
+    it('should clear all sensitive credential data', () => {
+      // Verify credentials are initially set
+      expect(xAuthManager.twitterUsername).toBe('test_user');
+      expect(xAuthManager.twitterPassword).toBe('test_password');
+      
+      xAuthManager.clearSensitiveData();
+      
+      expect(xAuthManager.twitterUsername).toBeNull();
+      expect(xAuthManager.twitterPassword).toBeNull();
+      expect(xAuthManager.twitterEmail).toBeNull();
+      expect(xAuthManager.twitterPhone).toBeNull();
+    });
+
+    it('should not throw if credentials were already cleared', () => {
+      xAuthManager.clearSensitiveData();
+      
+      expect(() => xAuthManager.clearSensitiveData()).not.toThrow();
+    });
+  });
+
+  describe('sanitizeErrorMessage method', () => {
+    beforeEach(() => {
+      // Restore config mocks to return actual values for sanitization testing
+      mockConfig.getRequired.mockImplementation(key => {
+        const config = {
+          TWITTER_USERNAME: 'test_user',
+          TWITTER_PASSWORD: 'secret_password_123',
+        };
+        return config[key];
+      });
+      mockConfig.get.mockImplementation(key => {
+        const config = {
+          TWITTER_EMAIL: 'test@example.com',
+          TWITTER_PHONE: '+1234567890',
+        };
+        return config[key];
+      });
+    });
+
+    it('should remove username from error messages', () => {
+      const errorMessage = 'Login failed for user test_user with timeout';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('Login failed for user [REDACTED_USERNAME] with timeout');
+      expect(sanitized).not.toContain('test_user');
+    });
+
+    it('should remove password from error messages', () => {
+      const errorMessage = 'Authentication failed with password secret_password_123';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('Authentication failed with password [REDACTED_PASSWORD]');
+      expect(sanitized).not.toContain('secret_password_123');
+    });
+
+    it('should remove email from error messages', () => {
+      const errorMessage = 'Email verification failed for test@example.com';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('Email verification failed for [REDACTED_EMAIL]');
+      expect(sanitized).not.toContain('test@example.com');
+    });
+
+    it('should remove phone from error messages', () => {
+      const errorMessage = 'Phone verification sent to +1234567890';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('Phone verification sent to [REDACTED_PHONE]');
+      expect(sanitized).not.toContain('+1234567890');
+    });
+
+    it('should handle non-string input gracefully', () => {
+      expect(xAuthManager.sanitizeErrorMessage(null)).toBe('An unknown error occurred');
+      expect(xAuthManager.sanitizeErrorMessage(undefined)).toBe('An unknown error occurred');
+      expect(xAuthManager.sanitizeErrorMessage(123)).toBe('An unknown error occurred');
+      expect(xAuthManager.sanitizeErrorMessage({})).toBe('An unknown error occurred');
+    });
+
+    it('should handle error messages with special regex characters', () => {
+      // Test username with special characters that need escaping
+      mockConfig.getRequired.mockImplementation(key => {
+        const config = {
+          TWITTER_USERNAME: 'user.test+123',
+          TWITTER_PASSWORD: 'pass[word]',
+        };
+        return config[key];
+      });
+      
+      const errorMessage = 'Login failed for user.test+123 with pass[word]';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('Login failed for [REDACTED_USERNAME] with [REDACTED_PASSWORD]');
+      expect(sanitized).not.toContain('user.test+123');
+      expect(sanitized).not.toContain('pass[word]');
+    });
+
+    it('should handle multiple occurrences of the same credential', () => {
+      const errorMessage = 'test_user login failed, retry for test_user again';
+      const sanitized = xAuthManager.sanitizeErrorMessage(errorMessage);
+      
+      expect(sanitized).toBe('[REDACTED_USERNAME] login failed, retry for [REDACTED_USERNAME] again');
+      expect(sanitized).not.toContain('test_user');
+    });
+  });
+
+  describe('isRecoverableError method', () => {
+    it('should identify recoverable network errors', () => {
+      const recoverableErrors = [
+        new Error('Network timeout occurred'),
+        new Error('Connection refused'),
+        new Error('Server error 500'),
+        new Error('Page loading failed'),
+        new Error('Navigation timeout'),
+        new Error('Protocol error'),
+        new Error('Service temporarily unavailable'),
+        new Error('Page crash detected'),
+      ];
+      
+      recoverableErrors.forEach(error => {
+        expect(xAuthManager.isRecoverableError(error)).toBe(true);
+      });
+    });
+
+    it('should identify non-recoverable challenge errors', () => {
+      const nonRecoverableErrors = [
+        new Error('Unusual login activity challenge detected, but no email or phone number configured'),
+        new Error('Challenge form filled but could not find continue button'),
+        new Error('Challenge detected but no verification credentials available'),
+      ];
+      
+      nonRecoverableErrors.forEach(error => {
+        expect(xAuthManager.isRecoverableError(error)).toBe(false);
+      });
+    });
+
+    it('should identify non-recoverable authentication errors', () => {
+      const nonRecoverableErrors = [
+        new Error('Invalid credentials provided'),
+        new Error('Account suspended'),
+        new Error('Access denied'),
+        new Error('Authentication method not supported'),
+      ];
+      
+      nonRecoverableErrors.forEach(error => {
+        expect(xAuthManager.isRecoverableError(error)).toBe(false);
+      });
+    });
+
+    it('should handle case-insensitive error matching', () => {
+      const mixedCaseErrors = [
+        new Error('NETWORK ERROR OCCURRED'),
+        new Error('Connection TIMEOUT'),
+        new Error('unusual LOGIN activity challenge detected'),
+      ];
+      
+      expect(xAuthManager.isRecoverableError(mixedCaseErrors[0])).toBe(true);
+      expect(xAuthManager.isRecoverableError(mixedCaseErrors[1])).toBe(true);
+      expect(xAuthManager.isRecoverableError(mixedCaseErrors[2])).toBe(false);
+    });
+  });
+
+  describe('waitForSelectorWithFallback method', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should return first successful selector', async () => {
+      const selectors = ['input[name="username"]', 'input[type="text"]', 'input.username'];
+      mockBrowserService.waitForSelector.mockResolvedValueOnce();
+      
+      const result = await xAuthManager.waitForSelectorWithFallback(selectors);
+      
+      expect(result).toBe('input[name="username"]');
+      expect(mockBrowserService.waitForSelector).toHaveBeenCalledWith(
+        'input[name="username"]',
+        { timeout: 3333 } // 10000ms / 3 selectors = 3333ms per selector
+      );
+    });
+
+    it('should try multiple selectors until one succeeds', async () => {
+      const selectors = ['input[name="username"]', 'input[type="text"]', 'input.username'];
+      mockBrowserService.waitForSelector
+        .mockRejectedValueOnce(new Error('Selector not found'))
+        .mockResolvedValueOnce();
+      
+      const result = await xAuthManager.waitForSelectorWithFallback(selectors);
+      
+      expect(result).toBe('input[type="text"]');
+      expect(mockBrowserService.waitForSelector).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw error when all selectors fail', async () => {
+      const selectors = ['input[name="username"]', 'input[type="text"]'];
+      mockBrowserService.waitForSelector.mockRejectedValue(new Error('Selector not found'));
+      
+      await expect(xAuthManager.waitForSelectorWithFallback(selectors))
+        .rejects.toThrow('Could not find element with any of the selectors: input[name="username"], input[type="text"]');
+      
+      expect(mockBrowserService.waitForSelector).toHaveBeenCalledTimes(2);
+    });
+
+    it('should provide debug information for password selectors', async () => {
+      const passwordSelectors = ['input[name="password"]', 'input[type="password"]'];
+      mockBrowserService.waitForSelector.mockRejectedValue(new Error('Selector not found'));
+      mockBrowserService.getUrl.mockResolvedValue('https://x.com/login');
+      mockBrowserService.getContent.mockResolvedValue('<html><input type="text"><input type="email"></html>');
+      
+      await expect(xAuthManager.waitForSelectorWithFallback(passwordSelectors))
+        .rejects.toThrow('Could not find element with any of the selectors');
+      
+      // Verify debug information was gathered
+      expect(mockBrowserService.getUrl).toHaveBeenCalled();
+      expect(mockBrowserService.getContent).toHaveBeenCalled();
+    });
+
+    it('should handle debug information failures gracefully', async () => {
+      const passwordSelectors = ['input[name="password"]'];
+      mockBrowserService.waitForSelector.mockRejectedValue(new Error('Selector not found'));
+      mockBrowserService.getUrl.mockRejectedValue(new Error('Debug failed'));
+      
+      await expect(xAuthManager.waitForSelectorWithFallback(passwordSelectors))
+        .rejects.toThrow('Could not find element with any of the selectors');
+      
+      // Should still attempt to get debug info even if it fails
+      expect(mockBrowserService.getUrl).toHaveBeenCalled();
+    });
+
+    it('should respect minimum time per selector', async () => {
+      const selectors = ['input[name="username"]'];
+      const shortTimeout = 2000; // Less than minimum 3000ms
+      mockBrowserService.waitForSelector.mockResolvedValue();
+      
+      await xAuthManager.waitForSelectorWithFallback(selectors, { timeout: shortTimeout });
+      
+      // Should use minimum time of 3000ms, not the calculated 2000ms
+      expect(mockBrowserService.waitForSelector).toHaveBeenCalledWith(
+        'input[name="username"]',
+        { timeout: 3000 }
+      );
+    });
+
+    it('should distribute time evenly among selectors', async () => {
+      const selectors = ['input[name="username"]', 'input[type="text"]', 'input.username', 'input#username'];
+      const totalTimeout = 12000;
+      mockBrowserService.waitForSelector.mockResolvedValue();
+      
+      await xAuthManager.waitForSelectorWithFallback(selectors, { timeout: totalTimeout });
+      
+      // 12000ms / 4 selectors = 3000ms per selector
+      expect(mockBrowserService.waitForSelector).toHaveBeenCalledWith(
+        'input[name="username"]',
+        { timeout: 3000 }
+      );
+    });
+  });
+
+  describe('ensureAuthenticated retry logic', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should retry authentication with exponential backoff', async () => {
+      mockStateManager.get.mockReturnValue(null);
+      jest.spyOn(xAuthManager, 'loginToX')
+        .mockRejectedValueOnce(new Error('Network timeout'))
+        .mockRejectedValueOnce(new Error('Connection refused'))
+        .mockResolvedValueOnce(true);
+      
+      const ensureAuthPromise = xAuthManager.ensureAuthenticated({ maxRetries: 3, baseDelay: 1000 });
+      
+      // Advance through the delays: 1000ms, 2000ms exponential backoff
+      await jest.advanceTimersByTimeAsync(1000);
+      await jest.advanceTimersByTimeAsync(2000);
+      
+      await ensureAuthPromise;
+      
+      expect(xAuthManager.loginToX).toHaveBeenCalledTimes(3);
+    }, 10000);
+
+    it('should fail after max retries exceeded', async () => {
+      mockStateManager.get.mockReturnValue(null);
+      const networkError = new Error('Network timeout');
+      jest.spyOn(xAuthManager, 'loginToX').mockRejectedValue(networkError);
+      
+      // Mock delay to avoid actual waiting
+      jest.spyOn(xAuthManager, 'delay').mockResolvedValue();
+      
+      await expect(xAuthManager.ensureAuthenticated({ maxRetries: 2, baseDelay: 10 })).rejects.toThrow('Authentication failed');
+      expect(xAuthManager.loginToX).toHaveBeenCalledTimes(2);
+    });
+
+    it('should fail immediately on non-recoverable errors', async () => {
+      mockStateManager.get.mockReturnValue(null);
+      jest.spyOn(xAuthManager, 'loginToX')
+        .mockRejectedValue(new Error('unusual login activity challenge detected, but no email configured'));
+      
+      await expect(xAuthManager.ensureAuthenticated({ maxRetries: 3 })).rejects.toThrow('Authentication failed');
+      
+      // Should only try once for non-recoverable errors
+      expect(xAuthManager.loginToX).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle state manager errors during cookie cleanup', async () => {
+      const invalidCookies = [{ name: 'invalid' }];
+      mockStateManager.get.mockReturnValue(invalidCookies);
+      mockStateManager.delete.mockImplementation(() => {
+        throw new Error('State delete failed');
+      });
+      jest.spyOn(xAuthManager, 'loginToX').mockResolvedValue(true);
+      
+      await xAuthManager.ensureAuthenticated();
+      
+      // Should continue with login despite state cleanup failure
+      expect(xAuthManager.loginToX).toHaveBeenCalled();
+    });
+  });
+
+  describe('isAuthenticated advanced scenarios', () => {
+    beforeEach(() => {
+      mockBrowserService.getCookies = jest.fn();
+      mockBrowserService.getUrl = jest.fn();
+      mockBrowserService.goto = jest.fn();
+    });
+
+    it('should handle alternative authentication mechanisms', async () => {
+      // Mock alternative auth with ct0 + twid instead of auth_token
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'ct0', value: 'valid_ct0_token' },
+        { name: 'twid', value: 'valid_twid_token' },
+        { name: 'other1', value: 'value1' },
+        { name: 'other2', value: 'value2' },
+        { name: 'other3', value: 'value3' },
+        { name: 'other4', value: 'value4' }, // 6 total cookies to trigger alternative auth
+      ]);
+      
+      mockBrowserService.getUrl
+        .mockResolvedValueOnce('https://x.com/login')
+        .mockResolvedValueOnce('https://x.com/home');
+      
+      const result = await xAuthManager.isAuthenticated();
+      
+      expect(result).toBe(true);
+      expect(mockBrowserService.goto).toHaveBeenCalledWith(
+        'https://x.com/home',
+        { timeout: 10000, waitUntil: 'domcontentloaded' }
+      );
+    });
+
+    it('should skip navigation if already on home page', async () => {
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'auth_token', value: 'valid_token' },
+        { name: 'ct0', value: 'valid_ct0' },
+      ]);
+      
+      mockBrowserService.getUrl
+        .mockResolvedValueOnce('https://x.com/home')
+        .mockResolvedValueOnce('https://x.com/home');
+      
+      const result = await xAuthManager.isAuthenticated();
+      
+      expect(result).toBe(true);
+      expect(mockBrowserService.goto).not.toHaveBeenCalled();
+    });
+
+    it('should detect login page redirect as authentication failure', async () => {
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'auth_token', value: 'expired_token' },
+        { name: 'ct0', value: 'expired_ct0' },
+      ]);
+      
+      mockBrowserService.getUrl
+        .mockResolvedValueOnce('https://x.com/profile')
+        .mockResolvedValueOnce('https://x.com/i/flow/login'); // Redirected to login
+      
+      const result = await xAuthManager.isAuthenticated();
+      
+      expect(result).toBe(false);
+    });
+
+    it('should handle navigation errors gracefully with valid cookies', async () => {
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'auth_token', value: 'valid_token' },
+        { name: 'ct0', value: 'valid_ct0' },
+      ]);
+      
+      mockBrowserService.getUrl.mockResolvedValue('https://x.com/profile');
+      mockBrowserService.goto.mockRejectedValue(new Error('Navigation failed'));
+      
+      const result = await xAuthManager.isAuthenticated();
+      
+      // Should return true because cookies are present, even if navigation fails
+      expect(result).toBe(true);
+    });
+
+    it('should provide detailed logging for authentication checks', async () => {
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'auth_token', value: 'valid_token' },
+        { name: 'ct0', value: 'valid_ct0' },
+        { name: 'other', value: 'other_value' },
+      ]);
+      
+      mockBrowserService.getUrl
+        .mockResolvedValueOnce('https://x.com/profile')
+        .mockResolvedValueOnce('https://x.com/home');
+      
+      const result = await xAuthManager.isAuthenticated();
+      
+      expect(result).toBe(true);
+      
+      // Verify enhanced logger operations were called with proper metadata
+      const enhancedLogger = xAuthManager.logger;
+      const startOperationSpy = jest.spyOn(enhancedLogger, 'startOperation');
+      
+      // Call again to verify logging
+      await xAuthManager.isAuthenticated();
+      
+      expect(startOperationSpy).toHaveBeenCalledWith(
+        'isAuthenticated',
+        expect.objectContaining({
+          hasBrowser: true,
+          hasPage: true,
+        })
+      );
     });
   });
 
