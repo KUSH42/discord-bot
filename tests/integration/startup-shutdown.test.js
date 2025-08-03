@@ -48,6 +48,8 @@ describe('Application Startup and Shutdown Integration Tests', () => {
       DISCORD_X_RETWEETS_CHANNEL_ID: '123456789012345684',
       YOUTUBE_API_KEY: 'test-youtube-key',
       YOUTUBE_CHANNEL_ID: 'UCrAOyUwjSM5zzPz_FqsUhuQ',
+      YOUTUBE_USERNAME: 'test@example.com',
+      YOUTUBE_PASSWORD: 'testpass',
       PSH_CALLBACK_URL: 'https://example.com/webhook',
       PSH_SECRET: 'test-psh-secret',
       PSH_PORT: '3001', // Use different port to avoid conflicts

@@ -51,6 +51,7 @@ describe('Content Announcement Flow Integration', () => {
           MAX_CONTENT_AGE_HOURS: '24',
           PROCESSING_LOCK_TIMEOUT_MS: '30000',
           ANNOUNCE_OLD_TWEETS: 'false',
+          X_USER_HANDLE: 'testuser',
         };
         return values[key] || defaultValue;
       }),
@@ -211,6 +212,7 @@ describe('Content Announcement Flow Integration', () => {
         timestamp: '2024-01-01T12:00:00Z',
         publishedAt: '2024-01-01T12:00:00Z',
         isOld: false,
+        xUser: 'testuser',
       };
 
       const result = await contentCoordinator.processContent(contentId, 'scraper', tweetData);
@@ -235,6 +237,7 @@ describe('Content Announcement Flow Integration', () => {
         timestamp: '2024-01-01T12:00:00Z',
         publishedAt: '2024-01-01T12:00:00Z',
         isOld: false,
+        xUser: 'testuser',
       };
 
       const result = await contentCoordinator.processContent(contentId, 'scraper', replyData);

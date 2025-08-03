@@ -618,8 +618,8 @@ export class YouTubeAuthManager {
         authScore += 2;
       } // Good positive indicator
       if (authIndicators.hasSignIn) {
-        authScore -= 4;
-      } // Strong negative indicator - "Sign in" button visible
+        authScore -= 2;
+      } // Moderate negative indicator - "Sign in" button visible (reduced from -4 for headless compatibility)
       if (authIndicators.hasAuthCookies) {
         authScore += 2;
       } // Good positive indicator
@@ -630,7 +630,7 @@ export class YouTubeAuthManager {
         authScore -= 5;
       } // Strong negative indicator
 
-      const isAuthenticated = authScore >= 3; // Require positive evidence with strong penalties for sign-in buttons
+      const isAuthenticated = authScore >= 1; // Reduced threshold for headless environments (was 3)
 
       operation.success(`Authentication check completed with score ${authScore}`, {
         authenticated: isAuthenticated,
@@ -653,7 +653,7 @@ export class YouTubeAuthManager {
           scoreBreakdown: {
             avatar: authIndicators.hasAvatar ? '+3' : '0',
             noSignIn: !authIndicators.hasSignIn ? '+2' : '0',
-            hasSignIn: authIndicators.hasSignIn ? '-4' : '0',
+            hasSignIn: authIndicators.hasSignIn ? '-2' : '0',
             authCookies: authIndicators.hasAuthCookies ? '+2' : '0',
             userMenu: authIndicators.hasUserMenu ? '+1' : '0',
             loginPage: authIndicators.onLoginPage ? '-5' : '0',

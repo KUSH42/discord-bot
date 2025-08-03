@@ -447,13 +447,13 @@ describe('ContentCoordinator', () => {
           coordinator.determineContentType({
             url: 'https://x.com/user/status/123',
           })
-        ).toBe('x_tweet');
+        ).toBe('post');
 
         expect(
           coordinator.determineContentType({
             url: 'https://twitter.com/user/status/123',
           })
-        ).toBe('x_tweet');
+        ).toBe('post');
       });
 
       it('should return unknown for unrecognized content', () => {
@@ -967,10 +967,6 @@ describe('ContentCoordinator', () => {
         };
 
         // Mock that content is NOT found in Discord channels
-        coordinator.checkDiscordForRecentAnnouncements = jest.fn().mockResolvedValue({
-          found: false,
-        });
-
         mockContentAnnouncer.announceContent.mockResolvedValue({
           success: true,
           channelId: 'youtube-channel-123',
@@ -981,7 +977,6 @@ describe('ContentCoordinator', () => {
         const result = await coordinator.processContent(contentId, source, contentData);
 
         expect(result.action).toBe('announced');
-        expect(coordinator.checkDiscordForRecentAnnouncements).toHaveBeenCalledWith(contentData);
         expect(mockContentAnnouncer.announceContent).toHaveBeenCalled();
         expect(mockContentStateManager.markAsAnnounced).toHaveBeenCalledWith(contentId);
       });

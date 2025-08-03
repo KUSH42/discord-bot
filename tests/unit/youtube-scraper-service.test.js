@@ -680,6 +680,7 @@ describe('YouTubeScraperService', () => {
         authenticateWithYouTube: jest.fn().mockResolvedValue(),
         isAuthenticated: false,
         handleConsentPageRedirect: jest.fn().mockResolvedValue(),
+        ensureAuthenticated: jest.fn().mockResolvedValue(true),
       };
 
       authenticatedService = new YouTubeScraperService({
@@ -704,7 +705,7 @@ describe('YouTubeScraperService', () => {
 
         await authenticatedService.initialize('testchannel');
 
-        expect(mockAuthManager.authenticateWithYouTube).toHaveBeenCalled();
+        expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
         expect(authenticatedService.isInitialized).toBe(true);
       });
 
@@ -776,7 +777,7 @@ describe('YouTubeScraperService', () => {
       });
 
       it('should provide authentication failure hints when enabled but not authenticated', async () => {
-        authenticatedService.isAuthenticated = false;
+        mockAuthManager.ensureAuthenticated.mockResolvedValue(false);
         mockBrowserService.evaluate.mockResolvedValue(null);
 
         await authenticatedService.initialize();

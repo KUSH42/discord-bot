@@ -636,6 +636,19 @@ describe('Scraper Announcement Flow E2E', () => {
         return values[key] !== undefined ? values[key] : defaultValue;
       });
 
+      // Override bot start time for this test to ensure old content gets filtered
+      // Set bot start time to 1 hour ago, so the 25-hour-old content will be filtered
+      const botStartTimeOverride = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      mockDependencies.stateManager.get.mockImplementation((key, defaultValue) => {
+        const state = {
+          postingEnabled: true,
+          announcementEnabled: true,
+          vxTwitterConversionEnabled: false,
+          botStartTime: botStartTimeOverride,
+        };
+        return state[key] !== undefined ? state[key] : defaultValue;
+      });
+
       // Mock to return only old tweets
       mockBrowserService.evaluate.mockImplementation(() => {
         return Promise.resolve([
@@ -654,6 +667,17 @@ describe('Scraper Announcement Flow E2E', () => {
 
       // Should not announce old content (older than 24 hours by default)
       expect(announcementCallLog).toHaveLength(0);
+
+      // Restore original state manager implementation
+      mockDependencies.stateManager.get.mockImplementation((key, defaultValue) => {
+        const state = {
+          postingEnabled: true,
+          announcementEnabled: true,
+          vxTwitterConversionEnabled: false,
+          botStartTime: new Date('2020-01-01T00:00:00Z'), // Set to much earlier to avoid age filtering
+        };
+        return state[key] !== undefined ? state[key] : defaultValue;
+      });
     }, 30000);
 
     it('should handle authentication failures gracefully', async () => {
