@@ -61,6 +61,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.1",
     "googleapis": "^152.0.0",
+    "gradient-string": "^3.0.0",
     "node-fetch": "^3.3.2",
     "playwright": "^1.44.1",
     "puppeteer-extra": "^3.3.6",

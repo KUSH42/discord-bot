@@ -1,6 +1,7 @@
 import { exec as defaultExec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { ChannelType } from 'discord.js';
 import { CommandRateLimit } from '../rate-limiter.js';
 import { nowUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
@@ -429,6 +430,22 @@ export class BotApplication {
       };
 
       operation.progress(`Processing command: ${command}`);
+
+      // Special handling for colorize command - DM only
+      if (command === 'colorize') {
+        if (message.channel.type !== ChannelType.DM) {
+          await message.reply(
+            '🎨 The colorize command only works in direct messages. Please DM me to use this command.'
+          );
+          return operation.success('Colorize command attempted outside DM', {
+            command,
+            userId: user.id,
+            channelType: message.channel.type,
+            action: 'rejected_not_dm',
+          });
+        }
+      }
+
       const result = await this.commandProcessor.processCommand(command, args, user.id, appStats);
 
       operation.progress('Handling command result');
