@@ -116,23 +116,17 @@ export class YouTubeScraperService {
     // Store channel handle for browser evaluation functions
     this.channelHandle = channelHandle;
 
-    // Get YouTube channel ID for embed URL construction
-    const youtubeChannelId = this.config.getRequired('YOUTUBE_CHANNEL_ID');
-
     // Construct channel URLs
     const baseUrl = `https://www.youtube.com/@${channelHandle}`;
     this.videosUrl = `${baseUrl}/videos`;
     this.liveStreamUrl = `${baseUrl}/live`;
     this.streamsUrl = `${baseUrl}/streams`; // Add streams endpoint
-    this.embedLiveUrl = `https://www.youtube.com/embed/${youtubeChannelId}/live`;
 
     try {
       operation.progress('Launching browser with optimized settings');
 
       // Launch browser with optimized settings for scraping
-      const browserOptions = getYouTubeScrapingBrowserConfig({
-        headless: false,
-      });
+      const browserOptions = getYouTubeScrapingBrowserConfig();
 
       await this.browserService.launch(browserOptions);
 
@@ -160,7 +154,13 @@ export class YouTubeScraperService {
       // Find and set the initial latest video
       const latestVideo = await this.fetchLatestVideo();
       if (latestVideo && latestVideo.success && latestVideo.id) {
-        await this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
+        const processLatestVideo = this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
+        const activeLiveStream = await this.fetchActiveLiveStream();
+        const pocessActiveLiveStream = this.contentCoordinator.processContent(
+          activeLiveStream.id,
+          'scraper',
+          latestVideo
+        );
 
         return operation.success('YouTube scraper initialized successfully', {
           videosUrl: this.videosUrl,
@@ -625,11 +625,9 @@ export class YouTubeScraperService {
           return streamsResult;
         }
 
-        // Final fallback: embed URL
-        operation.progress('Both endpoints failed, trying embed URL as final fallback');
-        const embedResult = await this.tryEmbedEndpoint(operation);
-
-        return embedResult;
+        // Final: return null
+        operation.progress('No active livestream detected');
+        return null;
       } catch (error) {
         operation.error(error, 'Failed to scrape for active live stream', {
           liveStreamUrl: this.liveStreamUrl,
@@ -1001,85 +999,6 @@ export class YouTubeScraperService {
         apiChannelTitle: this.stateManager?.get('youtubeChannelTitle'),
       }
     );
-  }
-
-  /**
-   * Try embed endpoint as final fallback
-   * @private
-   */
-  async tryEmbedEndpoint(operation) {
-    try {
-      operation.progress('Trying embed URL as final fallback');
-      await this.browserService.goto(this.embedLiveUrl, {
-        waitUntil: 'networkidle',
-        timeout: this.timeoutMs,
-      });
-
-      const embedCheck = await this.browserService.evaluate(() => {
-        /* eslint-disable no-undef */
-        const player = document.querySelector('#movie_player');
-        const video = document.querySelector('video');
-
-        if (!player || !video) {
-          return { hasActiveStream: false, reason: 'no-player-or-video' };
-        }
-
-        const hasLiveBadge = !!player.querySelector('.ytp-live, .ytp-live-badge');
-        const hasLiveClass = player.className.includes('live') || player.className.includes('ytp-live');
-        const isLiveVideo = video.duration === null || isNaN(video.duration) || video.duration === Infinity;
-        const hasVideoContent = video.readyState >= 2 && !video.ended;
-
-        const isActive = (hasLiveBadge || hasLiveClass) && isLiveVideo && hasVideoContent;
-
-        return {
-          hasActiveStream: isActive,
-          hasLiveBadge,
-          hasLiveClass,
-          isLiveVideo,
-          hasVideoContent,
-          videoReadyState: video.readyState,
-          videoDuration: video.duration,
-          playerClasses: player.className,
-          currentUrl: window.location.href,
-          reason: isActive ? 'active-livestream-detected' : 'no-active-livestream',
-        };
-        /* eslint-enable no-undef */
-      });
-
-      if (embedCheck.hasActiveStream) {
-        let videoIdMatch = embedCheck.currentUrl.match(/[?&]v=([^&]+)/);
-
-        if (!videoIdMatch) {
-          videoIdMatch = this.embedLiveUrl.match(/embed\/([^/]+)\/live/);
-        }
-
-        if (!videoIdMatch) {
-          const channelId = this.config.getRequired('YOUTUBE_CHANNEL_ID');
-          videoIdMatch = [null, channelId];
-        }
-
-        if (videoIdMatch && videoIdMatch[1]) {
-          const videoId = videoIdMatch[1];
-          return {
-            id: videoId,
-            title: 'Live Stream (embed fallback)',
-            url: `https://www.youtube.com/watch?v=${videoId}`,
-            type: 'livestream',
-            platform: 'youtube',
-            publishedAt: new Date().toISOString(),
-            scrapedAt: new Date().toISOString(),
-            detectionMethod: 'embed-url-fallback',
-            isCurrentlyLive: true,
-            embedInfo: embedCheck,
-          };
-        }
-      }
-
-      return null;
-    } catch (error) {
-      operation.progress(`Error with embed endpoint: ${error.message}`);
-      return null;
-    }
   }
 
   /**

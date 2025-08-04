@@ -16,6 +16,18 @@ export class EnhancedLogger {
 
     // Active operations tracking
     this.activeOperations = new Map();
+
+    // Sampling configuration (can be overridden per operation)
+    this.defaultSamplingRates = {
+      debug: 0.1, // Log 10% of debug messages by default
+      verbose: 0.05, // Log 5% of verbose messages by default
+      info: 1.0, // Log all info messages by default
+      warn: 1.0, // Log all warnings
+      error: 1.0, // Log all errors
+    };
+
+    // Operation sampling counters
+    this.samplingCounters = new Map();
   }
 
   /**
@@ -24,6 +36,111 @@ export class EnhancedLogger {
    */
   generateCorrelationId() {
     return crypto.randomBytes(8).toString('hex');
+  }
+
+  /**
+   * Check if a message should be logged based on sampling rate
+   * @param {string} level - Log level (debug, verbose, info, warn, error)
+   * @param {string} operationName - Operation name for sampling tracking
+   * @param {number} sampleRate - Custom sample rate (0.0-1.0), defaults to level default
+   * @returns {boolean} True if message should be logged
+   */
+  shouldSample(level, operationName = 'default', sampleRate = null) {
+    const rate = sampleRate !== null ? sampleRate : this.defaultSamplingRates[level] || 1.0;
+
+    // Always log if rate is 1.0 (100%)
+    if (rate >= 1.0) {
+      return true;
+    }
+
+    // Never log if rate is 0.0 (0%)
+    if (rate <= 0.0) {
+      return false;
+    }
+
+    // Use deterministic sampling based on operation counter for consistency
+    const counterKey = `${this.moduleName}.${operationName}.${level}`;
+    const currentCount = (this.samplingCounters.get(counterKey) || 0) + 1;
+    this.samplingCounters.set(counterKey, currentCount);
+
+    // Sample every Nth message where N = 1/rate
+    const interval = Math.ceil(1 / rate);
+    return currentCount % interval === 0;
+  }
+
+  /**
+   * Set sampling rate for a specific level and operation
+   * @param {string} level - Log level
+   * @param {number} rate - Sample rate (0.0-1.0)
+   * @param {string} operationName - Optional operation name for specific sampling
+   */
+  setSamplingRate(level, rate, operationName = null) {
+    if (operationName) {
+      const key = `${this.moduleName}.${operationName}.${level}`;
+      this.samplingCounters.set(key, 0); // Reset counter when changing rate
+    } else {
+      this.defaultSamplingRates[level] = rate;
+    }
+  }
+
+  /**
+   * Start a sampled tracked operation (logs only a percentage of operations)
+   * @param {string} operationName - Name of the operation
+   * @param {Object} context - Additional context for the operation
+   * @param {number} sampleRate - Custom sample rate (0.0-1.0), defaults to 0.1 for high-volume ops
+   * @returns {Object|null} Operation tracker or null if not sampled
+   */
+  startSampledOperation(operationName, context = {}, sampleRate = 0.1) {
+    // Check if this operation should be sampled
+    if (!this.shouldSample('debug', operationName, sampleRate)) {
+      // Return a no-op operation tracker that still records metrics but doesn't log
+      return this.createNoOpOperation(operationName, context);
+    }
+
+    // Log this operation normally
+    return this.startOperation(operationName, { ...context, sampled: true });
+  }
+
+  /**
+   * Create a no-op operation tracker that records metrics but doesn't log
+   * @private
+   */
+  createNoOpOperation(operationName, context = {}) {
+    const startTime = nowUTC();
+    const correlationId = context.correlationId || this.generateCorrelationId();
+
+    return {
+      name: operationName,
+      correlationId,
+      startTime,
+      context: { ...context, correlationId, noLog: true },
+
+      success: (message, additionalContext = {}) => {
+        const duration = nowUTC() - startTime;
+        this.recordMetrics(operationName, duration, true);
+        return { correlationId, duration, success: true, sampled: false };
+      },
+
+      error: (error, message, additionalContext = {}) => {
+        const duration = nowUTC() - startTime;
+        this.recordMetrics(operationName, duration, false);
+        // Always log errors regardless of sampling
+        this.error(message, {
+          ...context,
+          ...additionalContext,
+          duration,
+          error: error?.message,
+          stack: error?.stack,
+          outcome: 'error',
+        });
+        return { correlationId, duration, success: false, error, sampled: false };
+      },
+
+      progress: (message, progressContext = {}) => {
+        // No-op for progress in sampled operations
+        return { correlationId, currentDuration: nowUTC() - startTime };
+      },
+    };
   }
 
   /**
@@ -219,10 +336,52 @@ export class EnhancedLogger {
   }
 
   /**
-   * Core logging method with debug level filtering
+   * Log debug message with sampling (for high-volume operations)
+   * @param {string} message - Log message
+   * @param {Object} context - Additional context
+   * @param {string} operationName - Operation name for sampling
+   * @param {number} sampleRate - Custom sample rate (0.0-1.0)
+   */
+  debugSampled(message, context = {}, operationName = 'default', sampleRate = 0.1) {
+    this.log('debug', 4, message, { ...context, operationName, sampleRate });
+  }
+
+  /**
+   * Log verbose message with sampling (for very high-volume operations)
+   * @param {string} message - Log message
+   * @param {Object} context - Additional context
+   * @param {string} operationName - Operation name for sampling
+   * @param {number} sampleRate - Custom sample rate (0.0-1.0)
+   */
+  verboseSampled(message, context = {}, operationName = 'default', sampleRate = 0.05) {
+    this.log('verbose', 5, message, { ...context, operationName, sampleRate });
+  }
+
+  /**
+   * Log info message with sampling
+   * @param {string} message - Log message
+   * @param {Object} context - Additional context
+   * @param {string} operationName - Operation name for sampling
+   * @param {number} sampleRate - Custom sample rate (0.0-1.0)
+   */
+  infoSampled(message, context = {}, operationName = 'default', sampleRate = 0.5) {
+    this.log('info', 3, message, { ...context, operationName, sampleRate });
+  }
+
+  /**
+   * Core logging method with debug level filtering and sampling
    * @private
    */
   log(level, levelNumber, message, context = {}) {
+    // Check sampling first (unless it's an error/warning or no-log context)
+    const operationName = context.operationName || 'default';
+    const customSampleRate = context.sampleRate;
+
+    // Skip sampling check for errors/warnings and forced no-log contexts
+    if (levelNumber > 2 && !context.noLog && !this.shouldSample(level, operationName, customSampleRate)) {
+      return;
+    }
+
     // Always log errors and warnings
     if (levelNumber <= 2) {
       this.executeLog(level, message, context);

@@ -65,14 +65,22 @@ try {
 }
 ```
 
-### Logging Objects
-- **String Templates**: Use `${JSON.stringify(object)}` to properly log object contents
-- **Enhanced Logger**: Objects as second parameter may not display properly - use JSON.stringify()
-```javascript
-// ❌ Incorrect - logs [object Object]
-operation.success('Completed with stats', stats);
+### Logging Objects ✅ **ENHANCED WITH AUTOMATIC STRINGIFICATION**
+- **Automatic Object Handling**: Enhanced logger now automatically stringifies complex objects inline
+- **Manual Stringification**: Use convenience methods or string templates for explicit control
+- **Context Objects**: Objects passed as second parameter are automatically appended to message
 
-// ✅ Correct - shows actual object properties
+```javascript
+// ✅ NEW: Automatic object stringification
+this.logger.error('Command failed', { command, userId, error: error.stack });
+// Output: "Command failed | command: restart, userId: 123456, error: Error: Connection failed..."
+
+// ✅ NEW: Convenience methods for explicit control
+this.logger.errorWithObject('Stats collected', statsObject);
+this.logger.warnWithObject('Performance data', performanceMetrics);
+this.logger.infoWithObject('User data', userData);
+
+// ✅ LEGACY: Manual stringification (still works)
 operation.success(`Completed with stats: ${JSON.stringify(stats)}`);
 ```
 
@@ -239,7 +247,12 @@ async someOperation(data) {
 const correlationId = this.logger.generateCorrelationId();
 const parentLogger = this.logger.forOperation('parentOperation', correlationId);
 
-// 4. Register content stores with memory monitor
+// 4. Use enhanced object logging (NEW)
+this.logger.errorWithObject('Command processing failed', { command, args, userId });
+this.logger.warnWithObject('Performance threshold exceeded', performanceData);
+this.logger.infoWithObject('Operation completed', resultSummary);
+
+// 5. Register content stores with memory monitor
 constructor(dependencies) {
   // ... existing code ...
   if (dependencies.memoryMonitor) {
@@ -247,7 +260,7 @@ constructor(dependencies) {
   }
 }
 
-// 5. Implement content analysis for memory monitoring
+// 6. Implement content analysis for memory monitoring
 analyzeContentStore() {
   return {
     totalItems: this.contentCache.size,

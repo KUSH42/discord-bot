@@ -224,8 +224,8 @@ async function setupCoreServices(container, _config) {
   });
 
   // Content Classifier
-  container.registerSingleton('contentClassifier', () => {
-    return new ContentClassifier();
+  container.registerSingleton('contentClassifier', c => {
+    return new ContentClassifier(c.resolve('logger'), c.resolve('debugFlagManager'), c.resolve('metricsManager'));
   });
 
   // Content Announcer
