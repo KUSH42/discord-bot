@@ -311,14 +311,19 @@ describe('End-to-End Command Processing Workflows', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('**Discord Bot Message Commands**');
-      expect(result.message).toContain('**!kill**: Stops *all* bot posting');
-      expect(result.message).toContain('**!restart**: Performs a full restart');
       expect(result.message).toContain('**!announce <true|false>**: Toggles announcement posting');
       expect(result.message).toContain('**!vxtwitter <true|false>**: Toggles the conversion');
       expect(result.message).toContain("**!loglevel <level>**: Changes the bot's logging level");
       expect(result.message).toContain('**!health**: Shows bot health status');
+
+      // Admin commands should be in additionalMessage
+      expect(result.additionalMessage).toBeDefined();
+      expect(result.additionalMessage).toContain('**!kill**: Stops *all* bot posting');
+      expect(result.additionalMessage).toContain('**!restart**: Performs a full restart');
+      expect(result.additionalMessage).toContain('**!update**: Pulls the latest changes from git');
+
+      // General commands should be in main message
       expect(result.message).toContain('**!health-detailed**: Shows detailed health status');
-      expect(result.message).toContain('**!update**: Pulls the latest changes from git');
       expect(result.message).toContain('**!readme**: Displays this command information');
     });
   });

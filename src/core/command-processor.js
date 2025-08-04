@@ -668,11 +668,15 @@ export class CommandProcessor {
       `**${this.commandPrefix}colorize help**: Shows detailed colorize command help and available presets.`,
     ];
 
-    const readmeMessage = `**Discord Bot Message Commands**\n\nThese commands can only be used in the configured support channel.\n\n**General Commands:**\n${generalCommands.join('\n')}\n\n**Admin Commands** (require \`ALLOWED_USER_IDS\` authorization):\n${adminCommands.join('\n')}`;
+    // Split into multiple messages to stay under Discord's 2000 character limit
+    const generalSection = `**Discord Bot Message Commands**\n\nThese commands can only be used in the configured support channel.\n\n**General Commands:**\n${generalCommands.join('\n')}`;
+
+    const adminSection = `**Admin Commands** (require \`ALLOWED_USER_IDS\` authorization):\n${adminCommands.join('\n')}`;
 
     return {
       success: true,
-      message: readmeMessage,
+      message: generalSection,
+      additionalMessage: adminSection,
       requiresRestart: false,
     };
   }

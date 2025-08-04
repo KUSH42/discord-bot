@@ -519,6 +519,11 @@ export class BotApplication {
           }
         } else {
           await message.reply(result.message);
+
+          // Handle additional message for multi-part responses (e.g., readme command)
+          if (result.additionalMessage) {
+            await message.channel.send(result.additionalMessage);
+          }
         }
       }
 
@@ -566,7 +571,12 @@ export class BotApplication {
         await this.handleDeleteAction(deleteAction, result, message);
       }
     } catch (error) {
-      this.logger.error('Error handling command result:', error);
+      this.logger.error(`Error handling command result: ${error.message}`, {
+        stack: error.stack,
+        command,
+        userId: user?.id,
+        resultKeys: result ? Object.keys(result) : 'no result',
+      });
     }
   }
 

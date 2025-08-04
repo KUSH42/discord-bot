@@ -189,6 +189,36 @@ export class EnhancedLogger {
   }
 
   /**
+   * Log error with inline object stringification
+   * @param {string} message - Base error message
+   * @param {Object} obj - Object to stringify inline
+   */
+  errorWithObject(message, obj) {
+    const objStr = typeof obj === 'object' && obj !== null ? JSON.stringify(obj) : String(obj);
+    this.error(`${message}: ${objStr}`);
+  }
+
+  /**
+   * Log warning with inline object stringification
+   * @param {string} message - Base warning message
+   * @param {Object} obj - Object to stringify inline
+   */
+  warnWithObject(message, obj) {
+    const objStr = typeof obj === 'object' && obj !== null ? JSON.stringify(obj) : String(obj);
+    this.warn(`${message}: ${objStr}`);
+  }
+
+  /**
+   * Log info with inline object stringification
+   * @param {string} message - Base info message
+   * @param {Object} obj - Object to stringify inline
+   */
+  infoWithObject(message, obj) {
+    const objStr = typeof obj === 'object' && obj !== null ? JSON.stringify(obj) : String(obj);
+    this.info(`${message}: ${objStr}`);
+  }
+
+  /**
    * Core logging method with debug level filtering
    * @private
    */
@@ -231,11 +261,36 @@ export class EnhancedLogger {
     // Sanitize sensitive information
     const sanitizedContext = this.sanitizeContext(enrichedContext);
 
+    // Enhanced message with inline object stringification
+    let enhancedMessage = message;
+
+    // If context has complex objects, append them to the message for better visibility
+    if (Object.keys(sanitizedContext).length > 3) {
+      // More than just timestamp, module, and maybe one other field
+      const contextKeys = Object.keys(sanitizedContext).filter(
+        key => key !== 'timestamp' && key !== 'module' && sanitizedContext[key] !== undefined
+      );
+
+      if (contextKeys.length > 0) {
+        const contextStr = contextKeys
+          .map(key => {
+            const value = sanitizedContext[key];
+            if (typeof value === 'object' && value !== null) {
+              return `${key}: ${JSON.stringify(value)}`;
+            }
+            return `${key}: ${value}`;
+          })
+          .join(', ');
+
+        enhancedMessage = `${message} | ${contextStr}`;
+      }
+    }
+
     if (this.logger && typeof this.logger[level] === 'function') {
-      this.logger[level](message, sanitizedContext);
+      this.logger[level](enhancedMessage, sanitizedContext);
     } else {
       // Fallback to console
-      console[level] || console.log(`[${level.toUpperCase()}] ${message}`, sanitizedContext);
+      console[level] || console.log(`[${level.toUpperCase()}] ${enhancedMessage}`, sanitizedContext);
     }
   }
 
