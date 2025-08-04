@@ -85,6 +85,7 @@ describe('YouTubeScraperService', () => {
       setUserAgent: jest.fn().mockResolvedValue(),
       setViewport: jest.fn().mockResolvedValue(),
       goto: jest.fn().mockResolvedValue(),
+      getCurrentUrl: jest.fn().mockResolvedValue('https://www.youtube.com/@testchannel/live'),
       waitFor: jest.fn().mockResolvedValue(),
       waitForFunction: jest.fn().mockResolvedValue(true),
       evaluate: jest.fn(),
@@ -311,15 +312,18 @@ describe('YouTubeScraperService', () => {
         title: '🔴 Now Live!',
         url: 'https://www.youtube.com/watch?v=live123',
         type: 'livestream',
+        isCurrentlyLive: true, // Required for live stream validation
         scrapedAt: expect.any(String),
       };
+
+      // Mock browser evaluation to return the live stream (first endpoint succeeds)
       mockBrowserService.evaluate.mockResolvedValue(mockLiveStream);
 
       const result = await scraperService.fetchActiveLiveStream();
 
       expect(result).toEqual(mockLiveStream);
       expect(mockBrowserService.goto).toHaveBeenCalledWith('https://www.youtube.com/@testchannel/live', {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded', // Updated to match fix for video player loading issues
         timeout: 30000,
       });
       // The service logs progress steps but doesn't log final success for live stream fetch

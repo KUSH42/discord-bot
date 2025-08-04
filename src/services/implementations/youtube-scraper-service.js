@@ -648,7 +648,7 @@ export class YouTubeScraperService {
     try {
       operation.progress('Navigating to /live endpoint');
       await this.browserService.goto(this.liveStreamUrl, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded', // Changed from 'networkidle' to avoid video player loading issues
         timeout: this.timeoutMs,
       });
 
