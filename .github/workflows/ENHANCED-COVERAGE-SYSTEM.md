@@ -273,10 +273,10 @@ lcov-html-report/                   # Interactive HTML report
 - Preserves unique coverage from different test types
 
 ### Robust Merging
-- **Primary: Custom Python merger** (scripts/coverage/merge-coverage.py)
-- **Deprecated: lcov-result-merger** ⚠️ **BROKEN** - strips essential coverage summary lines
+- **Primary: merge with c8** accurate, modern code coverage
 - Validates merged output with comprehensive statistics
 - Handles edge cases gracefully with intelligent fallbacks
+- integrates well with instanbul reporters
 
 ### Professional Reporting
 - Quality gate status with clear pass/fail indicators
@@ -299,31 +299,9 @@ lcov-html-report/                   # Interactive HTML report
 - Continues workflow even if coverage fails
 - Logs detailed error information
 
-## Migration Guide
 
-### From Old System
+### Benefits
 
-1. **Remove old coverage section** from `.github/workflows/ci.yml` (lines 968-1217)
-
-2. **Add new coverage section** using the enhanced implementation above
-
-3. **Update test jobs** to organize artifacts properly:
-   ```yaml
-   # Add to each test job
-   - name: Organize test artifacts
-     if: always()
-     run: |
-       mkdir -p test-results/[test-type]
-       if [ -d "coverage" ]; then
-         cp -r coverage test-results/[test-type]/
-       fi
-   ```
-
-4. **Test the changes** in a feature branch first
-
-### Benefits After Migration
-
-- ✅ **Accurate Coverage**: No more 0% results with valid data
 - ✅ **Clean Reports**: Professional, comprehensive test summaries
 - ✅ **Better Artifacts**: Organized, downloadable coverage reports
 - ✅ **Quality Gates**: Automated pass/fail decisions
@@ -338,55 +316,23 @@ lcov-html-report/                   # Interactive HTML report
 - Verify artifact upload/download is working
 - Ensure coverage files are in expected locations
 
-#### "lcov-result-merger failed"
-- **This tool is fundamentally broken** - it strips LF, LH, FNF, FNH, BRF, BRH summary lines
-- The system automatically uses the Python merger instead
-- **lcov-result-merger should not be used** for coverage merging
-
 #### "Coverage percentage is 0%"
 - Check that test files contain actual coverage data (`SF:`, `DA:` lines)
 - Verify LCOV files are not empty or corrupted
 - Check test execution logs for coverage generation errors
+- Ensure that you have branch coverage enabled
 
 #### "HTML report not generated"
 - Ensure `lcov` package is installed in CI
 - Check that merged LCOV file exists and is valid
 - HTML generation failure won't break the overall process
 
-### Debug Mode
-
-Enable verbose logging by setting debug flags:
-```bash
-DEBUG=1 node scripts/ci/ci-coverage-merger.js
-```
-
-This will provide detailed information about:
-- File discovery process
-- Deduplication decisions
-- Merging operations
-- Summary generation
-
-## Performance
-
-### System Impact
-- **Memory**: ~1-2% additional usage during processing
-- **Time**: ~10-30 seconds for coverage merging
-- **Storage**: Organized artifacts, similar total size
-- **Network**: No additional external calls
-
-### Optimization
-- Coverage files are processed in memory
-- Deduplication prevents unnecessary merging
-- Fallback systems ensure reliability
-- HTML generation is optional and skippable
-
 ## Security
 
 ### Data Handling
 - No sensitive data is logged or exposed
 - Coverage files are processed locally
-- External tools (lcov-result-merger) are from npm registry
-- Python fallback is part of the repository
+- External tools (c8, istanbul) are from npm registry
 
 ### Permissions
 - Uses existing GitHub Actions permissions
@@ -396,11 +342,10 @@ This will provide detailed information about:
 ## Maintenance
 
 ### Dependencies
-- **Python 3**: For primary merger (merge-coverage.py) - **RECOMMENDED**
-- **lcov**: System package for HTML generation
+- **c8** - **RECOMMENDED**
+- **istanbul**: NPM package for code coverage report generation
 - **jest-junit**: NPM package for JUnit XML test result generation
 - **xml2js**: NPM package for XML parsing in test summary generator
-- **lcov-result-merger**: ⚠️ **BROKEN** - DO NOT USE (strips coverage summaries)
 
 ### Updates
 - Scripts are self-contained and versioned with repository
@@ -411,60 +356,3 @@ This will provide detailed information about:
 - Coverage trends visible in commit comments
 - Quality gate failures reported in CI status
 - Detailed logs available in GitHub Actions
-
----
-
-## Technical Details: lcov-result-merger Issues
-
-### Why lcov-result-merger is Broken
-
-The `lcov-result-merger` npm package has a critical flaw that makes it unsuitable for coverage merging:
-
-**Problem**: It strips essential coverage summary lines from LCOV files
-- **Missing lines**: `LF`, `LH`, `FNF`, `FNH`, `BRF`, `BRH`
-- **Result**: Coverage parsers show 0% coverage despite valid data
-- **File size**: Outputs ~1,700 fewer lines than properly merged files
-
-**Evidence**:
-```bash
-# Python merger (CORRECT): 24,144 lines
-# lcov-result-merger (BROKEN): 22,415 lines
-# Missing: 1,729 lines of coverage summaries
-```
-
-**What gets stripped**:
-```lcov
-# These essential lines are removed by lcov-result-merger:
-LF:575      # Lines Found
-LH:518      # Lines Hit  
-FNF:31      # Functions Found
-FNH:28      # Functions Hit
-BRF:122     # Branches Found
-BRH:106     # Branches Hit
-```
-
-**Impact**: Without these summary lines, coverage analysis tools cannot determine actual coverage percentages, resulting in misleading 0% reports.
-
-### Recommended Solution
-
-**Use the Python merger** (`scripts/coverage/merge-coverage.py`) which:
-- ✅ Preserves all coverage summary lines
-- ✅ Provides accurate statistics (78% lines, 86% functions, 88% branches)
-- ✅ Handles file-level merging correctly
-- ✅ Generates proper LCOV output that tools can parse
-
-The enhanced coverage system automatically uses the Python merger to avoid these issues.
-
-## Support
-
-For issues with the enhanced coverage system:
-
-1. **Check the troubleshooting section** above
-2. **Review GitHub Actions logs** for detailed error messages
-3. **Run local tests** with `node scripts/coverage/test-coverage-simple.js`
-4. **Create an issue** with:
-   - Error messages and logs
-   - Coverage files (if not sensitive)
-   - Expected vs. actual behavior
-
-The enhanced coverage system is designed to be robust and self-healing, but if you encounter issues, the troubleshooting information above should help resolve most problems.
