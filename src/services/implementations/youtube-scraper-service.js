@@ -18,6 +18,7 @@ export class YouTubeScraperService {
     browserService,
     youtubeAuthManager,
     stateManager,
+    memoryMonitor,
   }) {
     // Create enhanced logger for YouTube module
     this.logger = createEnhancedLogger('youtube', logger, debugManager, metricsManager);
@@ -63,8 +64,12 @@ export class YouTubeScraperService {
     this.maxCachedVideos = 500; // Limit cached videos
     this.videoCacheHours = 48; // Keep videos for 48 hours
     this.lastMemoryCleanup = Date.now();
+    this.memoryMonitor = memoryMonitor; // Optional
 
-    // Memory monitor registration is handled by dependency injection container
+    // Register with memory monitor if available
+    if (this.memoryMonitor) {
+      this.memoryMonitor.registerContentStore('youtubeVideos', () => this.analyzeVideoCache());
+    }
   }
 
   /**
@@ -1374,6 +1379,8 @@ export class YouTubeScraperService {
       }
 
       try {
+        // Periodic memory cleanup
+        this.cleanupVideoCache();
         await this.scanForContent();
       } catch (error) {
         this.logger.error('Error in YouTube scraper monitoring loop', {

@@ -377,6 +377,7 @@ async function setupApplicationServices(container, _config) {
       browserService: c.resolve('youtubeBrowserService'),
       youtubeAuthManager: c.resolve('youtubeAuthManager'),
       stateManager: c.resolve('stateManager'),
+      memoryMonitor: c.resolve('memoryMonitor'),
     });
   });
 }
