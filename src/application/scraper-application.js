@@ -1488,6 +1488,7 @@ export class ScraperApplication {
 
   /**
    * Clean up old extracted tweets to prevent memory leaks
+   * 🚨 RACE CONDITION FIX: Create snapshot before iterating to prevent iterator invalidation
    * @private
    */
   cleanupExtractedTweets() {
@@ -1495,8 +1496,11 @@ export class ScraperApplication {
     const cleanupThreshold = now - this.tweetCleanupHours * 60 * 60 * 1000;
     let cleaned = 0;
 
+    // 🚨 FIX: Create snapshot to prevent race condition with concurrent iterations
+    const entries = Array.from(this.extractedTweets.entries());
+
     // Remove tweets older than threshold
-    for (const [key, tweet] of this.extractedTweets) {
+    for (const [key, tweet] of entries) {
       if (tweet.extractedAt && tweet.extractedAt < cleanupThreshold) {
         this.extractedTweets.delete(key);
         cleaned++;
@@ -1505,14 +1509,18 @@ export class ScraperApplication {
 
     // If still too many tweets, remove oldest ones
     if (this.extractedTweets.size > this.maxExtractedTweets) {
-      const entries = Array.from(this.extractedTweets.entries()).sort(
-        (a, b) => (a[1].extractedAt || 0) - (b[1].extractedAt || 0)
-      );
+      // Use existing snapshot, re-sort by age
+      const sortedEntries = entries
+        .filter(([key]) => this.extractedTweets.has(key)) // Only keep entries that still exist
+        .sort((a, b) => (a[1].extractedAt || 0) - (b[1].extractedAt || 0));
 
-      const toRemove = entries.slice(0, entries.length - this.maxExtractedTweets);
+      const toRemove = sortedEntries.slice(0, sortedEntries.length - this.maxExtractedTweets);
       for (const [key] of toRemove) {
-        this.extractedTweets.delete(key);
-        cleaned++;
+        if (this.extractedTweets.has(key)) {
+          // Double-check before deletion
+          this.extractedTweets.delete(key);
+          cleaned++;
+        }
       }
     }
 
@@ -1567,6 +1575,7 @@ export class ScraperApplication {
 
   /**
    * Analyze extracted tweets for memory monitoring
+   * 🚨 RACE CONDITION FIX: Create snapshot to prevent iterator invalidation during cleanup
    * @private
    * @returns {Object} Analysis of extracted tweets
    */
@@ -1585,8 +1594,11 @@ export class ScraperApplication {
     let newestTime = 0;
     let totalSize = 0;
 
-    // Analyze tweets
-    for (const tweet of this.extractedTweets.values()) {
+    // 🚨 FIX: Create snapshot to prevent race condition with concurrent cleanup
+    const tweets = Array.from(this.extractedTweets.values());
+
+    // Analyze tweets from snapshot
+    for (const tweet of tweets) {
       if (tweet.extractedAt) {
         oldestTime = Math.min(oldestTime, tweet.extractedAt);
         newestTime = Math.max(newestTime, tweet.extractedAt);
@@ -1597,12 +1609,12 @@ export class ScraperApplication {
     }
 
     return {
-      totalItems: this.extractedTweets.size,
+      totalItems: tweets.length, // Use snapshot size for consistency
       totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
       oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
       newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
       itemTypes: {
-        tweets: this.extractedTweets.size,
+        tweets: tweets.length, // Use snapshot size for consistency
       },
     };
   }
