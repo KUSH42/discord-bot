@@ -14,6 +14,7 @@ import { StateManager } from '../infrastructure/state-manager.js';
 import { PersistentStorage } from '../infrastructure/persistent-storage.js';
 import { DebugFlagManager } from '../infrastructure/debug-flag-manager.js';
 import { MetricsManager } from '../infrastructure/metrics-manager.js';
+import { MemoryMonitor } from '../infrastructure/memory-monitor.js';
 
 // Core Logic
 import { DuplicateDetector } from '../duplicate-detector.js';
@@ -116,6 +117,17 @@ async function setupInfrastructureServices(container, config) {
       aggregationWindows: [60, 300, 900, 3600], // 1min, 5min, 15min, 1hour
     });
   });
+
+  // Memory Monitor for memory management and leak detection
+  container.registerSingleton('memoryMonitor', c => {
+    return new MemoryMonitor(c.resolve('logger').child({ service: 'MemoryMonitor' }), {
+      maxMemoryMB: parseInt(process.env.MEMORY_MAX_MB, 10) || 1024,
+      warningThresholdMB: parseInt(process.env.MEMORY_WARNING_MB, 10) || 768,
+      gcThresholdMB: parseInt(process.env.MEMORY_GC_MB, 10) || 512,
+      checkIntervalMs: 30000, // 30 seconds
+      samplesRetention: 100,
+    });
+  });
 }
 
 /**
@@ -204,7 +216,8 @@ async function setupCoreServices(container, _config) {
       c.resolve('stateManager'),
       c.resolve('debugFlagManager'),
       c.resolve('metricsManager'),
-      c.resolve('logger').child({ service: 'CommandProcessor' })
+      c.resolve('logger').child({ service: 'CommandProcessor' }),
+      c.resolve('memoryMonitor')
     );
   });
 

@@ -8,11 +8,19 @@ import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 import { ProcessCleanup } from '../utilities/process-cleanup.js';
 
 export class CommandProcessor {
-  constructor(config, stateManager, debugFlagManager = null, metricsManager = null, baseLogger = null) {
+  constructor(
+    config,
+    stateManager,
+    debugFlagManager = null,
+    metricsManager = null,
+    baseLogger = null,
+    memoryMonitor = null
+  ) {
     this.config = config;
     this.state = stateManager;
     this.debugManager = debugFlagManager;
     this.metricsManager = metricsManager;
+    this.memoryMonitor = memoryMonitor;
     this.commandPrefix = config.get('COMMAND_PREFIX', '!');
 
     // Create enhanced logger if components are available
@@ -402,6 +410,9 @@ export class CommandProcessor {
         case 'log-pipeline':
           return await this.handleLogPipeline();
 
+        case 'memory-status':
+          return await this.handleMemoryStatus();
+
         case 'delete':
           return await this.handleDelete(args, userId);
 
@@ -600,6 +611,7 @@ export class CommandProcessor {
       `**${this.commandPrefix}debug-level <1-5>**: Sets debug level for all modules (1=errors, 5=verbose).`,
       `**${this.commandPrefix}debug-level <module1> <module2> ... <1-5>**: Sets debug level for specific modules.`,
       `**${this.commandPrefix}metrics**: Shows performance metrics and system statistics.`,
+      `**${this.commandPrefix}memory-status**: Shows real-time memory analysis with content store breakdown.`,
       `**${this.commandPrefix}log-pipeline**: Shows recent pipeline activities with correlation tracking.`,
       `**${this.commandPrefix}health**: Shows bot health status and system information.`,
       `**${this.commandPrefix}health-detailed**: Shows detailed health status for all components.`,
@@ -1227,6 +1239,88 @@ export class CommandProcessor {
   }
 
   /**
+   * Handle memory-status command
+   */
+  async handleMemoryStatus() {
+    if (!this.memoryMonitor) {
+      return {
+        success: false,
+        message: '❌ Memory monitor is not available.',
+        requiresRestart: false,
+      };
+    }
+
+    try {
+      const stats = this.memoryMonitor.getStats();
+      const detailed = this.memoryMonitor.getDetailedContentAnalysis();
+      const currentMem = process.memoryUsage();
+      const currentMB = Math.round(currentMem.heapUsed / 1024 / 1024);
+
+      const summary = [
+        `**💾 Memory Status Report**`,
+        `🔍 Current: ${currentMB} MB heap used`,
+        `📊 Peak: ${stats.peakMemoryMB} MB | Avg: ${stats.averageMemoryMB} MB`,
+        `⚠️ Warning: ${stats.thresholds.warningMB} MB | Max: ${stats.thresholds.maxMB} MB`,
+        `🗑️ GC Executions: ${stats.gcExecutions} | Warnings: ${stats.warningsIssued}`,
+        ``,
+      ];
+
+      // Content stores analysis
+      const { contentStores } = stats;
+      if (contentStores && Object.keys(contentStores).length > 0) {
+        summary.push(`**📦 Content Stores:**`);
+        for (const [name, analysis] of Object.entries(contentStores)) {
+          if (analysis.error) {
+            summary.push(`❌ **${name}**: Error - ${analysis.error}`);
+          } else {
+            const sizeMB = analysis.totalSizeMB || 0;
+            const items = analysis.totalItems || 0;
+            const age = analysis.oldestItemHours ? `${Math.round(analysis.oldestItemHours)}h old` : 'unknown age';
+            summary.push(`• **${name}**: ${items} items, ${sizeMB} MB, ${age}`);
+          }
+        }
+        summary.push(``);
+      }
+
+      // Memory recommendations
+      if (detailed.recommendations && detailed.recommendations.length > 0) {
+        summary.push(`**💡 Recommendations:**`);
+        for (const rec of detailed.recommendations) {
+          summary.push(`• ${rec}`);
+        }
+        summary.push(``);
+      }
+
+      // Status indicator
+      let statusIcon = '✅';
+      let statusText = 'Healthy';
+      if (currentMB > stats.thresholds.warningMB) {
+        statusIcon = '⚠️';
+        statusText = 'High Memory Usage';
+      }
+      if (currentMB > stats.thresholds.maxMB) {
+        statusIcon = '🚨';
+        statusText = 'Critical Memory Usage';
+      }
+
+      summary.unshift(`${statusIcon} **Status**: ${statusText}`);
+
+      return {
+        success: true,
+        message: summary.join('\n'),
+        requiresRestart: false,
+        memoryData: { stats, detailed },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to get memory status: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
+  }
+
+  /**
    * Handle log-pipeline command
    */
   async handleLogPipeline() {
@@ -1293,6 +1387,7 @@ export class CommandProcessor {
         'debug-status',
         'debug-level',
         'metrics',
+        'memory-status',
         'log-pipeline',
         'delete',
       ],
