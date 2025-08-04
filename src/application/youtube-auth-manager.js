@@ -339,7 +339,9 @@ export class YouTubeAuthManager {
 
         operation.error(new Error('No consent buttons found'), 'Could not handle YouTube consent page');
       } else {
-        operation.success('No YouTube consent page redirect detected', { currentUrl });
+        operation.success('No YouTube consent page redirect detected', {
+          currentUrl: this.sanitizeUrl(currentUrl),
+        });
       }
     } catch (error) {
       operation.error(error, 'Error handling YouTube consent page redirect', {
@@ -591,7 +593,7 @@ export class YouTubeAuthManager {
       });
 
       return hasAuthCookies;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -937,5 +939,76 @@ export class YouTubeAuthManager {
     }
 
     return sanitized;
+  }
+
+  /**
+   * Sanitizes URLs to remove sensitive authentication tokens and parameters.
+   * @param {string} url - URL to sanitize
+   * @returns {string} Sanitized URL with sensitive parameters removed
+   */
+  sanitizeUrl(url) {
+    if (typeof url !== 'string') {
+      return '[INVALID_URL]';
+    }
+
+    try {
+      const urlObj = new URL(url);
+
+      // Remove sensitive query parameters commonly found in Google OAuth URLs
+      const sensitiveParams = [
+        'TL', // Google OAuth token
+        'dsh', // Session hash
+        'ifkv', // Form verification token
+        'flowEntry', // OAuth flow entry point
+        'flowName', // OAuth flow name
+        'checkConnection', // Connection check parameter
+        'checkedDomains', // Domain check parameter
+        'pstMsg', // Post message parameter
+        'lid', // Login ID
+        'service', // Service identifier
+        'continue', // Redirect URL (may contain sensitive info)
+        'state', // OAuth state parameter
+        'code', // OAuth authorization code
+        'access_token', // Access token
+        'id_token', // ID token
+        'session_state', // Session state
+        'authuser', // Authenticated user parameter
+      ];
+
+      // Remove sensitive parameters
+      sensitiveParams.forEach(param => {
+        urlObj.searchParams.delete(param);
+      });
+
+      // Special handling for accounts.google.com URLs - redact most query params
+      if (urlObj.hostname === 'accounts.google.com') {
+        // Keep only essential, non-sensitive parameters
+        const allowedParams = ['hl', 'lang', 'locale']; // Language/locale params are safe
+        const paramsToKeep = new URLSearchParams();
+
+        allowedParams.forEach(param => {
+          if (urlObj.searchParams.has(param)) {
+            paramsToKeep.set(param, urlObj.searchParams.get(param));
+          }
+        });
+
+        urlObj.search = paramsToKeep.toString();
+
+        // If there were removed parameters, indicate this
+        const originalParamCount = url.match(/[?&]/g)?.length || 0;
+        const keptParamCount = paramsToKeep.toString() ? paramsToKeep.toString().split('&').length : 0;
+
+        if (originalParamCount > keptParamCount) {
+          const removedCount = originalParamCount - keptParamCount;
+          return `${urlObj.toString()}${urlObj.search ? '&' : '?'}[${removedCount}_SENSITIVE_PARAMS_REMOVED]`;
+        }
+      }
+
+      return urlObj.toString();
+    } catch (_error) {
+      // If URL parsing fails, return a safe fallback
+      const domain = url.match(/https?:\/\/([^/?]+)/)?.[1] || '[UNKNOWN_DOMAIN]';
+      return `https://${domain}/[SANITIZED_URL]`;
+    }
   }
 }
