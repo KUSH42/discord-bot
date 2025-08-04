@@ -1637,6 +1637,7 @@ export class YouTubeScraperService {
 
   /**
    * Clean up old cached videos to prevent memory leaks
+   * 🚨 RACE CONDITION FIX: Create snapshot before iterating to prevent iterator invalidation
    * @private
    */
   cleanupVideoCache() {
@@ -1644,8 +1645,11 @@ export class YouTubeScraperService {
     const cleanupThreshold = now - this.videoCacheHours * 60 * 60 * 1000;
     let cleaned = 0;
 
+    // 🚨 FIX: Create snapshot to prevent race condition with concurrent iterations
+    const entries = Array.from(this.videoCache.entries());
+
     // Remove videos older than threshold
-    for (const [key, video] of this.videoCache) {
+    for (const [key, video] of entries) {
       if (video.cachedAt && video.cachedAt < cleanupThreshold) {
         this.videoCache.delete(key);
         cleaned++;
@@ -1654,12 +1658,18 @@ export class YouTubeScraperService {
 
     // If still too many videos, remove oldest ones
     if (this.videoCache.size > this.maxCachedVideos) {
-      const entries = Array.from(this.videoCache.entries()).sort((a, b) => (a[1].cachedAt || 0) - (b[1].cachedAt || 0));
+      // Use existing snapshot, re-sort by age
+      const sortedEntries = entries
+        .filter(([key]) => this.videoCache.has(key)) // Only keep entries that still exist
+        .sort((a, b) => (a[1].cachedAt || 0) - (b[1].cachedAt || 0));
 
-      const toRemove = entries.slice(0, entries.length - this.maxCachedVideos);
+      const toRemove = sortedEntries.slice(0, sortedEntries.length - this.maxCachedVideos);
       for (const [key] of toRemove) {
-        this.videoCache.delete(key);
-        cleaned++;
+        if (this.videoCache.has(key)) {
+          // Double-check before deletion
+          this.videoCache.delete(key);
+          cleaned++;
+        }
       }
     }
 
@@ -1672,6 +1682,7 @@ export class YouTubeScraperService {
 
   /**
    * Analyze video cache for memory monitoring
+   * 🚨 RACE CONDITION FIX: Create snapshot to prevent iterator invalidation during cleanup
    * @private
    * @returns {Object} Analysis of video cache
    */
@@ -1690,8 +1701,11 @@ export class YouTubeScraperService {
     let newestTime = 0;
     let totalSize = 0;
 
-    // Analyze videos
-    for (const video of this.videoCache.values()) {
+    // 🚨 FIX: Create snapshot to prevent race condition with concurrent cleanup
+    const videos = Array.from(this.videoCache.values());
+
+    // Analyze videos from snapshot
+    for (const video of videos) {
       if (video.cachedAt) {
         oldestTime = Math.min(oldestTime, video.cachedAt);
         newestTime = Math.max(newestTime, video.cachedAt);
@@ -1702,12 +1716,12 @@ export class YouTubeScraperService {
     }
 
     return {
-      totalItems: this.videoCache.size,
+      totalItems: videos.length, // Use snapshot size for consistency
       totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
       oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
       newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
       itemTypes: {
-        videos: this.videoCache.size,
+        videos: videos.length, // Use snapshot size for consistency
       },
     };
   }
