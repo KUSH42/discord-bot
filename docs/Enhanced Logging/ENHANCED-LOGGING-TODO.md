@@ -97,6 +97,22 @@ The enhanced logging system consists of:
 - **Commands**: `!debug state true/false`, `!debug-level state 1-5`
 - **Benefits**: Content coordination visibility, race condition debugging, content processing pipeline tracking
 
+#### MemoryMonitor ✅ FULLY INTEGRATED
+- **Status**: ✅ Complete
+- **Module Name**: `performance`
+- **Location**: `src/infrastructure/memory-monitor.js`
+- **Features**: Memory monitoring operations with enhanced tracking, leak detection with detailed logging, garbage collection timing
+- **Commands**: `!debug performance true/false`, `!debug-level performance 1-5`
+- **Benefits**: Real-time memory usage visibility, memory leak detection debugging, GC operation tracking
+
+#### ProcessingScheduler ✅ FULLY INTEGRATED
+- **Status**: ✅ Complete
+- **Module Name**: `performance`
+- **Location**: `src/services/implementations/message-sender/processing-scheduler.js`
+- **Features**: Callback scheduling operations, timing metrics, test vs production mode tracking
+- **Commands**: `!debug performance true/false`, `!debug-level performance 1-5`
+- **Benefits**: Message processing scheduling visibility, timing analysis, performance bottleneck detection
+
 ### 🚧 **Pending Integrations**
 
 #### Core Services - MEDIUM PRIORITY
@@ -162,13 +178,13 @@ For each module integration, complete these steps:
 Ensure consistent module names across integrations:
 
 - `content-announcer` ✅ - Content announcement pipeline
-- `scraper` 🚧 - X scraping operations and browser interactions  
+- `scraper` ✅ - X scraping operations and browser interactions  
 - `youtube` ✅ - YouTube monitoring and webhook processing
-- `browser` 🚧 - Browser automation and anti-detection
-- `auth` 🚧 - Authentication flows and session management
-- `performance` 🚧 - Performance metrics and timing data
-- `api` 🚧 - External API calls (YouTube, Discord)
-- `state` 🚧 - State management operations
+- `browser` ✅ - Browser automation and anti-detection
+- `auth` ✅ - Authentication flows and session management
+- `performance` ✅ - Performance metrics and timing data
+- `api` ✅ - External API calls (YouTube, Discord)
+- `state` ✅ - State management operations
 - `rate-limiting` 🚧 - Rate limiting and throttling operations
 
 ## Priority Guidelines

@@ -1,12 +1,16 @@
 import { nowUTC, timestampUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
  * Memory monitoring and leak detection system
  * Monitors memory usage patterns and provides cleanup suggestions
  */
 export class MemoryMonitor {
-  constructor(logger, config = {}) {
-    this.logger = logger;
+  constructor(dependencies) {
+    const { logger, debugManager, metricsManager, config = {} } = dependencies;
+
+    // Create enhanced logger for performance monitoring
+    this.logger = createEnhancedLogger('performance', logger, debugManager, metricsManager);
 
     // Configuration
     this.maxMemoryMB = config.maxMemoryMB || 1024; // 1GB default limit
@@ -44,14 +48,21 @@ export class MemoryMonitor {
       return;
     }
 
-    this.isMonitoring = true;
-    this.logger.info('Starting memory monitoring', {
+    const operation = this.logger.startOperation('startMemoryMonitoring', {
       maxMemoryMB: this.maxMemoryMB,
       warningThresholdMB: this.warningThresholdMB,
       checkIntervalMs: this.checkIntervalMs,
     });
 
+    this.isMonitoring = true;
+    operation.progress('Memory monitoring initialized');
+
     this.scheduleNextCheck();
+
+    operation.success('Memory monitoring started successfully', {
+      status: 'active',
+      nextCheckMs: this.checkIntervalMs,
+    });
   }
 
   /**
@@ -62,15 +73,22 @@ export class MemoryMonitor {
       return;
     }
 
+    const operation = this.logger.startOperation('stopMemoryMonitoring', {
+      isMonitoring: this.isMonitoring,
+    });
+
     this.isMonitoring = false;
 
     if (this.monitorTimer) {
       clearTimeout(this.monitorTimer);
       this.monitorTimer = null;
+      operation.progress('Monitoring timer cleared');
     }
 
-    this.logger.info('Memory monitoring stopped', {
-      finalStats: this.getStats(),
+    const finalStats = this.getStats();
+    operation.success('Memory monitoring stopped successfully', {
+      finalStats,
+      samplesCollected: this.samples.length,
     });
   }
 
@@ -94,6 +112,8 @@ export class MemoryMonitor {
    * @private
    */
   async checkMemoryUsage() {
+    const operation = this.logger.startOperation('memoryCheck', {});
+
     try {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
@@ -101,8 +121,11 @@ export class MemoryMonitor {
       const externalMB = Math.round(memUsage.external / 1024 / 1024);
       const rssMB = Math.round(memUsage.rss / 1024 / 1024);
 
+      operation.progress(`Memory usage: ${heapUsedMB}MB heap, ${externalMB}MB external`);
+
       // Analyze content stores
       const contentAnalysis = await this.analyzeContentStores();
+      operation.progress(`Analyzed ${Object.keys(contentAnalysis).length} content stores`);
 
       // Record sample
       const sample = {
@@ -124,10 +147,17 @@ export class MemoryMonitor {
 
       // Force GC if memory is high
       if (sample.totalMB > this.gcThresholdMB) {
+        operation.progress(`High memory detected (${sample.totalMB}MB), forcing GC`);
         this.forceGarbageCollection();
       }
+
+      operation.success('Memory check completed', {
+        totalMB: sample.totalMB,
+        contentStores: Object.keys(contentAnalysis).length,
+        isHighMemory: sample.totalMB > this.warningThresholdMB,
+      });
     } catch (error) {
-      this.logger.error('Error checking memory usage:', error);
+      operation.error(error, 'Memory check failed', { error: error.message });
     }
   }
 
