@@ -302,9 +302,9 @@ export class YouTubeAuthManager {
   async handleConsentPageRedirect() {
     const operation = this.logger.startOperation('handleConsentPageRedirect');
 
+    /* eslint-disable no-undef */
     try {
       const currentUrl = await this.browserService.evaluate(() => {
-        // eslint-disable-next-line no-undef
         return window.location.href;
       });
 
@@ -345,6 +345,7 @@ export class YouTubeAuthManager {
       operation.error(error, 'Error handling YouTube consent page redirect', {
         errorMessage: this.sanitizeErrorMessage(error.message),
       });
+      /* eslint-disable no-undef */
     }
   }
 
@@ -497,32 +498,73 @@ export class YouTubeAuthManager {
         return { hasAccess: false, statusCode: 0, error: 'No browser service available' };
       }
 
-      // Test access to library endpoint which requires authentication
-      const testResult = await this.browserService.evaluate(async () => {
-        try {
-          const response = await fetch('https://www.youtube.com/feed/library', {
-            method: 'HEAD',
-            credentials: 'include',
-          });
+      // Navigate to library page and check if we can access it without redirects to login
+      const originalUrl = await this.browserService.evaluate(() => window.location.href);
 
-          // If we get 200/302, we have access. If 403/401, we don't.
-          const hasAccess = response.status !== 403 && response.status !== 401;
+      try {
+        await this.browserService.goto('https://www.youtube.com/feed/library', {
+          timeout: 10000,
+          waitUntil: 'domcontentloaded',
+        });
 
-          return {
-            hasAccess,
-            statusCode: response.status,
-          };
-        } catch (error) {
-          // Network errors - assume no access
-          return {
-            hasAccess: false,
-            statusCode: 0,
-            error: error.message,
-          };
+        // Wait for page to load
+        await this.browserService.waitFor(2000);
+
+        const finalUrl = await this.browserService.evaluate(() => window.location.href);
+        const pageTitle = await this.browserService.evaluate(() => document.title);
+
+        // If we're redirected to accounts.google.com or login pages, we don't have access
+        const isOnLoginPage =
+          finalUrl.includes('accounts.google.com') ||
+          finalUrl.includes('/signin') ||
+          pageTitle.toLowerCase().includes('sign in');
+
+        // Check for error pages (like 400/403/404)
+        const isErrorPage =
+          pageTitle.includes('Error') ||
+          pageTitle.includes('400') ||
+          pageTitle.includes('403') ||
+          pageTitle.includes('404');
+
+        // Check if library page loaded successfully by looking for library-specific elements
+        const hasLibraryContent = await this.browserService.evaluate(() => {
+          // Look for typical library page elements
+          const indicators = [
+            document.querySelector('[href="/feed/history"]'), // History link
+            document.querySelector('[href="/feed/playlists"]'), // Playlists link
+            document.querySelector('[href*="playlist?list=WL"]'), // Watch later
+            document.querySelector('[href*="playlist?list=LL"]'), // Liked videos
+            document.title.includes('Library') || document.title.includes('YouTube'),
+          ];
+          return indicators.some(indicator => indicator);
+        });
+
+        const hasAccess = !isOnLoginPage && !isErrorPage && hasLibraryContent;
+        const statusCode = hasAccess ? 200 : isOnLoginPage ? 401 : isErrorPage ? 403 : 0;
+
+        // Navigate back to original URL to avoid side effects
+        if (originalUrl !== finalUrl) {
+          try {
+            await this.browserService.goto(originalUrl, { timeout: 5000 });
+          } catch {
+            // Ignore navigation back errors
+          }
         }
-      });
 
-      return testResult;
+        return {
+          hasAccess,
+          statusCode,
+          finalUrl: finalUrl.substring(0, 120), // Truncate for logging
+          pageTitle: pageTitle.substring(0, 50),
+        };
+      } catch (navigationError) {
+        // Navigation failed - likely no access
+        return {
+          hasAccess: false,
+          statusCode: 0,
+          error: navigationError.message,
+        };
+      }
     } catch (error) {
       return {
         hasAccess: false,
@@ -545,7 +587,6 @@ export class YouTubeAuthManager {
 
       // Quick cookie-based check first (fastest method)
       const hasAuthCookies = await this.browserService.evaluate(() => {
-        // eslint-disable-next-line no-undef
         return document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
       });
 
@@ -610,7 +651,6 @@ export class YouTubeAuthManager {
 
         let avatarButton = null;
         for (const selector of avatarSelectors) {
-          // eslint-disable-next-line no-undef
           avatarButton = document.querySelector(selector);
           if (avatarButton) {
             break;
@@ -618,11 +658,11 @@ export class YouTubeAuthManager {
         }
 
         // Check for authentication cookies as additional indicator
-        // eslint-disable-next-line no-undef
+
         const hasAuthCookies = document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
 
         // Check for authenticated user-specific elements
-        // eslint-disable-next-line no-undef
+
         const hasUserMenu = !!document.querySelector('[aria-label*="menu"], [data-target-id="topbar-menu-button"]');
 
         // Check if we're on login/error pages (bad indicators)
@@ -646,7 +686,6 @@ export class YouTubeAuthManager {
 
         let signInButton = null;
         for (const selector of signInSelectors) {
-          // eslint-disable-next-line no-undef
           const element = document.querySelector(selector);
           if (element) {
             // Special handling for tp-yt-paper-button - check if it contains "Sign in" text
@@ -664,7 +703,6 @@ export class YouTubeAuthManager {
 
         // Additional aggressive text-based search for "Sign in" if not found yet
         if (!signInButton) {
-          // eslint-disable-next-line no-undef
           const allButtons = document.querySelectorAll('button, a, yt-button-renderer, .ytd-button-renderer');
           for (const btn of allButtons) {
             const text = btn.textContent || btn.innerText || '';
@@ -677,13 +715,9 @@ export class YouTubeAuthManager {
         }
 
         const onLoginPage =
-          // eslint-disable-next-line no-undef
           window.location.href.includes('accounts.google.com') ||
-          // eslint-disable-next-line no-undef
           window.location.href.includes('login') ||
-          // eslint-disable-next-line no-undef
           window.location.href.includes('signin') ||
-          // eslint-disable-next-line no-undef
           document.title.toLowerCase().includes('sign in');
 
         return {
@@ -692,9 +726,9 @@ export class YouTubeAuthManager {
           hasAuthCookies,
           hasUserMenu,
           onLoginPage,
-          // eslint-disable-next-line no-undef
+
           currentUrl: window.location.href,
-          // eslint-disable-next-line no-undef
+
           pageTitle: document.title,
         };
       });
@@ -732,8 +766,8 @@ export class YouTubeAuthManager {
         hasAuthCookies: authIndicators.hasAuthCookies,
         hasUserMenu: authIndicators.hasUserMenu,
         onLoginPage: authIndicators.onLoginPage,
-        currentUrl: authIndicators.currentUrl.substring(0, 120),
-        pageTitle: authIndicators.pageTitle.substring(0, 30),
+        currentUrl: (authIndicators.currentUrl || '').substring(0, 120),
+        pageTitle: (authIndicators.pageTitle || '').substring(0, 30),
       });
 
       // Enhanced debugging for authentication detection issues
