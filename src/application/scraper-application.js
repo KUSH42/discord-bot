@@ -4,6 +4,7 @@ import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 import { getBrowserTweetHelperFunctions } from '../utilities/browser-tweet-helpers.js';
 import { AsyncMutex } from '../utilities/async-mutex.js';
+import { createBrowserRateLimiter } from '../services/browser-rate-limiter.js';
 
 /**
  * X (Twitter) scraping application orchestrator
@@ -63,6 +64,18 @@ export class ScraperApplication {
     this.maxExtractedTweets = 1000; // Limit cached tweets
     this.tweetCleanupHours = 24; // Clean up tweets older than 24 hours
     this.tweetsMutex = new AsyncMutex(); // Synchronize access to extractedTweets Map
+
+    // Anti-bot browser rate limiting
+    this.browserRateLimit = createBrowserRateLimiter({
+      maxRequests: parseInt(this.config.get('BROWSER_MAX_REQUESTS_PER_MINUTE', '3'), 10),
+      windowMs: 60000, // 1 minute windows
+      humanizedDelays: this.config.getBoolean('BROWSER_HUMANIZED_DELAYS', true),
+      variancePercent: parseInt(this.config.get('BROWSER_TIMING_VARIANCE_PERCENT', '30'), 10),
+      timeAwarePatterns: this.config.getBoolean('BROWSER_TIME_AWARE_LIMITING', true),
+    });
+
+    // Browser instance identifier for rate limiting
+    this.browserId = `scraper-${this.xUser}-${Date.now()}`;
 
     // Register with memory monitor if available
     if (this.memoryMonitor) {
@@ -640,6 +653,18 @@ export class ScraperApplication {
       operation.progress('STEP 1: Using advanced search for user-authored posts');
       const searchUrl = this.generateSearchUrl(true);
       operation.progress(`Navigating to search URL: ${searchUrl}`);
+
+      // Apply anti-bot rate limiting before navigation
+      operation.progress('Applying humanized browser rate limiting');
+      const rateLimitResult = await this.browserRateLimit.recordBrowserRequest(this.browserId);
+      if (!rateLimitResult) {
+        operation.progress('Browser rate limit exceeded, waiting for window to reset');
+        const waitTime = this.browserRateLimit.getRemainingTime(this.browserId);
+        if (waitTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+
       await this.browser.goto(searchUrl);
 
       // Check if we got redirected to home page (login required)
@@ -800,6 +825,18 @@ export class ScraperApplication {
       }
 
       operation.progress('Navigating to user profile timeline for retweet detection');
+
+      // Apply anti-bot rate limiting before profile navigation
+      operation.progress('Applying humanized browser rate limiting for profile access');
+      const rateLimitResult = await this.browserRateLimit.recordBrowserRequest(this.browserId);
+      if (!rateLimitResult) {
+        operation.progress('Browser rate limit exceeded, waiting for window to reset');
+        const waitTime = this.browserRateLimit.getRemainingTime(this.browserId);
+        if (waitTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+
       await this.navigateToProfileTimeline(this.xUser);
 
       // Verify we're on the correct user profile page
@@ -1438,6 +1475,17 @@ export class ScraperApplication {
   async navigateToProfileTimeline(username) {
     const profileUrl = `https://x.com/${username}`;
     this.logger.info(`Navigating to profile timeline: ${profileUrl} (username: ${username})`);
+
+    // Apply browser rate limiting before navigation
+    const rateLimitResult = await this.browserRateLimit.recordBrowserRequest(this.browserId);
+    if (!rateLimitResult) {
+      this.logger.debug('Browser rate limit exceeded during profile navigation, waiting');
+      const waitTime = this.browserRateLimit.getRemainingTime(this.browserId);
+      if (waitTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+
     await this.browser.goto(profileUrl);
 
     // Wait for timeline to load
@@ -1675,6 +1723,17 @@ export class ScraperApplication {
       // Then navigate to user's profile to get recent content from X directly
       operation.progress('Navigating to user profile for recent content scan');
       try {
+        // Apply rate limiting for initialization navigation
+        operation.progress('Applying browser rate limiting for initialization navigation');
+        const rateLimitResult = await this.browserRateLimit.recordBrowserRequest(this.browserId);
+        if (!rateLimitResult) {
+          operation.progress('Browser rate limit exceeded during initialization, waiting');
+          const waitTime = this.browserRateLimit.getRemainingTime(this.browserId);
+          if (waitTime > 0) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+
         await this.navigateToProfileTimeline(this.xUser);
       } catch (error) {
         operation.error(error, 'Failed to navigate to user profile during initialization', {
