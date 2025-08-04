@@ -12,6 +12,10 @@ export class YouTubeAuthManager {
     this.youtubePassword = this.config.getRequired('YOUTUBE_PASSWORD');
     this.authEnabled = this.config.get('YOUTUBE_AUTHENTICATION_ENABLED', 'false') === 'true';
 
+    // Cookie persistence configuration
+    this.cookieStorageKey = 'youtube_auth_cookies';
+    this.cookieExpiryHours = 24; // Consider cookies stale after 24 hours
+
     // Create enhanced logger for this module
     this.logger = createEnhancedLogger(
       'auth',
@@ -53,6 +57,9 @@ export class YouTubeAuthManager {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         operation.progress(`Authentication attempt ${attempt}/${maxRetries}`);
+
+        // Try to restore saved cookies first
+        await this.restoreSavedCookies();
 
         // Quick authentication check first (faster)
         if (await this.isQuickAuthenticated()) {
@@ -131,6 +138,26 @@ export class YouTubeAuthManager {
     try {
       operation.progress('Starting YouTube authentication...');
 
+      // Save existing cookies before clearing (for potential restoration)
+      operation.progress('Saving existing cookies before fresh authentication');
+      const existingCookies = await this.browserService.getCookies();
+      const hasPotentialAuthCookies = existingCookies.some(
+        cookie => cookie.name === 'SAPISID' || cookie.name === 'LOGIN_INFO' || cookie.name === 'SID'
+      );
+
+      if (hasPotentialAuthCookies) {
+        operation.progress('Found existing auth cookies, testing validity before clearing');
+        const cookieTestResult = await this.testProtectedEndpointAccess();
+        if (cookieTestResult.hasAccess) {
+          operation.success('Existing cookies are valid, skipping fresh authentication', {
+            method: 'existing_valid_cookies',
+            statusCode: cookieTestResult.statusCode,
+          });
+          return true;
+        }
+        operation.progress('Existing cookies are invalid, proceeding with fresh authentication');
+      }
+
       // Clear all cookies to ensure clean authentication state
       operation.progress('Clearing existing cookies for fresh authentication');
       await this.browserService.clearCookies();
@@ -200,6 +227,10 @@ export class YouTubeAuthManager {
       operation.progress('Verifying authentication success');
       const isAuth = await this.isAuthenticated();
       if (isAuth) {
+        // Save cookies for future use
+        operation.progress('Saving authentication cookies for persistence');
+        await this.saveCookies();
+
         this.clearSensitiveData();
         operation.success('YouTube authentication completed successfully', {
           method: 'credential_login',
@@ -210,6 +241,9 @@ export class YouTubeAuthManager {
         return false;
       }
     } catch (error) {
+      // Clear potentially invalid saved cookies on authentication failure
+      this.clearSavedCookies();
+
       operation.error(error, 'YouTube authentication failed', {
         errorMessage: this.sanitizeErrorMessage(error.message),
       });
@@ -454,6 +488,51 @@ export class YouTubeAuthManager {
   }
 
   /**
+   * Test access to a protected YouTube endpoint to verify authentication is valid
+   * @returns {Promise<Object>} Object with hasAccess boolean and statusCode
+   */
+  async testProtectedEndpointAccess() {
+    try {
+      if (!this.browserService || !this.browserService.page) {
+        return { hasAccess: false, statusCode: 0, error: 'No browser service available' };
+      }
+
+      // Test access to library endpoint which requires authentication
+      const testResult = await this.browserService.evaluate(async () => {
+        try {
+          const response = await fetch('https://www.youtube.com/feed/library', {
+            method: 'HEAD',
+            credentials: 'include',
+          });
+
+          // If we get 200/302, we have access. If 403/401, we don't.
+          const hasAccess = response.status !== 403 && response.status !== 401;
+
+          return {
+            hasAccess,
+            statusCode: response.status,
+          };
+        } catch (error) {
+          // Network errors - assume no access
+          return {
+            hasAccess: false,
+            statusCode: 0,
+            error: error.message,
+          };
+        }
+      });
+
+      return testResult;
+    } catch (error) {
+      return {
+        hasAccess: false,
+        statusCode: 0,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Quick authentication check that can be called frequently without side effects.
    * Uses a lightweight approach to verify authentication status.
    * @returns {Promise<boolean>} True if authenticated
@@ -496,12 +575,24 @@ export class YouTubeAuthManager {
         return false;
       }
 
-      // Try to navigate to YouTube and check if we're logged in
+      // First, try to navigate to YouTube and check if we're logged in
       operation.progress('Checking authentication by navigating to YouTube');
       await this.browserService.goto('https://www.youtube.com', { timeout: 15000, waitUntil: 'domcontentloaded' });
 
       // Wait for page to fully load
       await this.browserService.waitFor(3000);
+
+      // Test access to a protected endpoint to verify cookies are valid
+      operation.progress('Testing access to protected endpoint to verify authentication');
+      const protectedAccessTest = await this.testProtectedEndpointAccess();
+      if (!protectedAccessTest.hasAccess) {
+        operation.success('Authentication failed: no access to protected endpoints', {
+          authenticated: false,
+          reason: 'no_protected_access',
+          statusCode: protectedAccessTest.statusCode,
+        });
+        return false;
+      }
 
       // Check for signs of being logged in using multiple indicators
       const authIndicators = await this.browserService.evaluate(() => {
@@ -709,6 +800,83 @@ export class YouTubeAuthManager {
     // Clear credentials from memory after successful authentication
     this.youtubeUsername = null;
     this.youtubePassword = null;
+  }
+
+  /**
+   * Save authentication cookies to persistent storage
+   * @returns {Promise<void>}
+   */
+  async saveCookies() {
+    try {
+      if (!this.browserService || !this.browserService.page) {
+        return;
+      }
+
+      const cookies = await this.browserService.getCookies();
+      const authCookies = cookies.filter(
+        cookie =>
+          cookie.name === 'SAPISID' ||
+          cookie.name === 'LOGIN_INFO' ||
+          cookie.name === 'SID' ||
+          cookie.name === 'HSID' ||
+          cookie.name === 'SSID' ||
+          cookie.name === 'APISID'
+      );
+
+      if (authCookies.length > 0) {
+        const cookieData = {
+          cookies: authCookies,
+          timestamp: Date.now(),
+        };
+
+        this.state.set(this.cookieStorageKey, cookieData);
+        this.logger.debug(`Saved ${authCookies.length} authentication cookies for persistence`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to save authentication cookies:', error.message);
+    }
+  }
+
+  /**
+   * Restore saved authentication cookies
+   * @returns {Promise<void>}
+   */
+  async restoreSavedCookies() {
+    try {
+      if (!this.browserService || !this.browserService.page) {
+        return;
+      }
+
+      const cookieData = this.state.get(this.cookieStorageKey);
+      if (!cookieData || !cookieData.cookies) {
+        return;
+      }
+
+      // Check if cookies are not too old
+      const ageHours = (Date.now() - cookieData.timestamp) / (1000 * 60 * 60);
+      if (ageHours > this.cookieExpiryHours) {
+        this.logger.debug(`Saved cookies are ${Math.round(ageHours)}h old, clearing stale data`);
+        this.state.delete(this.cookieStorageKey);
+        return;
+      }
+
+      // Restore cookies
+      await this.browserService.setCookies(cookieData.cookies);
+      this.logger.debug(`Restored ${cookieData.cookies.length} authentication cookies from storage`);
+    } catch (error) {
+      this.logger.error('Failed to restore authentication cookies:', error.message);
+      // Clear potentially corrupted cookie data
+      this.state.delete(this.cookieStorageKey);
+    }
+  }
+
+  /**
+   * Clear saved authentication cookies
+   * @returns {void}
+   */
+  clearSavedCookies() {
+    this.state.delete(this.cookieStorageKey);
+    this.logger.debug('Cleared saved authentication cookies');
   }
 
   /**

@@ -84,19 +84,23 @@ async function checkForExistingInstances() {
     }
 
     // Check for existing node processes running index.js (excluding current process)
-    const { stdout } = await execAsync(`pgrep -f "node.*index\\.js" | grep -v ${process.pid} || true`);
+    if (process.env.SKIP_INSTANCE_CHECK === 'true') {
+      safeConsoleLog('⚠️ Skipping instance check (SKIP_INSTANCE_CHECK=true)');
+    } else {
+      const { stdout } = await execAsync(`pgrep -f "node.*index\\.js" | grep -v ${process.pid} || true`);
 
-    if (stdout.trim()) {
-      const existingPids = stdout
-        .trim()
-        .split('\n')
-        .filter(pid => pid.trim());
-      if (existingPids.length > 0) {
-        safeConsoleLog('❌ Found existing bot instance(s) running:');
-        safeConsoleLog(`   PIDs: ${existingPids.join(', ')}`);
-        safeConsoleLog('   Kill existing instances with: pkill -f "node.*index\\.js"');
-        safeConsoleLog('   Or use the restart command in Discord: !restart');
-        process.exit(1);
+      if (stdout.trim()) {
+        const existingPids = stdout
+          .trim()
+          .split('\n')
+          .filter(pid => pid.trim());
+        if (existingPids.length > 0) {
+          safeConsoleLog('❌ Found existing bot instance(s) running:');
+          safeConsoleLog(`   PIDs: ${existingPids.join(', ')}`);
+          safeConsoleLog('   Kill existing instances with: pkill -f "node.*index\\.js"');
+          safeConsoleLog('   Or use the restart command in Discord: !restart');
+          process.exit(1);
+        }
       }
     }
 
@@ -262,16 +266,27 @@ async function main() {
  */
 async function startApplications(container, config) {
   const logger = container.resolve('logger').child({ service: 'Main' });
-  const hasErrors = false;
+  let hasErrors = false;
+
+  // Start Discord Bot (includes YouTube Scraper Service)
+  let botAppStart;
+  try {
+    logger.info('Starting Discord Bot Application...');
+    const botApp = container.resolve('botApplication');
+    botAppStart = botApp.start();
+    logger.info('✅ Discord Bot Application started successfully');
+  } catch (error) {
+    hasErrors = true;
+    logger.error('❌ Failed to start Discord Bot Application:', error.message);
+    throw error; // Bot is essential, fail startup if it can't start
+  }
 
   // Start YouTube Monitor
   let monitorAppStart;
-
-  logger.info(`Starting YouTube Monitor…`);
+  logger.info('Starting YouTube Monitor...');
   const monitorApp = container.resolve('monitorApplication');
   monitorAppStart = monitorApp.start();
 
-  /*
   // Start X Scraper (if enabled)
   const xUser = config.get('X_USER_HANDLE');
   if (xUser) {
@@ -286,9 +301,10 @@ async function startApplications(container, config) {
     }
   } else {
     logger.info('X Scraper disabled (no X_USER_HANDLE configured)');
-  }*/
+  }
 
-  await monitorAppStart;
+  // Wait for all applications to start
+  await Promise.all([botAppStart, monitorAppStart]);
 
   return { hasErrors };
 }
