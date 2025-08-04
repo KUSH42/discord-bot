@@ -252,10 +252,10 @@ this.logger.errorWithObject('Command processing failed', { command, args, userId
 this.logger.warnWithObject('Performance threshold exceeded', performanceData);
 this.logger.infoWithObject('Operation completed', resultSummary);
 
-// 5. Use sampling for high-volume operations (NEW)
+// 5. Use sampling for high-volume operations (NEW - Correlation-ID Based)
 // For operations that process dozens of items (like content classification)
 const operation = this.logger.startSampledOperation('classifyContent', context, 0.1); // 10% sampling
-this.logger.debugSampled('Processing batch', { count }, 'batchProcessing', 0.05); // 5% sampling
+this.logger.debugSampled('Processing batch', { count }, correlationId, 0.05); // 5% sampling
 
 // 6. Register content stores with memory monitor
 constructor(dependencies) {
@@ -288,8 +288,9 @@ analyzeContentStore() {
 - **ContentCoordinator** (`state`): Content coordination visibility and race condition prevention
 - **MemoryMonitor** (`memory`): **Real-time memory tracking with content store analysis and leak detection**
 
-#### ✅ **NEW: Log Sampling System** (2025-01-28)
+#### ✅ **NEW: Log Sampling System** (2025-01-28, Updated Correlation-ID Based)
 - **Purpose**: Handles high-volume operations without log flooding
+- **Correlation-ID Based**: Deterministic sampling based on correlation ID hash for consistent behavior
 - **Smart Sampling**: 10% sampling for X content classification, 20% for YouTube
 - **Metrics Preserved**: All performance data collected regardless of sampling
 - **Error Logging**: Errors always logged regardless of sampling rates

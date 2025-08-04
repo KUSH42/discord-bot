@@ -20,9 +20,9 @@ describe('EnhancedLogger', () => {
     };
 
     mockDebugManager = {
-      shouldLog: jest.fn(() => true),
+      shouldLog: jest.fn((module, level) => level <= 5), // Enable all levels up to 5
       isEnabled: jest.fn(() => true),
-      getLevel: jest.fn(() => 3),
+      getLevel: jest.fn(() => 5), // Enable debug level
     };
 
     mockMetricsManager = {
@@ -97,7 +97,7 @@ describe('EnhancedLogger', () => {
       expect(result.success).toBe(true);
       expect(result.correlationId).toBe(operation.correlationId);
       expect(mockBaseLogger.info).toHaveBeenCalledWith(
-        'Operation completed',
+        expect.stringContaining('Operation completed | testId: 123'),
         expect.objectContaining({
           testId: '123',
           additionalData: 'value',
@@ -116,7 +116,7 @@ describe('EnhancedLogger', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe(error);
       expect(mockBaseLogger.error).toHaveBeenCalledWith(
-        'Operation failed',
+        expect.stringContaining('Operation failed | testId: 123'),
         expect.objectContaining({
           testId: '123',
           context: 'test',
@@ -133,7 +133,7 @@ describe('EnhancedLogger', () => {
 
       expect(result.correlationId).toBe(operation.correlationId);
       expect(mockBaseLogger.debug).toHaveBeenCalledWith(
-        'Step 1 completed',
+        expect.stringContaining('Step 1 completed | testId: 123'),
         expect.objectContaining({
           testId: '123',
           step: 1,
@@ -248,7 +248,7 @@ describe('EnhancedLogger', () => {
       childLogger.info('Child message', { data: 'value' });
 
       expect(mockBaseLogger.info).toHaveBeenCalledWith(
-        'Child message',
+        expect.stringContaining('Child message | requestId: 123'),
         expect.objectContaining({
           requestId: '123',
           data: 'value',
@@ -266,7 +266,7 @@ describe('EnhancedLogger', () => {
       expect(result).toBe('result');
       expect(testFn).toHaveBeenCalled();
       expect(mockBaseLogger.info).toHaveBeenCalledWith(
-        'testOperation completed',
+        expect.stringContaining('testOperation completed'),
         expect.objectContaining({ outcome: 'success' })
       );
     });
@@ -281,7 +281,7 @@ describe('EnhancedLogger', () => {
 
       expect(result).toBe('async result');
       expect(mockBaseLogger.info).toHaveBeenCalledWith(
-        'asyncOperation completed',
+        expect.stringContaining('asyncOperation completed'),
         expect.objectContaining({ outcome: 'success' })
       );
     });
@@ -295,7 +295,7 @@ describe('EnhancedLogger', () => {
       await expect(enhancedLogger.measure('failingOperation', testFn)).rejects.toThrow('Function failed');
 
       expect(mockBaseLogger.error).toHaveBeenCalledWith(
-        'failingOperation failed',
+        expect.stringContaining('failingOperation failed'),
         expect.objectContaining({
           outcome: 'error',
           error: 'Function failed',
@@ -311,7 +311,7 @@ describe('EnhancedLogger', () => {
       opLogger.info('Operation message');
 
       expect(mockBaseLogger.info).toHaveBeenCalledWith(
-        'Operation message',
+        expect.stringContaining('Operation message | operation: specificOp'),
         expect.objectContaining({
           operation: 'specificOp',
           correlationId: 'correlation-123',
@@ -339,7 +339,7 @@ describe('EnhancedLogger', () => {
       expect(stats.moduleName).toBe('test-module');
       expect(stats.activeOperations).toBe(2);
       expect(stats.debugEnabled).toBe(true);
-      expect(stats.debugLevel).toBe(3);
+      expect(stats.debugLevel).toBe(5);
     });
   });
 

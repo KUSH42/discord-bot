@@ -26,8 +26,7 @@ export class EnhancedLogger {
       error: 1.0, // Log all errors
     };
 
-    // Operation sampling counters
-    this.samplingCounters = new Map();
+    // Correlation-based sampling - no counters needed
   }
 
   /**
@@ -41,11 +40,11 @@ export class EnhancedLogger {
   /**
    * Check if a message should be logged based on sampling rate
    * @param {string} level - Log level (debug, verbose, info, warn, error)
-   * @param {string} operationName - Operation name for sampling tracking
+   * @param {string} correlationId - Correlation ID for consistent sampling
    * @param {number} sampleRate - Custom sample rate (0.0-1.0), defaults to level default
    * @returns {boolean} True if message should be logged
    */
-  shouldSample(level, operationName = 'default', sampleRate = null) {
+  shouldSample(level, correlationId = null, sampleRate = null) {
     const rate = sampleRate !== null ? sampleRate : this.defaultSamplingRates[level] || 1.0;
 
     // Always log if rate is 1.0 (100%)
@@ -58,29 +57,45 @@ export class EnhancedLogger {
       return false;
     }
 
-    // Use deterministic sampling based on operation counter for consistency
-    const counterKey = `${this.moduleName}.${operationName}.${level}`;
-    const currentCount = (this.samplingCounters.get(counterKey) || 0) + 1;
-    this.samplingCounters.set(counterKey, currentCount);
+    // Use correlation ID for deterministic sampling
+    // If no correlation ID provided, generate one for this sampling decision
+    const id = correlationId || this.generateCorrelationId();
 
-    // Sample every Nth message where N = 1/rate
-    const interval = Math.ceil(1 / rate);
-    return currentCount % interval === 0;
+    // Create a numeric hash from the correlation ID for consistent sampling
+    const hash = this.hashString(id);
+
+    // Convert sample rate to threshold (0.1 rate = 10% = threshold of 0.1)
+    const threshold = rate;
+
+    // Use modulo to create deterministic sampling based on correlation ID
+    const normalizedHash = (hash % 10000) / 10000; // Normalize to 0.0-1.0 range
+
+    return normalizedHash < threshold;
   }
 
   /**
-   * Set sampling rate for a specific level and operation
+   * Create a numeric hash from a string (correlation ID)
+   * @param {string} str - String to hash
+   * @returns {number} Numeric hash
+   * @private
+   */
+  hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  /**
+   * Set default sampling rate for a specific level
    * @param {string} level - Log level
    * @param {number} rate - Sample rate (0.0-1.0)
-   * @param {string} operationName - Optional operation name for specific sampling
    */
-  setSamplingRate(level, rate, operationName = null) {
-    if (operationName) {
-      const key = `${this.moduleName}.${operationName}.${level}`;
-      this.samplingCounters.set(key, 0); // Reset counter when changing rate
-    } else {
-      this.defaultSamplingRates[level] = rate;
-    }
+  setSamplingRate(level, rate) {
+    this.defaultSamplingRates[level] = rate;
   }
 
   /**
@@ -91,14 +106,17 @@ export class EnhancedLogger {
    * @returns {Object|null} Operation tracker or null if not sampled
    */
   startSampledOperation(operationName, context = {}, sampleRate = 0.1) {
-    // Check if this operation should be sampled
-    if (!this.shouldSample('debug', operationName, sampleRate)) {
+    // Generate correlation ID first for consistent sampling decision
+    const correlationId = context.correlationId || this.generateCorrelationId();
+
+    // Check if this operation should be sampled based on correlation ID
+    if (!this.shouldSample('debug', correlationId, sampleRate)) {
       // Return a no-op operation tracker that still records metrics but doesn't log
-      return this.createNoOpOperation(operationName, context);
+      return this.createNoOpOperation(operationName, { ...context, correlationId });
     }
 
     // Log this operation normally
-    return this.startOperation(operationName, { ...context, sampled: true });
+    return this.startOperation(operationName, { ...context, correlationId, sampled: true });
   }
 
   /**
@@ -173,6 +191,7 @@ export class EnhancedLogger {
           ...additionalContext,
           duration,
           outcome: 'success',
+          sampleRate: 1.0, // Always log operation success (100% sampling)
         };
 
         this.info(message, finalContext);
@@ -197,6 +216,7 @@ export class EnhancedLogger {
           outcome: 'error',
           error: error?.message,
           stack: error?.stack,
+          sampleRate: 1.0, // Always log operation errors (100% sampling)
         };
 
         this.error(message, finalContext);
@@ -218,6 +238,7 @@ export class EnhancedLogger {
           ...progressContext,
           currentDuration,
           outcome: 'progress',
+          sampleRate: 1.0, // Always log operation progress (100% sampling)
         };
 
         this.debug(message, finalContext);
@@ -339,33 +360,36 @@ export class EnhancedLogger {
    * Log debug message with sampling (for high-volume operations)
    * @param {string} message - Log message
    * @param {Object} context - Additional context
-   * @param {string} operationName - Operation name for sampling
+   * @param {string} correlationId - Correlation ID for consistent sampling (optional)
    * @param {number} sampleRate - Custom sample rate (0.0-1.0)
    */
-  debugSampled(message, context = {}, operationName = 'default', sampleRate = 0.1) {
-    this.log('debug', 4, message, { ...context, operationName, sampleRate });
+  debugSampled(message, context = {}, correlationId = null, sampleRate = 0.1) {
+    const id = correlationId || context.correlationId || this.generateCorrelationId();
+    this.log('debug', 4, message, { ...context, correlationId: id, sampleRate });
   }
 
   /**
    * Log verbose message with sampling (for very high-volume operations)
    * @param {string} message - Log message
    * @param {Object} context - Additional context
-   * @param {string} operationName - Operation name for sampling
+   * @param {string} correlationId - Correlation ID for consistent sampling (optional)
    * @param {number} sampleRate - Custom sample rate (0.0-1.0)
    */
-  verboseSampled(message, context = {}, operationName = 'default', sampleRate = 0.05) {
-    this.log('verbose', 5, message, { ...context, operationName, sampleRate });
+  verboseSampled(message, context = {}, correlationId = null, sampleRate = 0.05) {
+    const id = correlationId || context.correlationId || this.generateCorrelationId();
+    this.log('verbose', 5, message, { ...context, correlationId: id, sampleRate });
   }
 
   /**
    * Log info message with sampling
    * @param {string} message - Log message
    * @param {Object} context - Additional context
-   * @param {string} operationName - Operation name for sampling
+   * @param {string} correlationId - Correlation ID for consistent sampling (optional)
    * @param {number} sampleRate - Custom sample rate (0.0-1.0)
    */
-  infoSampled(message, context = {}, operationName = 'default', sampleRate = 0.5) {
-    this.log('info', 3, message, { ...context, operationName, sampleRate });
+  infoSampled(message, context = {}, correlationId = null, sampleRate = 0.5) {
+    const id = correlationId || context.correlationId || this.generateCorrelationId();
+    this.log('info', 3, message, { ...context, correlationId: id, sampleRate });
   }
 
   /**
@@ -374,11 +398,11 @@ export class EnhancedLogger {
    */
   log(level, levelNumber, message, context = {}) {
     // Check sampling first (unless it's an error/warning or no-log context)
-    const operationName = context.operationName || 'default';
+    const { correlationId } = context;
     const customSampleRate = context.sampleRate;
 
     // Skip sampling check for errors/warnings and forced no-log contexts
-    if (levelNumber > 2 && !context.noLog && !this.shouldSample(level, operationName, customSampleRate)) {
+    if (levelNumber > 2 && !context.noLog && !this.shouldSample(level, correlationId, customSampleRate)) {
       return;
     }
 
