@@ -796,24 +796,125 @@ export class YouTubeScraperService {
       ({ channelHandle, extractedDisplayName, apiChannelTitle }) => {
         /* eslint-disable no-undef */
 
-        // Look for "Now playing" or featured content
-        const selectors = [
-          'ytd-channel-featured-content-renderer a[href*="/watch?v="]',
-          'a[href*="/watch?v="]', // Any video link
+        // PRIORITY 1: Check canonical/meta tags for the actual livestream video ID
+        const canonicalLink = document.querySelector('link[rel="canonical"]');
+        const metaVideoUrl = document.querySelector('meta[property="og:video:url"]');
+
+        let canonicalVideoId = null;
+        if (canonicalLink && canonicalLink.href) {
+          const match = canonicalLink.href.match(/[?&]v=([^&]+)/);
+          if (match) {
+            canonicalVideoId = match[1];
+          }
+        }
+
+        if (!canonicalVideoId && metaVideoUrl && metaVideoUrl.content) {
+          const match = metaVideoUrl.content.match(/[?&]v=([^&]+)/);
+          if (match) {
+            canonicalVideoId = match[1];
+          }
+        }
+
+        // If we found a canonical video ID, verify it's actually live
+        if (canonicalVideoId) {
+          // Check for live indicators on the page to confirm this is an active livestream
+          const liveIndicators = [
+            document.querySelector('.ytp-live-badge'),
+            document.querySelector('.live-badge'),
+            document.querySelector('[aria-label*="live"]'),
+            document.querySelector('[class*="watching"]'),
+            ...Array.from(document.querySelectorAll('*')).filter(
+              el =>
+                el.textContent &&
+                (el.textContent.includes('watching now') || el.textContent.includes('Started streaming'))
+            ),
+          ].filter(Boolean);
+
+          const hasLiveIndicators = liveIndicators.length > 0;
+          const title = document.title.replace(' - YouTube', '').replace('Live Stream', '').trim();
+
+          if (hasLiveIndicators) {
+            return {
+              id: canonicalVideoId,
+              title: title || 'Live Stream',
+              url: `https://www.youtube.com/watch?v=${canonicalVideoId}`,
+              type: 'livestream',
+              platform: 'youtube',
+              isCurrentlyLive: true,
+              publishedAt: new Date().toISOString(),
+              scrapedAt: new Date().toISOString(),
+              detectionMethod: 'live-page-canonical',
+              channelTitle: apiChannelTitle || extractedDisplayName || channelHandle,
+            };
+          }
+        }
+
+        // PRIORITY 2: Look for channel-specific featured content (not recommendations)
+        const channelFeaturedLink = document.querySelector(
+          'ytd-channel-featured-content-renderer a[href*="/watch?v="]'
+        );
+        if (channelFeaturedLink) {
+          const container = channelFeaturedLink.closest('ytd-channel-featured-content-renderer');
+          const hasLiveText =
+            container &&
+            (container.textContent.toLowerCase().includes('live') ||
+              container.textContent.toLowerCase().includes('now playing') ||
+              container.textContent.toLowerCase().includes('watching'));
+
+          if (hasLiveText) {
+            const videoIdMatch = channelFeaturedLink.href.match(/[?&]v=([^&]+)/);
+            if (videoIdMatch) {
+              return {
+                id: videoIdMatch[1],
+                title:
+                  channelFeaturedLink.textContent.trim() || channelFeaturedLink.getAttribute('title') || 'Live Stream',
+                url: channelFeaturedLink.href,
+                type: 'livestream',
+                platform: 'youtube',
+                isCurrentlyLive: true,
+                publishedAt: new Date().toISOString(),
+                scrapedAt: new Date().toISOString(),
+                detectionMethod: 'live-page-featured',
+                channelTitle: apiChannelTitle || extractedDisplayName || channelHandle,
+              };
+            }
+          }
+        }
+
+        // PRIORITY 3: Look for main content area (avoid recommendations sidebar)
+        const mainContentSelectors = [
+          '#primary #contents a[href*="/watch?v="]', // Main content area
+          'ytd-two-column-browse-results-renderer #primary a[href*="/watch?v="]', // Primary column only
+          '.ytd-channel-video-player-renderer a[href*="/watch?v="]', // Channel video player
         ];
 
-        for (const selector of selectors) {
+        for (const selector of mainContentSelectors) {
           const links = document.querySelectorAll(selector);
           for (const link of links) {
-            const container = link.closest('div, article, section');
-            if (container) {
-              // Check if this container has live indicators
-              const hasLiveText =
-                container.textContent.toLowerCase().includes('live') ||
-                container.textContent.toLowerCase().includes('now playing') ||
-                container.textContent.toLowerCase().includes('watching');
+            // Skip if this link is in the recommendations/secondary sidebar
+            if (
+              link.closest('#secondary') ||
+              link.closest('#related') ||
+              link.closest('ytd-watch-next-secondary-results-renderer')
+            ) {
+              continue;
+            }
 
-              if (hasLiveText) {
+            const container = link.closest('div, article, section, ytd-rich-grid-media');
+            if (container) {
+              const containerText = container.textContent.toLowerCase();
+              const hasLiveText =
+                containerText.includes('live') ||
+                containerText.includes('now playing') ||
+                containerText.includes('watching');
+
+              // Additional check: ensure this belongs to our channel
+              const belongsToChannel =
+                containerText.includes(channelHandle.toLowerCase()) ||
+                containerText.includes((extractedDisplayName || '').toLowerCase()) ||
+                containerText.includes((apiChannelTitle || '').toLowerCase());
+
+              if (hasLiveText && belongsToChannel) {
                 const videoIdMatch = link.href.match(/[?&]v=([^&]+)/);
                 if (videoIdMatch) {
                   return {
@@ -825,7 +926,7 @@ export class YouTubeScraperService {
                     isCurrentlyLive: true,
                     publishedAt: new Date().toISOString(),
                     scrapedAt: new Date().toISOString(),
-                    detectionMethod: 'live-page-featured',
+                    detectionMethod: 'live-page-main-content',
                     channelTitle: apiChannelTitle || extractedDisplayName || channelHandle,
                   };
                 }
