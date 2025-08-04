@@ -16,9 +16,9 @@ export class ProcessingScheduler {
     }
     // Configuration
     this.testMode = options.testMode || false;
-    this.baseCheckInterval = options.baseCheckInterval || 100; // ms between checks
-    this.idleCheckInterval = options.idleCheckInterval || 1000; // ms when queue is empty
-    this.maxJitter = options.maxJitter || 0.1; // 10% jitter by default
+    this.baseCheckInterval = options.baseCheckInterval !== undefined ? options.baseCheckInterval : 100; // ms between checks
+    this.idleCheckInterval = options.idleCheckInterval !== undefined ? options.idleCheckInterval : 1000; // ms when queue is empty
+    this.maxJitter = options.maxJitter !== undefined ? options.maxJitter : 0.1; // 10% jitter by default
     this.enableJitter = options.enableJitter !== false;
 
     // State

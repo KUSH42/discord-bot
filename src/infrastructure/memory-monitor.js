@@ -411,7 +411,7 @@ export class MemoryMonitor {
         peak: this.stats.peakMemoryMB,
         average: this.stats.averageMemoryMB,
       },
-      recommendations: this.generateMemoryRecommendations(),
+      recommendations: await this.generateMemoryRecommendations(),
     };
   }
 
