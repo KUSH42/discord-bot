@@ -10,7 +10,6 @@ The previous coverage system had several critical issues:
 - Missing integration between test types
 - Inconsistent artifact structure
 - Poor test summary generation
-- **lcov-result-merger stripping essential coverage summary lines**
 
 The new system provides:
 - ✅ **Proper LCOV merging** with deduplication
@@ -37,27 +36,19 @@ This represents a **significant improvement** over the broken 0% results from th
 
 ### Core Components
 
-1. **Enhanced Coverage Merger** (`scripts/coverage/merge-coverage-enhanced.js`)
+1. **Enhanced Coverage Merger** 
    - Discovers coverage files across test types
    - Deduplicates identical files (e.g., Node 18/20 unit tests)
-   - **Uses proven Python merger** for accurate statistics
-   - **Avoids broken lcov-result-merger** that strips coverage summaries
-   - Generates comprehensive summaries with quality scoring
+   - **Uses proven c8 merger** for accurate statistics
+   - Generates comprehensive summaries with quality scoring and reports
 
 2. **Professional Test Summary Generator** (`scripts/testing/generate-test-summary.js`)
    - Aggregates results from all test types
    - **Parses JUnit XML test results** for structured test data
    - Creates quality gate assessments
-   - Generates professional markdown reports
+   - Generates professional markdown and HTML reports
    - Includes coverage analysis and recommendations
    - Links to CI artifacts and detailed reports
-
-3. **CI Coverage Merger** (`scripts/ci/ci-coverage-merger.js`)
-   - Specialized for GitHub Actions environment
-   - Handles artifact collection and organization
-   - Sets GitHub Action outputs for workflow decisions
-   - Creates fallback reports when coverage is missing
-   - Integrates with existing CI infrastructure
 
 ### Data Flow
 
@@ -107,41 +98,7 @@ All Jest configurations now generate **structured test results** via the `jest-j
 
 ### Local Development
 
-#### Generate Coverage Summary
-```bash
-# Use existing coverage files
-node scripts/coverage/merge-coverage-enhanced.js
-
-# Custom search paths
-node scripts/coverage/merge-coverage-enhanced.js --search-paths "test-results,coverage,artifacts"
-
-# Specify output location
-node scripts/coverage/merge-coverage-enhanced.js --output ./merged/lcov.info
-```
-
-#### Generate Test Summary
-```bash
-# Standard test summary
-npm run test:summary
-
-# Or directly
-node scripts/testing/generate-test-summary.js
-
-# Custom paths
-node scripts/testing/generate-test-summary.js --test-results ./artifacts/tests --output ./reports
-```
-
-#### Test the System
-```bash
-# Run comprehensive tests
-node scripts/coverage/test-coverage-simple.js
-
-# This validates:
-# - LCOV parsing and merging
-# - Summary generation
-# - Report creation
-# - Script structure
-```
+TODO
 
 ### GitHub Actions Integration
 
@@ -161,25 +118,7 @@ Replace the existing coverage section in `.github/workflows/ci.yml` with the enh
       - name: Generate LCOV HTML Report
         if: steps.coverage.outputs.status == 'available'
         run: |
-          set -e
-          LCOV_REPORT_DIR="lcov-html-report"
-          mkdir -p "$LCOV_REPORT_DIR"
-          
-          if [ -d "assets/lcov" ]; then
-            find assets/lcov -name "*.css" -exec cp {} "$LCOV_REPORT_DIR/" \;
-          fi
-          
-          if [ -f "coverage/merged/lcov.info" ]; then
-            genhtml coverage/merged/lcov.info \
-              --output-directory "$LCOV_REPORT_DIR" \
-              --title "Enhanced Code Coverage Report" \
-              --branch-coverage \
-              --function-coverage \
-              --prefix "$(pwd)" \
-              --legend \
-              --show-details || echo "genhtml failed but continuing"
-            echo "✅ LCOV HTML report generated"
-          fi
+            [...]
 
       - name: Store comprehensive test report
         uses: actions/upload-artifact@v4
@@ -225,52 +164,12 @@ The system implements these quality gates:
 ## File Organization
 
 ### Input Structure
-```
-test-results/
-├── unit/
-│   ├── node18/coverage/unit/lcov.info
-│   └── node20/coverage/unit/lcov.info
-├── integration/coverage/integration/lcov.info
-├── e2e/coverage/e2e/lcov.info
-├── performance/coverage/performance/lcov.info
-├── unit-tests.xml                   # JUnit XML results
-├── integration-tests.xml
-├── e2e-tests.xml
-├── performance-tests.xml
-├── security-tests.xml
-└── all-tests.xml                    # Main test run results
-```
+TODO
 
 ### Output Structure
-```
-coverage/
-├── merged/lcov.info                 # Merged LCOV file
-├── coverage-summary.json           # Standard Jest format
-└── coverage-metrics.json          # Extended metrics
-
-reports/
-├── test-summary.md                 # Professional report
-└── test-summary.json              # Machine-readable summary
-
-test-results/                       # JUnit XML test results
-├── unit-tests.xml
-├── integration-tests.xml
-├── e2e-tests.xml
-├── performance-tests.xml
-├── security-tests.xml
-└── all-tests.xml
-
-lcov-html-report/                   # Interactive HTML report
-├── index.html
-└── [coverage files]
-```
+TODO
 
 ## Features
-
-### Intelligent Deduplication
-- Detects identical coverage files by content hash
-- Prevents double-counting from multiple Node.js versions
-- Preserves unique coverage from different test types
 
 ### Robust Merging
 - **Primary: merge with c8** accurate, modern code coverage
