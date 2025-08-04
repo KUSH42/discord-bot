@@ -1450,42 +1450,76 @@ export class CommandProcessor {
    * Handle log-pipeline command
    */
   async handleLogPipeline() {
-    // This would integrate with enhanced logger to show recent pipeline activities
-    // For now, return a placeholder implementation
-
-    const activities = [
-      `**📋 Recent Pipeline Activities**`,
-      ``,
-      `ℹ️ This command shows recent logging activities with correlation tracking.`,
-      `🚧 Full implementation requires integration with EnhancedLogger instances.`,
-      ``,
-      `**Planned Features:**`,
-      `• Recent operation timings and outcomes`,
-      `• Failed operations with context`,
-      `• Correlation ID tracking across modules`,
-      `• Pipeline performance metrics`,
-      ``,
-    ];
-
-    // If we have enhanced loggers available, we could add real data here
-    if (this.debugManager) {
-      const enabledModules = this.debugManager.getEnabledModules();
-      if (enabledModules.length > 0) {
-        activities.push(`**Currently Debugging:**`);
-        for (const module of enabledModules) {
-          const level = this.debugManager.getLevel(module);
-          const levelName = this.debugManager.getLevelName(level);
-          activities.push(`• **${module}**: level ${level} (${levelName})`);
-        }
-      }
+    if (!this.metricsManager) {
+      return {
+        success: false,
+        message: '❌ Metrics manager is not available.',
+        requiresRestart: false,
+      };
     }
 
-    return {
-      success: true,
-      message: activities.join('\n'),
-      requiresRestart: false,
-      logMessage: 'Log pipeline status requested',
-    };
+    try {
+      const recentOps = this.metricsManager.getRecentOperations(8);
+      const stats = this.metricsManager.getStats();
+
+      const activities = [
+        `**📋 Recent Pipeline Activities**`,
+        `⏱️ Uptime: ${Math.floor(stats.uptime / 60)}m | Metrics: ${stats.totalMetricsRecorded} total`,
+        ``,
+      ];
+
+      if (recentOps.length === 0) {
+        activities.push(`ℹ️ No recent operations recorded yet.`);
+        activities.push(`🔄 Operations will appear here as enhanced logging captures activity.`);
+      } else {
+        activities.push(`**Last ${recentOps.length} Operations:**`);
+        for (const op of recentOps) {
+          const icon = op.success ? '✅' : '❌';
+          const duration = op.duration ? `${op.duration}ms` : 'N/A';
+          const timeDiff = Math.floor((Date.now() - op.timestamp) / 1000);
+          const timeText = timeDiff < 60 ? `${timeDiff}s ago` : `${Math.floor(timeDiff / 60)}m ago`;
+
+          // Format operation name for readability
+          const opName = op.operation
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .trim();
+
+          activities.push(`${icon} **${opName}** (${duration}) - ${timeText}`);
+        }
+      }
+
+      activities.push(``);
+
+      // Add debugging status if available
+      if (this.debugManager) {
+        const enabledModules = this.debugManager.getEnabledModules();
+        if (enabledModules.length > 0) {
+          activities.push(`**🔍 Active Debug Modules:**`);
+          for (const module of enabledModules) {
+            const level = this.debugManager.getLevel(module);
+            const levelName = this.debugManager.getLevelName(level);
+            activities.push(`• **${module}**: level ${level} (${levelName})`);
+          }
+        } else {
+          activities.push(`🔇 No debug modules currently active.`);
+        }
+      }
+
+      return {
+        success: true,
+        message: activities.join('\n'),
+        requiresRestart: false,
+        logMessage: 'Log pipeline status requested',
+        operationsData: { recentOps, stats },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to get pipeline status: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
   }
 
   /**

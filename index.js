@@ -287,6 +287,18 @@ async function startApplications(container, config) {
   const monitorApp = container.resolve('monitorApplication');
   monitorAppStart = monitorApp.start();
 
+  // Start Memory Monitor
+  try {
+    logger.info('Starting Memory Monitor...');
+    const memoryMonitor = container.resolve('memoryMonitor');
+    memoryMonitor.start();
+    logger.info('✅ Memory Monitor started successfully');
+  } catch (error) {
+    hasErrors = true;
+    logger.error('❌ Failed to start Memory Monitor:', error.message);
+    logger.warn('Memory monitoring will be disabled - bot will continue normally');
+  }
+
   // Start X Scraper (if enabled)
   const xUser = config.get('X_USER_HANDLE');
   if (xUser) {

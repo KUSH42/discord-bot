@@ -389,6 +389,32 @@ export class MetricsManager {
   }
 
   /**
+   * Get recent operations from timer metrics (for log pipeline)
+   * @param {number} limit - Maximum number of recent operations to return
+   * @returns {Array} Recent operations with timing data
+   */
+  getRecentOperations(limit = 10) {
+    const recentOps = [];
+
+    // Collect recent timer samples across all metrics
+    for (const [name, metric] of this.timers.entries()) {
+      for (const sample of metric.samples.slice(-5)) {
+        // Last 5 samples per metric
+        recentOps.push({
+          operation: name,
+          timestamp: sample.timestamp,
+          duration: sample.value,
+          tags: sample.tags,
+          success: !sample.tags.error, // Assume success unless error tag present
+        });
+      }
+    }
+
+    // Sort by timestamp (most recent first) and limit results
+    return recentOps.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+  }
+
+  /**
    * Get comprehensive statistics for all metrics
    * @returns {Object} Statistics object
    */
