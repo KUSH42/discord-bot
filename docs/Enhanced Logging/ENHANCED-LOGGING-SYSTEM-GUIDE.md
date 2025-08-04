@@ -283,6 +283,79 @@ Recent Pipeline Activities:
 🔄 [ghi789] processWebhook: 0.8s ✅
 ```
 
+## Log Sampling for High-Volume Operations ✅ **NEW FEATURE**
+
+### Sampling Overview
+
+For high-volume operations like content classification that may process dozens of items per minute, the enhanced logging system provides intelligent sampling to prevent log flooding while maintaining observability.
+
+### Sampling Features
+
+- **Deterministic Sampling**: Uses operation counters for consistent sampling patterns
+- **Configurable Rates**: Per-operation and per-level sampling rates
+- **Metrics Always Recorded**: Performance metrics are recorded even when logs are sampled
+- **Error Logging Always**: Errors are always logged regardless of sampling
+- **Smart No-Op Operations**: Sampled operations use lightweight no-op trackers
+
+### Sampling Usage Examples
+
+#### High-Volume Content Classification
+```javascript
+// ContentClassifier with 10% sampling for X content, 20% for YouTube
+export class ContentClassifier {
+  classifyXContent(url, text = '', metadata = {}) {
+    // Only logs 1 in 10 operations, but records all metrics
+    const operation = this.logger.startSampledOperation('classifyXContent', { 
+      url, hasText: !!text, hasMetadata: !!metadata 
+    }, 0.1);
+    
+    try {
+      // ... classification logic ...
+      operation.success('X content classified', { type: result.type });
+      return result;
+    } catch (error) {
+      // Errors are always logged even if operation was sampled
+      operation.error(error, 'Classification failed');
+      throw error;
+    }
+  }
+}
+```
+
+#### Manual Sampling Control
+```javascript
+// Individual log message sampling
+this.logger.debugSampled('Processing tweet batch', 
+  { batchSize: tweets.length }, 
+  'tweetProcessing', 
+  0.05  // Log only 5% of batch processing messages
+);
+
+// Set sampling rates dynamically
+this.logger.setSamplingRate('debug', 0.2); // 20% of debug messages
+this.logger.setSamplingRate('verbose', 0.1, 'contentClassification'); // 10% for specific operation
+```
+
+#### Default Sampling Rates
+```javascript
+// Built-in default sampling rates
+{
+  debug: 0.1,    // 10% of debug messages
+  verbose: 0.05, // 5% of verbose messages  
+  info: 1.0,     // 100% of info messages
+  warn: 1.0,     // 100% of warnings
+  error: 1.0     // 100% of errors
+}
+```
+
+### Sampling Benefits
+
+- **Reduced Log Volume**: Prevents overwhelming log files during high-activity periods
+- **Maintained Observability**: Still provides representative sample of operations
+- **Performance Preserved**: Metrics collection continues for all operations
+- **Error Visibility**: Critical errors are never missed due to sampling
+- **Configurable**: Adjust sampling rates based on operational needs
+
 ## Implementation Examples
 
 ### Before and After Comparison

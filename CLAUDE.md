@@ -252,7 +252,12 @@ this.logger.errorWithObject('Command processing failed', { command, args, userId
 this.logger.warnWithObject('Performance threshold exceeded', performanceData);
 this.logger.infoWithObject('Operation completed', resultSummary);
 
-// 5. Register content stores with memory monitor
+// 5. Use sampling for high-volume operations (NEW)
+// For operations that process dozens of items (like content classification)
+const operation = this.logger.startSampledOperation('classifyContent', context, 0.1); // 10% sampling
+this.logger.debugSampled('Processing batch', { count }, 'batchProcessing', 0.05); // 5% sampling
+
+// 6. Register content stores with memory monitor
 constructor(dependencies) {
   // ... existing code ...
   if (dependencies.memoryMonitor) {
@@ -260,7 +265,7 @@ constructor(dependencies) {
   }
 }
 
-// 6. Implement content analysis for memory monitoring
+// 7. Implement content analysis for memory monitoring
 analyzeContentStore() {
   return {
     totalItems: this.contentCache.size,
@@ -272,19 +277,26 @@ analyzeContentStore() {
 ```
 
 ### Integration Status (Production Ready)
-#### ✅ Completed Integrations (7 modules + Memory Management)
+#### ✅ Completed Integrations (8 modules + Memory Management + Sampling)
 - **ContentAnnouncer** (`content-announcer`): Content announcement pipeline with progress tracking
 - **ScraperApplication** (`scraper`): X scraping operations with **memory-managed tweet cache (1000 limit)**
 - **MonitorApplication** (`youtube`): YouTube webhook processing with API fallback monitoring  
 - **BotApplication** (`api`): Discord message processing with command tracking
 - **XAuthManager** (`auth`): Authentication flows with login attempt monitoring
 - **YouTubeScraperService** (`youtube`): YouTube monitoring with **memory-managed video cache (500 limit)**
+- **ContentClassifier** (`api`): **Content classification with intelligent sampling (10% X, 20% YouTube)**
+- **ContentCoordinator** (`state`): Content coordination visibility and race condition prevention
 - **MemoryMonitor** (`memory`): **Real-time memory tracking with content store analysis and leak detection**
+
+#### ✅ **NEW: Log Sampling System** (2025-01-28)
+- **Purpose**: Handles high-volume operations without log flooding
+- **Smart Sampling**: 10% sampling for X content classification, 20% for YouTube
+- **Metrics Preserved**: All performance data collected regardless of sampling
+- **Error Logging**: Errors always logged regardless of sampling rates
+- **Methods**: `startSampledOperation()`, `debugSampled()`, `verboseSampled()`, `infoSampled()`
 
 #### 🚧 Pending Integrations (Low Priority)
 - **Browser Services** (`browser`): Playwright automation debugging
-- **ContentCoordinator** (`state`): Content coordination visibility
-- **ContentClassifier** (`api`): Classification process tracking
 - **ContentStateManager** (`state`): State management operations
 
 ### Testing Framework (Fully Established)

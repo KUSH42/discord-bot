@@ -115,7 +115,7 @@ export class EnhancedLogger {
       startTime,
       context: { ...context, correlationId, noLog: true },
 
-      success: (message, additionalContext = {}) => {
+      success: (_message, _additionalContext = {}) => {
         const duration = nowUTC() - startTime;
         this.recordMetrics(operationName, duration, true);
         return { correlationId, duration, success: true, sampled: false };
@@ -136,7 +136,7 @@ export class EnhancedLogger {
         return { correlationId, duration, success: false, error, sampled: false };
       },
 
-      progress: (message, progressContext = {}) => {
+      progress: (_message, _progressContext = {}) => {
         // No-op for progress in sampled operations
         return { correlationId, currentDuration: nowUTC() - startTime };
       },

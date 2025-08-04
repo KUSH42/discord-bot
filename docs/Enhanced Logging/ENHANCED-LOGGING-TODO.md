@@ -9,6 +9,25 @@ The enhanced logging system consists of:
 - **MetricsManager**: Real-time performance metrics collection and aggregation  
 - **EnhancedLogger**: Advanced logging with automatic operation timing and correlation tracking
 
+## ✅ **NEW: Log Sampling System** (2025-01-28)
+
+**Purpose**: Handle high-volume operations (like content classification processing dozens of items) without overwhelming logs
+
+**Key Features**:
+- **Deterministic Sampling**: Consistent patterns using operation counters
+- **Configurable Rates**: Per-operation and per-level sampling rates  
+- **Metrics Preserved**: All operations contribute to performance data
+- **Error Logging Always**: Critical errors never missed
+- **Smart No-Op Operations**: Lightweight tracking for sampled operations
+
+**Implementation**:
+- `startSampledOperation()` - High-volume operation tracking with sampling
+- `debugSampled()`, `verboseSampled()`, `infoSampled()` - Individual message sampling
+- `setSamplingRate()` - Dynamic rate configuration
+- Default rates: debug=10%, verbose=5%, info/warn/error=100%
+
+**Usage**: ContentClassifier now uses 10% sampling for X content, 20% for YouTube content classification
+
 ## Integration Status by Module
 
 ### ✅ **Completed Integrations**
@@ -347,8 +366,9 @@ Modules with:
 1. **Phase 4**: Remaining core services (ContentStateManager, LivestreamStateMachine, CommandProcessor)
 
 **Recently Completed**:
-- ✅ **ContentClassifier** - Added enhanced logging with operation tracking for X and YouTube content classification
+- ✅ **ContentClassifier** - Added enhanced logging with operation tracking for X and YouTube content classification + **NEW: Log sampling for high-volume operations (10% X, 20% YouTube)**
 - ✅ **ContentCoordinator** - Enhanced logging for content processing coordination
+- ✅ **Enhanced Logger Sampling System** - Added intelligent sampling for high-volume operations with configurable rates
 
 **Next Focus**:
 2. **Integration Testing**: Validate debug command functionality end-to-end
