@@ -683,6 +683,85 @@ export class XAuthManager {
   }
 
   /**
+   * Sanitizes URLs to remove sensitive authentication tokens and parameters.
+   * @param {string} url - URL to sanitize
+   * @returns {string} Sanitized URL with sensitive parameters removed
+   */
+  sanitizeUrl(url) {
+    if (typeof url !== 'string' || url.trim() === '') {
+      return '[INVALID_URL]';
+    }
+
+    try {
+      const urlObj = new URL(url);
+
+      // Remove sensitive query parameters commonly found in X.com OAuth URLs
+      const sensitiveParams = [
+        'auth_token', // Authentication token
+        'oauth_token', // OAuth token
+        'oauth_verifier', // OAuth verifier
+        'code', // Authorization code
+        'state', // OAuth state parameter
+        'session_id', // Session identifier
+        'csrf_token', // CSRF token
+        'verification_string', // Verification string
+        'challenge', // Challenge parameter
+        'flow_token', // Flow token
+        'subtask_id', // Subtask identifier
+        'js_instrumentation', // Instrumentation data
+        'redirect_after_login', // Redirect URL
+        'auth_redirect', // Auth redirect URL
+        'continue', // Continue URL
+        'user_id', // User identifier
+        'screen_name', // Screen name
+        'authenticity_token', // Authenticity token
+      ];
+
+      // Remove sensitive parameters
+      sensitiveParams.forEach(param => {
+        urlObj.searchParams.delete(param);
+      });
+
+      // Special handling for X.com login/auth URLs
+      if (urlObj.hostname === 'x.com' || urlObj.hostname === 'twitter.com') {
+        // For login/auth related paths, be more aggressive about parameter removal
+        if (
+          urlObj.pathname.includes('/login') ||
+          urlObj.pathname.includes('/oauth') ||
+          urlObj.pathname.includes('/auth') ||
+          urlObj.pathname.includes('/i/flow')
+        ) {
+          // Keep only safe, non-sensitive parameters
+          const allowedParams = ['lang', 'hl', 'locale', 'redirect_after_login_verification'];
+          const paramsToKeep = new URLSearchParams();
+
+          allowedParams.forEach(param => {
+            if (urlObj.searchParams.has(param)) {
+              paramsToKeep.set(param, urlObj.searchParams.get(param));
+            }
+          });
+
+          const originalParamCount = url.match(/[?&]/g)?.length || 0;
+          const keptParamCount = paramsToKeep.toString() ? paramsToKeep.toString().split('&').length : 0;
+
+          urlObj.search = paramsToKeep.toString();
+
+          if (originalParamCount > keptParamCount) {
+            const removedCount = originalParamCount - keptParamCount;
+            return `${urlObj.toString()}${urlObj.search ? '&' : '?'}[${removedCount}_SENSITIVE_PARAMS_REMOVED]`;
+          }
+        }
+      }
+
+      return urlObj.toString();
+    } catch (_error) {
+      // If URL parsing fails, return a safe fallback
+      const domain = url.match(/https?:\/\/([^/?]+)/)?.[1] || '[UNKNOWN_DOMAIN]';
+      return `https://${domain}/[SANITIZED_URL]`;
+    }
+  }
+
+  /**
    * Validates the format and security of cookies.
    * @param {any} cookies - The cookies to validate.
    * @returns {boolean} - True if the format is valid and secure, false otherwise.

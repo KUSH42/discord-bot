@@ -827,7 +827,7 @@ describe('YouTubeAuthManager', () => {
     });
 
     it('should handle empty credentials gracefully', () => {
-      mockConfig.getRequired.mockImplementation(key => {
+      mockConfig.getRequired.mockImplementation(_key => {
         return ''; // Empty credentials
       });
 
@@ -835,6 +835,104 @@ describe('YouTubeAuthManager', () => {
       const sanitized = youtubeAuthManager.sanitizeErrorMessage(errorMessage);
 
       expect(sanitized).toBe('Login failed with empty credentials');
+    });
+  });
+
+  describe('sanitizeUrl method', () => {
+    it('should remove sensitive Google OAuth parameters', () => {
+      const sensitiveUrl =
+        'https://accounts.google.com/v3/signin/challenge/selection?TL=abc123&dsh=xyz789&ifkv=def456&flowEntry=ServiceLogin&service=youtube';
+      const sanitized = youtubeAuthManager.sanitizeUrl(sensitiveUrl);
+
+      expect(sanitized).toBe('https://accounts.google.com/v3/signin/challenge/selection?[5_SENSITIVE_PARAMS_REMOVED]');
+      expect(sanitized).not.toContain('abc123');
+      expect(sanitized).not.toContain('xyz789');
+      expect(sanitized).not.toContain('def456');
+    });
+
+    it('should preserve safe parameters on Google URLs', () => {
+      const urlWithSafeAndSensitive = 'https://accounts.google.com/signin?hl=en&TL=secret123&locale=en-US';
+      const sanitized = youtubeAuthManager.sanitizeUrl(urlWithSafeAndSensitive);
+
+      expect(sanitized).toContain('hl=en');
+      expect(sanitized).toContain('locale=en-US');
+      expect(sanitized).not.toContain('secret123');
+      expect(sanitized).toContain('[1_SENSITIVE_PARAMS_REMOVED]');
+    });
+
+    it('should handle OAuth flow parameters', () => {
+      const oauthUrl =
+        'https://accounts.google.com/oauth/authorize?code=auth123&state=state456&access_token=token789&continue=https%3A%2F%2Fyoutube.com';
+      const sanitized = youtubeAuthManager.sanitizeUrl(oauthUrl);
+
+      expect(sanitized).not.toContain('auth123');
+      expect(sanitized).not.toContain('state456');
+      expect(sanitized).not.toContain('token789');
+      expect(sanitized).toContain('[4_SENSITIVE_PARAMS_REMOVED]');
+    });
+
+    it('should handle non-Google URLs by removing common OAuth parameters', () => {
+      const externalUrl = 'https://example.com/callback?code=secret123&id_token=token456&other=value';
+      const sanitized = youtubeAuthManager.sanitizeUrl(externalUrl);
+
+      expect(sanitized).toBe('https://example.com/callback?other=value');
+      expect(sanitized).not.toContain('secret123');
+      expect(sanitized).not.toContain('token456');
+    });
+
+    it('should handle YouTube URLs without modification when no sensitive params', () => {
+      const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLn4o7';
+      const sanitized = youtubeAuthManager.sanitizeUrl(youtubeUrl);
+
+      expect(sanitized).toBe(youtubeUrl);
+    });
+
+    it('should handle invalid URL input gracefully', () => {
+      expect(youtubeAuthManager.sanitizeUrl(null)).toBe('[INVALID_URL]');
+      expect(youtubeAuthManager.sanitizeUrl(undefined)).toBe('[INVALID_URL]');
+      expect(youtubeAuthManager.sanitizeUrl(123)).toBe('[INVALID_URL]');
+      expect(youtubeAuthManager.sanitizeUrl('')).toBe('[INVALID_URL]');
+    });
+
+    it('should handle malformed URLs with parameter sanitization', () => {
+      const malformedUrl = 'https://accounts.google.com/path[invalid-chars?TL=secret&dsh=token';
+      const sanitized = youtubeAuthManager.sanitizeUrl(malformedUrl);
+
+      // URL constructor is forgiving, so it parses this and removes sensitive parameters
+      expect(sanitized).toBe('https://accounts.google.com/path[invalid-chars?[2_SENSITIVE_PARAMS_REMOVED]');
+      expect(sanitized).not.toContain('secret');
+      expect(sanitized).not.toContain('token');
+    });
+
+    it('should handle URLs without query parameters', () => {
+      const simpleUrl = 'https://accounts.google.com/signin';
+      const sanitized = youtubeAuthManager.sanitizeUrl(simpleUrl);
+
+      expect(sanitized).toBe(simpleUrl);
+    });
+
+    it('should handle complex Google authentication flow URLs', () => {
+      const complexUrl =
+        'https://accounts.google.com/v3/signin/challenge/selection?TL=ALgCv6xLqItYLBXasvWNWXEAWvZpfCmYKU5P1LdlAPZsLxZFRfpC5hhxZFBlCgFR&checkConnection=youtube%3A120&checkedDomains=youtube&dsh=S520854385%3A1754319327497394&flowEntry=ServiceLogin&flowName=GlifWebSignIn&ifkv=AdBytiM6IZchzr2MMjuI3dkqrEg4KK3TldiokD0HN60n4Sgwsrdo3enxWrqeEgSSW7S2-kXo9B8xnQ&lid=2&pstMsg=1&service=youtube';
+      const sanitized = youtubeAuthManager.sanitizeUrl(complexUrl);
+
+      // Should remove all sensitive parameters
+      expect(sanitized).not.toContain('ALgCv6xLqItYLBXasvWNWXEAWvZpfCmYKU5P1LdlAPZsLxZFRfpC5hhxZFBlCgFR');
+      expect(sanitized).not.toContain('S520854385:1754319327497394');
+      expect(sanitized).not.toContain('AdBytiM6IZchzr2MMjuI3dkqrEg4KK3TldiokD0HN60n4Sgwsrdo3enxWrqeEgSSW7S2-kXo9B8xnQ');
+      expect(sanitized).toContain('[10_SENSITIVE_PARAMS_REMOVED]');
+    });
+
+    it('should handle consent.youtube.com URLs', () => {
+      const consentUrl =
+        'https://consent.youtube.com/consent?continue=https%3A%2F%2Fwww.youtube.com&gl=US&hl=en&pc=yt&src=1';
+      const sanitized = youtubeAuthManager.sanitizeUrl(consentUrl);
+
+      // continue parameter contains sensitive redirect info, should be removed
+      expect(sanitized).not.toContain('continue=https%3A%2F%2Fwww.youtube.com');
+      // Safe parameters should remain
+      expect(sanitized).toContain('gl=US');
+      expect(sanitized).toContain('hl=en');
     });
   });
 
@@ -976,11 +1074,13 @@ describe('YouTubeAuthManager', () => {
       youtubeAuthManager.authEnabled = true;
       jest.spyOn(youtubeAuthManager, 'isQuickAuthenticated').mockResolvedValue(false);
       jest.spyOn(youtubeAuthManager, 'isAuthenticated').mockResolvedValue(false);
-      const authenticateSpy = jest.spyOn(youtubeAuthManager, 'authenticateWithYouTube').mockImplementation(async () => {
-        // Mock the behavior that clearSensitiveData is called within authenticateWithYouTube
-        youtubeAuthManager.clearSensitiveData();
-        return true;
-      });
+      const _authenticateSpy = jest
+        .spyOn(youtubeAuthManager, 'authenticateWithYouTube')
+        .mockImplementation(async () => {
+          // Mock the behavior that clearSensitiveData is called within authenticateWithYouTube
+          youtubeAuthManager.clearSensitiveData();
+          return true;
+        });
       jest.spyOn(youtubeAuthManager, 'clearSensitiveData').mockReturnValue();
 
       await youtubeAuthManager.ensureAuthenticated();

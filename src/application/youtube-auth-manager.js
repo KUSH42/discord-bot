@@ -947,7 +947,7 @@ export class YouTubeAuthManager {
    * @returns {string} Sanitized URL with sensitive parameters removed
    */
   sanitizeUrl(url) {
-    if (typeof url !== 'string') {
+    if (typeof url !== 'string' || url.trim() === '') {
       return '[INVALID_URL]';
     }
 

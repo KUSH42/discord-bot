@@ -811,6 +811,86 @@ describe('XAuthManager', () => {
     });
   });
 
+  describe('sanitizeUrl method', () => {
+    it('should remove sensitive X.com authentication parameters', () => {
+      const sensitiveUrl = 'https://x.com/i/flow/login?auth_token=abc123&oauth_token=xyz789&csrf_token=def456';
+      const sanitized = xAuthManager.sanitizeUrl(sensitiveUrl);
+
+      expect(sanitized).toBe('https://x.com/i/flow/login?[3_SENSITIVE_PARAMS_REMOVED]');
+      expect(sanitized).not.toContain('abc123');
+      expect(sanitized).not.toContain('xyz789');
+      expect(sanitized).not.toContain('def456');
+    });
+
+    it('should preserve safe parameters on X.com URLs', () => {
+      const urlWithSafeAndSensitive = 'https://x.com/login?lang=en&auth_token=secret123&hl=en';
+      const sanitized = xAuthManager.sanitizeUrl(urlWithSafeAndSensitive);
+
+      expect(sanitized).toContain('lang=en');
+      expect(sanitized).toContain('hl=en');
+      expect(sanitized).not.toContain('secret123');
+      expect(sanitized).toContain('[1_SENSITIVE_PARAMS_REMOVED]');
+    });
+
+    it('should handle OAuth verification parameters', () => {
+      const oauthUrl = 'https://x.com/oauth/authenticate?oauth_token=token123&oauth_verifier=verify456&state=state789';
+      const sanitized = xAuthManager.sanitizeUrl(oauthUrl);
+
+      expect(sanitized).not.toContain('token123');
+      expect(sanitized).not.toContain('verify456');
+      expect(sanitized).not.toContain('state789');
+      expect(sanitized).toContain('[3_SENSITIVE_PARAMS_REMOVED]');
+    });
+
+    it('should handle non-authentication URLs without modification', () => {
+      const regularUrl = 'https://x.com/user/profile?tab=posts&filter=recent';
+      const sanitized = xAuthManager.sanitizeUrl(regularUrl);
+
+      expect(sanitized).toBe(regularUrl);
+    });
+
+    it('should handle non-X.com URLs by removing common OAuth parameters', () => {
+      const externalUrl = 'https://example.com/callback?code=secret123&state=state456&other=value';
+      const sanitized = xAuthManager.sanitizeUrl(externalUrl);
+
+      expect(sanitized).toBe('https://example.com/callback?other=value');
+      expect(sanitized).not.toContain('secret123');
+      expect(sanitized).not.toContain('state456');
+    });
+
+    it('should handle invalid URL input gracefully', () => {
+      expect(xAuthManager.sanitizeUrl(null)).toBe('[INVALID_URL]');
+      expect(xAuthManager.sanitizeUrl(undefined)).toBe('[INVALID_URL]');
+      expect(xAuthManager.sanitizeUrl(123)).toBe('[INVALID_URL]');
+      expect(xAuthManager.sanitizeUrl('')).toBe('[INVALID_URL]');
+    });
+
+    it('should handle malformed URLs with parameter sanitization', () => {
+      const malformedUrl = 'https://x.com/path[invalid-chars?auth_token=secret';
+      const sanitized = xAuthManager.sanitizeUrl(malformedUrl);
+
+      // URL constructor is forgiving, so it parses this and removes the sensitive parameter
+      expect(sanitized).toBe('https://x.com/path[invalid-chars');
+      expect(sanitized).not.toContain('secret');
+    });
+
+    it('should handle URLs without query parameters', () => {
+      const simpleUrl = 'https://x.com/login';
+      const sanitized = xAuthManager.sanitizeUrl(simpleUrl);
+
+      expect(sanitized).toBe(simpleUrl);
+    });
+
+    it('should handle twitter.com domain (legacy)', () => {
+      const twitterUrl = 'https://twitter.com/oauth/authenticate?oauth_token=secret123&csrf_token=token456';
+      const sanitized = xAuthManager.sanitizeUrl(twitterUrl);
+
+      expect(sanitized).not.toContain('secret123');
+      expect(sanitized).not.toContain('token456');
+      expect(sanitized).toContain('[2_SENSITIVE_PARAMS_REMOVED]');
+    });
+  });
+
   describe('isRecoverableError method', () => {
     it('should identify recoverable network errors', () => {
       const recoverableErrors = [
