@@ -3,6 +3,7 @@ import { nowUTC, toISOStringUTC, daysAgoUTC } from '../utilities/utc-time.js';
 import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 import { getBrowserTweetHelperFunctions } from '../utilities/browser-tweet-helpers.js';
+import { AsyncMutex } from '../utilities/async-mutex.js';
 
 /**
  * X (Twitter) scraping application orchestrator
@@ -61,6 +62,7 @@ export class ScraperApplication {
     this.extractedTweets = new Map(); // Store with timestamp for cleanup
     this.maxExtractedTweets = 1000; // Limit cached tweets
     this.tweetCleanupHours = 24; // Clean up tweets older than 24 hours
+    this.tweetsMutex = new AsyncMutex(); // Synchronize access to extractedTweets Map
 
     // Register with memory monitor if available
     if (this.memoryMonitor) {
@@ -95,7 +97,16 @@ export class ScraperApplication {
       await this.ensureAuthenticated();
 
       operation.progress('Initializing with recent content to prevent old announcements');
-      await this.initializeRecentContent();
+      try {
+        await this.initializeRecentContent();
+      } catch (error) {
+        operation.error(error, 'Critical error during recent content initialization', {
+          errorType: error.constructor.name,
+          stack: error.stack,
+        });
+        // Re-throw to trigger proper error handling
+        throw error;
+      }
 
       operation.progress('Starting polling and health monitoring');
       this.startPolling();
@@ -146,7 +157,9 @@ export class ScraperApplication {
       await this.closeBrowser();
 
       operation.progress('Clearing cached tweets and extracted data');
-      this.extractedTweets.clear();
+      await this.tweetsMutex.runExclusive(async () => {
+        this.extractedTweets.clear();
+      });
 
       this.isRunning = false;
 
@@ -518,7 +531,7 @@ export class ScraperApplication {
       }
       try {
         // Periodic memory cleanup
-        this.cleanupExtractedTweets();
+        await this.cleanupExtractedTweets();
 
         await this.pollXProfile();
         this.scheduleNextPoll();
@@ -1491,42 +1504,46 @@ export class ScraperApplication {
    * 🚨 RACE CONDITION FIX: Create snapshot before iterating to prevent iterator invalidation
    * @private
    */
-  cleanupExtractedTweets() {
-    const now = Date.now();
-    const cleanupThreshold = now - this.tweetCleanupHours * 60 * 60 * 1000;
-    let cleaned = 0;
+  async cleanupExtractedTweets() {
+    return await this.tweetsMutex.runExclusive(async () => {
+      const now = Date.now();
+      const cleanupThreshold = now - this.tweetCleanupHours * 60 * 60 * 1000;
+      let cleaned = 0;
 
-    // 🚨 FIX: Create snapshot to prevent race condition with concurrent iterations
-    const entries = Array.from(this.extractedTweets.entries());
+      // 🚨 FIX: Create snapshot to prevent race condition with concurrent iterations
+      const entries = Array.from(this.extractedTweets.entries());
 
-    // Remove tweets older than threshold
-    for (const [key, tweet] of entries) {
-      if (tweet.extractedAt && tweet.extractedAt < cleanupThreshold) {
-        this.extractedTweets.delete(key);
-        cleaned++;
-      }
-    }
-
-    // If still too many tweets, remove oldest ones
-    if (this.extractedTweets.size > this.maxExtractedTweets) {
-      // Use existing snapshot, re-sort by age
-      const sortedEntries = entries
-        .filter(([key]) => this.extractedTweets.has(key)) // Only keep entries that still exist
-        .sort((a, b) => (a[1].extractedAt || 0) - (b[1].extractedAt || 0));
-
-      const toRemove = sortedEntries.slice(0, sortedEntries.length - this.maxExtractedTweets);
-      for (const [key] of toRemove) {
-        if (this.extractedTweets.has(key)) {
-          // Double-check before deletion
+      // Remove tweets older than threshold
+      for (const [key, tweet] of entries) {
+        if (tweet.extractedAt && tweet.extractedAt < cleanupThreshold) {
           this.extractedTweets.delete(key);
           cleaned++;
         }
       }
-    }
 
-    if (cleaned > 0) {
-      this.logger.debug(`[MEMORY] Cleaned up ${cleaned} old extracted tweets, ${this.extractedTweets.size} remaining`);
-    }
+      // If still too many tweets, remove oldest ones
+      if (this.extractedTweets.size > this.maxExtractedTweets) {
+        // Use existing snapshot, re-sort by age
+        const sortedEntries = entries
+          .filter(([key]) => this.extractedTweets.has(key)) // Only keep entries that still exist
+          .sort((a, b) => (a[1].extractedAt || 0) - (b[1].extractedAt || 0));
+
+        const toRemove = sortedEntries.slice(0, sortedEntries.length - this.maxExtractedTweets);
+        for (const [key] of toRemove) {
+          if (this.extractedTweets.has(key)) {
+            // Double-check before deletion
+            this.extractedTweets.delete(key);
+            cleaned++;
+          }
+        }
+      }
+
+      if (cleaned > 0) {
+        this.logger.debug(
+          `[MEMORY] Cleaned up ${cleaned} old extracted tweets, ${this.extractedTweets.size} remaining`
+        );
+      }
+    });
   }
 
   /**
@@ -1560,8 +1577,16 @@ export class ScraperApplication {
 
       // Store only new, non-duplicate tweets in performance cache
       // This cache is purely for performance - it can be cleaned up safely
-      this.extractedTweets.set(tweet.tweetID, { ...tweet, extractedAt });
       filteredTweets.push(tweet);
+    }
+
+    // Store filtered tweets in cache as a batch operation
+    if (filteredTweets.length > 0) {
+      await this.tweetsMutex.runExclusive(async () => {
+        for (const tweet of filteredTweets) {
+          this.extractedTweets.set(tweet.tweetID, { ...tweet, extractedAt });
+        }
+      });
     }
 
     if (duplicatesDropped > 0) {
@@ -1579,44 +1604,46 @@ export class ScraperApplication {
    * @private
    * @returns {Object} Analysis of extracted tweets
    */
-  analyzeExtractedTweets() {
-    if (this.extractedTweets.size === 0) {
-      return {
-        totalItems: 0,
-        totalSizeMB: 0,
-        oldestItemHours: 0,
-        newestItemHours: 0,
-      };
-    }
-
-    const now = Date.now();
-    let oldestTime = now;
-    let newestTime = 0;
-    let totalSize = 0;
-
-    // 🚨 FIX: Create snapshot to prevent race condition with concurrent cleanup
-    const tweets = Array.from(this.extractedTweets.values());
-
-    // Analyze tweets from snapshot
-    for (const tweet of tweets) {
-      if (tweet.extractedAt) {
-        oldestTime = Math.min(oldestTime, tweet.extractedAt);
-        newestTime = Math.max(newestTime, tweet.extractedAt);
+  async analyzeExtractedTweets() {
+    return await this.tweetsMutex.runExclusive(async () => {
+      if (this.extractedTweets.size === 0) {
+        return {
+          totalItems: 0,
+          totalSizeMB: 0,
+          oldestItemHours: 0,
+          newestItemHours: 0,
+        };
       }
 
-      // Estimate size (rough calculation)
-      totalSize += JSON.stringify(tweet).length;
-    }
+      const now = Date.now();
+      let oldestTime = now;
+      let newestTime = 0;
+      let totalSize = 0;
 
-    return {
-      totalItems: tweets.length, // Use snapshot size for consistency
-      totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
-      oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
-      newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
-      itemTypes: {
-        tweets: tweets.length, // Use snapshot size for consistency
-      },
-    };
+      // 🚨 FIX: Create snapshot to prevent race condition with concurrent cleanup
+      const tweets = Array.from(this.extractedTweets.values());
+
+      // Analyze tweets from snapshot
+      for (const tweet of tweets) {
+        if (tweet.extractedAt) {
+          oldestTime = Math.min(oldestTime, tweet.extractedAt);
+          newestTime = Math.max(newestTime, tweet.extractedAt);
+        }
+
+        // Estimate size (rough calculation)
+        totalSize += JSON.stringify(tweet).length;
+      }
+
+      return {
+        totalItems: tweets.length, // Use snapshot size for consistency
+        totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
+        oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
+        newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
+        itemTypes: {
+          tweets: tweets.length, // Use snapshot size for consistency
+        },
+      };
+    });
   }
 
   /**
@@ -1647,23 +1674,54 @@ export class ScraperApplication {
 
       // Then navigate to user's profile to get recent content from X directly
       operation.progress('Navigating to user profile for recent content scan');
-      await this.navigateToProfileTimeline(this.xUser);
+      try {
+        await this.navigateToProfileTimeline(this.xUser);
+      } catch (error) {
+        operation.error(error, 'Failed to navigate to user profile during initialization', {
+          xUser: this.xUser,
+          error: error.message,
+        });
+        throw error;
+      }
 
       operation.progress('Extracting recent tweets from profile');
-      const tweets = await this.extractTweets();
+      let tweets;
+      try {
+        tweets = await this.extractTweets();
+        operation.progress(`Successfully extracted ${tweets.length} tweets from profile`);
+      } catch (error) {
+        operation.error(error, 'Failed to extract tweets during initialization', {
+          xUser: this.xUser,
+          error: error.message,
+        });
+        throw error;
+      }
 
       operation.progress(`Marking recent tweets as seen within ${initializationHours}h window`);
       for (const tweet of tweets) {
-        // Only mark tweets that are within our initialization window
-        const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
+        try {
+          // Only mark tweets that are within our initialization window
+          const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
 
-        if (tweetTime && tweetTime >= cutoffTime) {
-          // Mark as seen by adding to duplicate detector
-          if (tweet.url) {
-            await this.duplicateDetector.markAsSeen(tweet.url);
-            markedAsSeen++;
-            this.logger.debug(`Marked tweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
+          if (tweetTime && tweetTime >= cutoffTime) {
+            // Mark as seen by adding to duplicate detector
+            if (tweet.url) {
+              await this.duplicateDetector.markAsSeen(tweet.url);
+              markedAsSeen++;
+              this.logger.debug(`Marked tweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
+            }
           }
+        } catch (error) {
+          this.logger.error(`Error marking tweet ${tweet.tweetID} as seen:`, {
+            error: error.message,
+            stack: error.stack,
+            tweet: {
+              id: tweet.tweetID,
+              url: tweet.url,
+              timestamp: tweet.timestamp,
+            },
+          });
+          // Continue with next tweet instead of crashing
         }
       }
 
@@ -1672,15 +1730,29 @@ export class ScraperApplication {
         operation.progress('Processing retweets during initialization');
         try {
           const retweetTweets = await this.extractTweets();
+          operation.progress(`Successfully extracted ${retweetTweets.length} retweets during initialization`);
           for (const tweet of retweetTweets) {
-            const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
+            try {
+              const tweetTime = tweet.timestamp ? new Date(tweet.timestamp) : null;
 
-            if (tweetTime && tweetTime >= cutoffTime && tweet.url) {
-              if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
-                await this.duplicateDetector.markAsSeen(tweet.url);
-                markedAsSeen++;
-                this.logger.debug(`Marked retweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
+              if (tweetTime && tweetTime >= cutoffTime && tweet.url) {
+                if (!(await this.duplicateDetector.isDuplicate(tweet.url))) {
+                  await this.duplicateDetector.markAsSeen(tweet.url);
+                  markedAsSeen++;
+                  this.logger.debug(`Marked retweet ${tweet.tweetID} as seen (${tweetTime.toISOString()})`);
+                }
               }
+            } catch (error) {
+              this.logger.error(`Error marking retweet ${tweet.tweetID} as seen:`, {
+                error: error.message,
+                stack: error.stack,
+                tweet: {
+                  id: tweet.tweetID,
+                  url: tweet.url,
+                  timestamp: tweet.timestamp,
+                },
+              });
+              // Continue with next tweet instead of crashing
             }
           }
         } catch (error) {

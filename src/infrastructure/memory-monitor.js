@@ -83,8 +83,8 @@ export class MemoryMonitor {
       return;
     }
 
-    this.monitorTimer = setTimeout(() => {
-      this.checkMemoryUsage();
+    this.monitorTimer = setTimeout(async () => {
+      await this.checkMemoryUsage();
       this.scheduleNextCheck();
     }, this.checkIntervalMs);
   }
@@ -93,7 +93,7 @@ export class MemoryMonitor {
    * Check current memory usage and take action if needed
    * @private
    */
-  checkMemoryUsage() {
+  async checkMemoryUsage() {
     try {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
@@ -102,7 +102,7 @@ export class MemoryMonitor {
       const rssMB = Math.round(memUsage.rss / 1024 / 1024);
 
       // Analyze content stores
-      const contentAnalysis = this.analyzeContentStores();
+      const contentAnalysis = await this.analyzeContentStores();
 
       // Record sample
       const sample = {
@@ -319,13 +319,13 @@ export class MemoryMonitor {
    * @private
    * @returns {Object} Analysis of content stores
    */
-  analyzeContentStores() {
+  async analyzeContentStores() {
     const analysis = {};
     let totalItems = 0;
 
     for (const [name, analyzer] of this.contentTrackers) {
       try {
-        const storeAnalysis = analyzer();
+        const storeAnalysis = await analyzer();
         analysis[name] = storeAnalysis;
         totalItems += storeAnalysis.totalItems || 0;
       } catch (error) {
@@ -372,10 +372,10 @@ export class MemoryMonitor {
    * Get detailed content breakdown for debugging
    * @returns {Object} Detailed content analysis
    */
-  getDetailedContentAnalysis() {
+  async getDetailedContentAnalysis() {
     return {
       timestamp: timestampUTC(),
-      contentStores: this.analyzeContentStores(),
+      contentStores: await this.analyzeContentStores(),
       memoryPressure: {
         current: this.samples.length > 0 ? this.samples[this.samples.length - 1].totalMB : 0,
         peak: this.stats.peakMemoryMB,
@@ -390,9 +390,9 @@ export class MemoryMonitor {
    * @private
    * @returns {Array} Array of recommendations
    */
-  generateMemoryRecommendations() {
+  async generateMemoryRecommendations() {
     const recommendations = [];
-    const contentAnalysis = this.analyzeContentStores();
+    const contentAnalysis = await this.analyzeContentStores();
 
     // Check for large content stores
     for (const [name, analysis] of Object.entries(contentAnalysis)) {
