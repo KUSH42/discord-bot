@@ -119,11 +119,12 @@ async function setupInfrastructureServices(container, config) {
   });
 
   // Memory Monitor for memory management and leak detection
+  // ✅ FIX: Increased memory limits to reasonable values for browser automation
   container.registerSingleton('memoryMonitor', c => {
     return new MemoryMonitor(c.resolve('logger').child({ service: 'MemoryMonitor' }), {
-      maxMemoryMB: parseInt(process.env.MEMORY_MAX_MB, 10) || 1024,
-      warningThresholdMB: parseInt(process.env.MEMORY_WARNING_MB, 10) || 768,
-      gcThresholdMB: parseInt(process.env.MEMORY_GC_MB, 10) || 512,
+      maxMemoryMB: parseInt(process.env.MEMORY_MAX_MB, 10) || 3072, // 3GB (was 1GB) - browser automation needs more memory
+      warningThresholdMB: parseInt(process.env.MEMORY_WARNING_MB, 10) || 2048, // 2GB (was 768MB) - warning at 2GB
+      gcThresholdMB: parseInt(process.env.MEMORY_GC_MB, 10) || 1536, // 1.5GB (was 512MB) - GC at 1.5GB
       checkIntervalMs: 30000, // 30 seconds
       samplesRetention: 100,
     });

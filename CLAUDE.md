@@ -205,9 +205,9 @@ DEBUG_LEVEL_BROWSER=1           # Errors only
 METRICS_RETENTION_HOURS=24      # Metrics retention period
 
 # Memory Management Configuration
-MEMORY_MAX_MB=1024              # Memory limit (1GB)
-MEMORY_WARNING_MB=768           # Warning threshold
-MEMORY_GC_MB=512               # Force GC threshold
+MEMORY_MAX_MB=3072              # Memory limit (3GB) - increased for browser automation
+MEMORY_WARNING_MB=2048          # Warning threshold (2GB) - increased for browser automation  
+MEMORY_GC_MB=1536              # Force GC threshold (1.5GB) - increased for browser automation
 SCRAPER_TWEET_CACHE_LIMIT=1000  # Max cached tweets
 YOUTUBE_VIDEO_CACHE_LIMIT=500   # Max cached videos
 ```
