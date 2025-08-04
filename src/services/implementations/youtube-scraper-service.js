@@ -156,11 +156,13 @@ export class YouTubeScraperService {
       if (latestVideo && latestVideo.success && latestVideo.id) {
         const processLatestVideo = this.contentCoordinator.processContent(latestVideo.id, 'scraper', latestVideo);
         const activeLiveStream = await this.fetchActiveLiveStream();
-        const pocessActiveLiveStream = this.contentCoordinator.processContent(
-          activeLiveStream.id,
-          'scraper',
-          latestVideo
-        );
+        if (activeLiveStream && activeLiveStream.id) {
+          const pocessActiveLiveStream = this.contentCoordinator.processContent(
+            activeLiveStream.id,
+            'scraper',
+            activeLiveStream
+          );
+        }
 
         return operation.success('YouTube scraper initialized successfully', {
           videosUrl: this.videosUrl,
