@@ -11,8 +11,8 @@ export class EnhancedLogger {
     this.debugManager = debugFlagManager;
     this.metricsManager = metricsManager;
 
-    // Create a child logger with module context
-    this.logger = baseLogger?.child({ module: moduleName }) || console;
+    // Create a child logger with module context if supported, otherwise use base logger
+    this.logger = baseLogger?.child ? baseLogger.child({ module: moduleName }) : baseLogger || console;
 
     // Active operations tracking
     this.activeOperations = new Map();

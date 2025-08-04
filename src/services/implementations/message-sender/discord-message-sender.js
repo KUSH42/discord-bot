@@ -25,8 +25,18 @@ export class DiscordMessageSender extends EventEmitter {
       logger: this.logger,
     });
     this.scheduler = options.testMode
-      ? ProcessingScheduler.forTesting(options)
-      : ProcessingScheduler.forProduction(options);
+      ? ProcessingScheduler.forTesting({
+          ...options,
+          logger: this.logger,
+          debugManager: options.debugManager,
+          metricsManager: options.metricsManager,
+        })
+      : ProcessingScheduler.forProduction({
+          ...options,
+          logger: this.logger,
+          debugManager: options.debugManager,
+          metricsManager: options.metricsManager,
+        });
 
     // State
     this.isProcessing = false;

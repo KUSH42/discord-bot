@@ -18,6 +18,8 @@ export class DebugFlagManager {
       'api',
       'state',
       'rate-limiting',
+      'discord-message-sender',
+      'discord-transport',
     ]);
 
     // Debug levels: 1=errors, 2=warnings, 3=info, 4=debug, 5=verbose

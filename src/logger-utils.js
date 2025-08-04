@@ -60,6 +60,7 @@ export class DiscordTransport extends Transport {
       this.debugManager && this.metricsManager
         ? createEnhancedLogger('discord-message-sender', baseLogger, this.debugManager, this.metricsManager)
         : baseLogger;
+
     this.messageSender = new DiscordMessageSender(messageSenderLogger, {
       baseSendDelay: opts.baseSendDelay || 1000, // 1 second between sends to respect Discord limits
       burstAllowance: opts.burstAllowance || 30, // Allow 30 quick messages per 2 minutes
@@ -70,6 +71,8 @@ export class DiscordTransport extends Transport {
       testMode: process.env.NODE_ENV === 'test', // Enable test mode in test environment
       autoStart: process.env.NODE_ENV !== 'test', // Don't auto-start in test environment
       suppressEmbeds: true,
+      debugManager: this.debugManager,
+      metricsManager: this.metricsManager,
     });
 
     // Don't start periodic flushing in test environment to prevent test timeouts
