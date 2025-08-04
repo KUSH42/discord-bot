@@ -41,8 +41,14 @@ export class PlaywrightBrowserService extends BrowserService {
       this.browser = await chromium.launch(options);
       operation.progress(`Browser launched: ${!!this.browser}, Connected: ${this.browser?.isConnected()}`);
 
+      // Setup browser crash monitoring
+      this.setupBrowserMonitoring();
+
       this.page = await this.browser.newPage();
       operation.progress(`Page created: ${!!this.page}, Closed: ${this.page?.isClosed()}`);
+
+      // Setup page crash monitoring
+      this.setupPageMonitoring();
 
       // Verify browser and page are ready
       if (!this.browser || !this.page) {
@@ -541,5 +547,82 @@ export class PlaywrightBrowserService extends BrowserService {
       operation.error(error, 'Failed to dispose browser service');
       throw error;
     }
+  }
+
+  /**
+   * Setup browser process monitoring for crash detection
+   * @private
+   */
+  setupBrowserMonitoring() {
+    if (!this.browser) {
+      return;
+    }
+
+    // Monitor browser disconnections
+    this.browser.on('disconnected', () => {
+      this.logger.error('🚨 BROWSER CRASHED: Browser process disconnected unexpectedly', {
+        timestamp: new Date().toISOString(),
+        browserConnected: this.browser?.isConnected(),
+        pageExists: !!this.page,
+        pageClosed: this.page?.isClosed(),
+      });
+
+      // Clean up references
+      this.browser = null;
+      this.page = null;
+    });
+
+    this.logger.debug('Browser crash monitoring enabled');
+  }
+
+  /**
+   * Setup page monitoring for crash detection
+   * @private
+   */
+  setupPageMonitoring() {
+    if (!this.page) {
+      return;
+    }
+
+    // Monitor page crashes
+    this.page.on('crash', () => {
+      this.logger.error('🚨 PAGE CRASHED: Page process crashed unexpectedly', {
+        timestamp: new Date().toISOString(),
+        browserConnected: this.browser?.isConnected(),
+        pageExists: !!this.page,
+      });
+    });
+
+    // Monitor page close events (might indicate unexpected closure)
+    this.page.on('close', () => {
+      if (!this.isClosing) {
+        this.logger.warn('⚠️ PAGE CLOSED: Page closed unexpectedly (not during shutdown)', {
+          timestamp: new Date().toISOString(),
+          browserConnected: this.browser?.isConnected(),
+          isClosing: this.isClosing,
+        });
+      }
+    });
+
+    // Monitor console errors from the page
+    this.page.on('console', msg => {
+      if (msg.type() === 'error') {
+        this.logger.warn('🔍 PAGE CONSOLE ERROR:', {
+          message: msg.text(),
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // Monitor page errors
+    this.page.on('pageerror', error => {
+      this.logger.error('🚨 PAGE ERROR: JavaScript error on page', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.logger.debug('Page crash monitoring enabled');
   }
 }

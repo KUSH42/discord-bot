@@ -16,6 +16,8 @@ import { setupProductionServices, setupWebhookEndpoints, createShutdownHandler }
 // Load environment variables with encryption support
 config();
 
+let logger;
+
 /**
  * Check if error is a write error (EPIPE, ECONNRESET, etc.)
  */
@@ -103,7 +105,7 @@ async function checkForExistingInstances() {
     safeConsoleLog('🔒 Created process lockfile with PID:', process.pid);
   } catch (error) {
     // If process check fails, log warning but continue (process might not have pgrep)
-    safeConsoleLog('⚠️  Could not check for existing bot instances:', error.message);
+    safeConsoleLog('⚠️  Could not chescraperck for existing bot instances:', error.message);
   }
 }
 
@@ -126,7 +128,7 @@ async function startBot() {
     const configuration = new Configuration();
     container = new DependencyContainer();
     await setupProductionServices(container, configuration);
-    const logger = container.resolve('logger');
+    logger = container.resolve('logger');
     logger.info('🚀 Starting Discord YouTube Bot...');
     const { hasErrors } = await startApplications(container, configuration);
     await startWebServer(container, configuration);
@@ -205,9 +207,10 @@ async function main() {
   let restartUnsubscribe;
   try {
     container = await startBot();
+    const logger = container.resolve('logger');
+    logger.info('Created new container...');
     const eventBus = container.resolve('eventBus');
     restartUnsubscribe = eventBus.on('bot.request_restart', async () => {
-      const logger = container.resolve('logger');
       logger.info('Restarting bot...');
       // Clean up the restart listener before disposing
       if (restartUnsubscribe) {
@@ -221,10 +224,7 @@ async function main() {
 
       // Add a small delay to ensure Discord client is fully destroyed before creating new one
       logger.info('Waiting for cleanup completion...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      logger.info('Creating new container...');
-      container = await startBot();
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Re-register the restart listener for the new container
       const newEventBus = container.resolve('eventBus');
@@ -262,39 +262,16 @@ async function main() {
  */
 async function startApplications(container, config) {
   const logger = container.resolve('logger').child({ service: 'Main' });
-  let hasErrors = false;
+  const hasErrors = false;
 
-  // Start Discord Bot
-  const botApp = container.resolve('botApplication');
-  await botApp.start();
+  // Start YouTube Monitor
+  let monitorAppStart;
 
-  // Start YouTube Monitor with retry logic
-  let monitorStarted = false;
-  const maxRetries = 3;
+  logger.info(`Starting YouTube Monitor…`);
+  const monitorApp = container.resolve('monitorApplication');
+  monitorAppStart = monitorApp.start();
 
-  for (let attempt = 1; attempt <= maxRetries && !monitorStarted; attempt++) {
-    try {
-      logger.info(`Starting YouTube Monitor (attempt ${attempt}/${maxRetries})...`);
-      const monitorApp = container.resolve('monitorApplication');
-      await monitorApp.start();
-      logger.info('✅ YouTube Monitor started successfully');
-      monitorStarted = true;
-    } catch (error) {
-      logger.error(`❌ YouTube Monitor startup attempt ${attempt} failed:`, error.message);
-
-      if (attempt < maxRetries) {
-        const delayMs = attempt * 2000; // 2s, 4s delays
-        logger.info(`Retrying YouTube Monitor startup in ${delayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      } else {
-        hasErrors = true;
-        logger.error('❌ Failed to start YouTube Monitor after all attempts');
-        logger.warn('YouTube Monitor will be disabled - bot will continue with limited functionality');
-        logger.warn('⚠️ This means YouTube duplicate detection will be disabled and old videos may be re-announced');
-      }
-    }
-  }
-
+  /*
   // Start X Scraper (if enabled)
   const xUser = config.get('X_USER_HANDLE');
   if (xUser) {
@@ -309,7 +286,9 @@ async function startApplications(container, config) {
     }
   } else {
     logger.info('X Scraper disabled (no X_USER_HANDLE configured)');
-  }
+  }*/
+
+  await monitorAppStart;
 
   return { hasErrors };
 }
@@ -320,6 +299,8 @@ async function startApplications(container, config) {
 async function startWebServer(container, config) {
   const logger = container.resolve('logger');
   const app = container.resolve('expressApp');
+  const port = config.get('PSH_PORT', 3000);
+  logger.info(`START 🌐 Web server on port ${port}`);
 
   // Set up rate limiting
   const webhookLimiter = rateLimit({
@@ -362,7 +343,6 @@ async function startWebServer(container, config) {
   });
 
   // Start server with port conflict detection
-  const port = config.get('PSH_PORT', 3000);
   const server = app.listen(port, () => {
     logger.info(`🌐 Web server listening on port ${port}`);
   });

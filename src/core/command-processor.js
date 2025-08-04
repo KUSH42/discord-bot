@@ -424,6 +424,9 @@ export class CommandProcessor {
         case 'debug-status':
           return await this.handleDebugStatus();
 
+        case 'crash-status':
+          return await this.handleCrashStatus();
+
         case 'debug-level':
           return await this.handleDebugLevel(args);
 
@@ -634,6 +637,7 @@ export class CommandProcessor {
       `**${this.commandPrefix}debug <true|false>**: Toggles debug logging for all modules.`,
       `**${this.commandPrefix}debug <module1> <module2> ... <true|false>**: Toggles debug logging for specific modules.`,
       `**${this.commandPrefix}debug-status**: Shows current debug status for all modules.`,
+      `**${this.commandPrefix}crash-status**: Shows system health, memory usage, and recent crash information.`,
       `**${this.commandPrefix}debug-level <1-5>**: Sets debug level for all modules (1=errors, 5=verbose).`,
       `**${this.commandPrefix}debug-level <module1> <module2> ... <1-5>**: Sets debug level for specific modules.`,
       `**${this.commandPrefix}metrics**: Shows performance metrics and system statistics.`,
@@ -999,6 +1003,95 @@ export class CommandProcessor {
       return {
         success: false,
         message: `❌ Failed to get debug status: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
+  }
+
+  /**
+   * Handle crash status command
+   */
+  async handleCrashStatus() {
+    try {
+      // Get memory usage
+      const memUsage = process.memoryUsage();
+      const memUsageMB = {
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+        external: Math.round(memUsage.external / 1024 / 1024),
+        rss: Math.round(memUsage.rss / 1024 / 1024),
+      };
+
+      // Get process information
+      const uptime = Math.round(process.uptime());
+      const uptimeStr = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`;
+
+      // Try to get recent crashes from crash detector
+      let recentCrashes = [];
+      let crashDetectorStatus = '❌ Not available';
+
+      try {
+        // Access crash detector via dependency container if available
+        if (this.container && this.container.resolve) {
+          const crashDetector = this.container.resolve('crashDetector');
+          recentCrashes = crashDetector.getRecentCrashes(5);
+          crashDetectorStatus = '✅ Active';
+        }
+      } catch (error) {
+        // Crash detector not available
+      }
+
+      // Memory status
+      let memoryStatus = '✅ Normal';
+      if (memUsageMB.heapUsed > 2048) {
+        memoryStatus = '🚨 Critical (>2GB)';
+      } else if (memUsageMB.heapUsed > 1536) {
+        memoryStatus = '⚠️ High (>1.5GB)';
+      } else if (memUsageMB.heapUsed > 1024) {
+        memoryStatus = '📊 Elevated (>1GB)';
+      }
+
+      const crashLines =
+        recentCrashes.length > 0
+          ? recentCrashes.map(crash => `• ${crash.type}: ${crash.details.timestamp || 'Unknown time'}`)
+          : ['• No recent crashes detected'];
+
+      const summary = [
+        `🕵️ **System Health & Crash Status**`,
+        ``,
+        `**Process Information:**`,
+        `🔗 PID: ${process.pid}`,
+        `⏱️ Uptime: ${uptimeStr}`,
+        `📱 Node.js: ${process.version}`,
+        `🖥️ Platform: ${process.platform}`,
+        ``,
+        `**Memory Usage:**`,
+        `${memoryStatus}`,
+        `💾 Heap Used: ${memUsageMB.heapUsed} MB / ${memUsageMB.heapTotal} MB`,
+        `🔧 External: ${memUsageMB.external} MB`,
+        `📊 RSS: ${memUsageMB.rss} MB`,
+        ``,
+        `**Crash Detection:**`,
+        `${crashDetectorStatus}`,
+        `📝 Recent Crashes (last 5):`,
+        ...crashLines,
+      ].join('\n');
+
+      return {
+        success: true,
+        message: summary,
+        requiresRestart: false,
+        crashStatus: {
+          memoryUsage: memUsageMB,
+          uptime,
+          recentCrashes: recentCrashes.length,
+          memoryStatus,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to get crash status: ${error.message}`,
         requiresRestart: false,
       };
     }
@@ -2133,6 +2226,7 @@ export class CommandProcessor {
         'scraper-health',
         'debug',
         'debug-status',
+        'crash-status',
         'debug-level',
         'metrics',
         'memory-status',

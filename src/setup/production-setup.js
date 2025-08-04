@@ -46,6 +46,7 @@ import { MonitorApplication } from '../application/monitor-application.js';
 // Utils
 import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../logger-utils.js';
 import { ProcessCleanup } from '../utilities/process-cleanup.js';
+import { CrashDetector } from '../utilities/crash-detector.js';
 const { createFileLogFormat, createSystemdSafeConsoleTransport } = LoggerUtils;
 
 /**
@@ -414,6 +415,14 @@ async function setupLogging(container, config) {
       format: winston.format.combine(winston.format.timestamp(), winston.format.errors({ stack: true })),
       transports,
     });
+  });
+
+  // Setup crash detection system immediately after logger
+  container.registerSingleton('crashDetector', c => {
+    const logger = c.resolve('logger');
+    const crashDetector = new CrashDetector(logger);
+    crashDetector.setup();
+    return crashDetector;
   });
 }
 
