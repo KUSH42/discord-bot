@@ -57,6 +57,14 @@ export class YouTubeScraperService {
       lastSuccessfulScrape: null,
       lastError: null,
     };
+
+    // Memory management
+    this.videoCache = new Map(); // Cache video data with timestamps
+    this.maxCachedVideos = 500; // Limit cached videos
+    this.videoCacheHours = 48; // Keep videos for 48 hours
+    this.lastMemoryCleanup = Date.now();
+
+    // Memory monitor registration is handled by dependency injection container
   }
 
   /**
@@ -1625,5 +1633,82 @@ export class YouTubeScraperService {
     const jitter = Math.random() * 0.2 - 0.1; // +/- 10% jitter
     const baseInterval = this.minInterval + Math.random() * (this.maxInterval - this.minInterval);
     return Math.floor(baseInterval * (1 + jitter));
+  }
+
+  /**
+   * Clean up old cached videos to prevent memory leaks
+   * @private
+   */
+  cleanupVideoCache() {
+    const now = Date.now();
+    const cleanupThreshold = now - this.videoCacheHours * 60 * 60 * 1000;
+    let cleaned = 0;
+
+    // Remove videos older than threshold
+    for (const [key, video] of this.videoCache) {
+      if (video.cachedAt && video.cachedAt < cleanupThreshold) {
+        this.videoCache.delete(key);
+        cleaned++;
+      }
+    }
+
+    // If still too many videos, remove oldest ones
+    if (this.videoCache.size > this.maxCachedVideos) {
+      const entries = Array.from(this.videoCache.entries()).sort((a, b) => (a[1].cachedAt || 0) - (b[1].cachedAt || 0));
+
+      const toRemove = entries.slice(0, entries.length - this.maxCachedVideos);
+      for (const [key] of toRemove) {
+        this.videoCache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      this.logger.debug(`[MEMORY] Cleaned up ${cleaned} old cached videos, ${this.videoCache.size} remaining`);
+    }
+
+    this.lastMemoryCleanup = now;
+  }
+
+  /**
+   * Analyze video cache for memory monitoring
+   * @private
+   * @returns {Object} Analysis of video cache
+   */
+  analyzeVideoCache() {
+    if (this.videoCache.size === 0) {
+      return {
+        totalItems: 0,
+        totalSizeMB: 0,
+        oldestItemHours: 0,
+        newestItemHours: 0,
+      };
+    }
+
+    const now = Date.now();
+    let oldestTime = now;
+    let newestTime = 0;
+    let totalSize = 0;
+
+    // Analyze videos
+    for (const video of this.videoCache.values()) {
+      if (video.cachedAt) {
+        oldestTime = Math.min(oldestTime, video.cachedAt);
+        newestTime = Math.max(newestTime, video.cachedAt);
+      }
+
+      // Estimate size (rough calculation)
+      totalSize += JSON.stringify(video).length;
+    }
+
+    return {
+      totalItems: this.videoCache.size,
+      totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
+      oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
+      newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
+      itemTypes: {
+        videos: this.videoCache.size,
+      },
+    };
   }
 }

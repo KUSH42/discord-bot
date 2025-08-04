@@ -19,6 +19,7 @@ export class ScraperApplication {
     this.eventBus = dependencies.eventBus;
     this.xAuthManager = dependencies.xAuthManager;
     this.delay = dependencies.delay || delay;
+    this.memoryMonitor = dependencies.memoryMonitor; // Optional
 
     // Create enhanced logger for this module
     this.logger = createEnhancedLogger(
@@ -55,6 +56,16 @@ export class ScraperApplication {
       lastRunTime: null,
       lastError: null,
     };
+
+    // Memory management
+    this.extractedTweets = new Map(); // Store with timestamp for cleanup
+    this.maxExtractedTweets = 1000; // Limit cached tweets
+    this.tweetCleanupHours = 24; // Clean up tweets older than 24 hours
+
+    // Register with memory monitor if available
+    if (this.memoryMonitor) {
+      this.memoryMonitor.registerContentStore('scraperTweets', () => this.analyzeExtractedTweets());
+    }
     this.nextPollTimestamp = null;
   }
 
@@ -133,6 +144,9 @@ export class ScraperApplication {
 
       operation.progress('Closing browser session');
       await this.closeBrowser();
+
+      operation.progress('Clearing cached tweets and extracted data');
+      this.extractedTweets.clear();
 
       this.isRunning = false;
 
@@ -503,6 +517,9 @@ export class ScraperApplication {
         return;
       }
       try {
+        // Periodic memory cleanup
+        this.cleanupExtractedTweets();
+
         await this.pollXProfile();
         this.scheduleNextPoll();
       } catch (error) {
@@ -663,13 +680,17 @@ export class ScraperApplication {
         operation.progress(`Found ${searchTweets.length} tweets on search page`);
       }
 
+      // Filter duplicates BEFORE expensive processing to save CPU and memory
+      const filteredSearchTweets = await this.filterDuplicatesImmediate(searchTweets);
+      operation.progress(
+        `Filtered to ${filteredSearchTweets.length} non-duplicate tweets (dropped ${searchTweets.length - filteredSearchTweets.length} duplicates)`
+      );
+
       // Sort tweets by timestamp (oldest to newest) for chronological processing
-      const sortedSearchTweets = this.sortTweetsByTimestamp(searchTweets);
+      const sortedSearchTweets = this.sortTweetsByTimestamp(filteredSearchTweets);
       this.logger.debug(`Sorted ${sortedSearchTweets.length} search tweets by timestamp (oldest to newest)`);
 
-      operation.progress(
-        `Processing ${sortedSearchTweets.length} tweets from search (ContentCoordinator will handle filtering)`
-      );
+      operation.progress(`Processing ${sortedSearchTweets.length} new tweets from search`);
       let processedCount = 0;
       if (sortedSearchTweets.length > 0) {
         for (const tweet of sortedSearchTweets) {
@@ -824,15 +845,17 @@ export class ScraperApplication {
       operation.progress(
         `Merged ${recentTweets.length} recent + ${additionalTweets.length - (additionalTweets.length - (allTweets.length - recentTweets.length))} additional tweets = ${allTweets.length} total unique tweets`
       );
-      const tweets = allTweets;
+      // Filter duplicates BEFORE expensive processing to save CPU and memory
+      const filteredTweets = await this.filterDuplicatesImmediate(allTweets);
+      operation.progress(
+        `Filtered to ${filteredTweets.length} non-duplicate tweets (dropped ${allTweets.length - filteredTweets.length} duplicates)`
+      );
 
       // Sort tweets by timestamp (oldest to newest) for chronological processing
-      const sortedTweets = this.sortTweetsByTimestamp(tweets);
+      const sortedTweets = this.sortTweetsByTimestamp(filteredTweets);
       this.logger.debug(`Sorted ${sortedTweets.length} profile tweets by timestamp (oldest to newest)`);
 
-      operation.progress(
-        `Processing ${sortedTweets.length} tweets from enhanced detection (ContentCoordinator will handle filtering)`
-      );
+      operation.progress(`Processing ${sortedTweets.length} new tweets from enhanced detection`);
       let processedCount = 0;
 
       for (const tweet of sortedTweets) {
@@ -1461,6 +1484,127 @@ export class ScraperApplication {
     }
     searchUrl += '&f=live&pf=on&src=typed_query';
     return searchUrl;
+  }
+
+  /**
+   * Clean up old extracted tweets to prevent memory leaks
+   * @private
+   */
+  cleanupExtractedTweets() {
+    const now = Date.now();
+    const cleanupThreshold = now - this.tweetCleanupHours * 60 * 60 * 1000;
+    let cleaned = 0;
+
+    // Remove tweets older than threshold
+    for (const [key, tweet] of this.extractedTweets) {
+      if (tweet.extractedAt && tweet.extractedAt < cleanupThreshold) {
+        this.extractedTweets.delete(key);
+        cleaned++;
+      }
+    }
+
+    // If still too many tweets, remove oldest ones
+    if (this.extractedTweets.size > this.maxExtractedTweets) {
+      const entries = Array.from(this.extractedTweets.entries()).sort(
+        (a, b) => (a[1].extractedAt || 0) - (b[1].extractedAt || 0)
+      );
+
+      const toRemove = entries.slice(0, entries.length - this.maxExtractedTweets);
+      for (const [key] of toRemove) {
+        this.extractedTweets.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      this.logger.debug(`[MEMORY] Cleaned up ${cleaned} old extracted tweets, ${this.extractedTweets.size} remaining`);
+    }
+  }
+
+  /**
+   * Filter out duplicate tweets using ONLY the authoritative DuplicateDetector
+   * Cache is used only for performance optimization, NOT for duplicate detection
+   * @private
+   * @param {Array} tweets - Array of tweet objects
+   * @returns {Promise<Array>} Filtered array of non-duplicate tweets
+   */
+  async filterDuplicatesImmediate(tweets) {
+    if (!tweets || tweets.length === 0) {
+      return [];
+    }
+
+    const filteredTweets = [];
+    const extractedAt = Date.now();
+    let duplicatesDropped = 0;
+
+    for (const tweet of tweets) {
+      if (!tweet.tweetID || !tweet.url) {
+        continue; // Skip invalid tweets
+      }
+
+      // 🚨 CRITICAL FIX: Use ONLY DuplicateDetector for duplicate checking
+      // Cache must NOT be used for duplicate detection - only for performance optimization
+      const isDuplicate = await this.duplicateDetector.isDuplicate(tweet.url);
+      if (isDuplicate) {
+        duplicatesDropped++;
+        continue; // Skip this tweet - don't store in cache either
+      }
+
+      // Store only new, non-duplicate tweets in performance cache
+      // This cache is purely for performance - it can be cleaned up safely
+      this.extractedTweets.set(tweet.tweetID, { ...tweet, extractedAt });
+      filteredTweets.push(tweet);
+    }
+
+    if (duplicatesDropped > 0) {
+      this.logger.debug(
+        `[MEMORY] Dropped ${duplicatesDropped} duplicates via DuplicateDetector, processing ${filteredTweets.length} new tweets`
+      );
+    }
+
+    return filteredTweets;
+  }
+
+  /**
+   * Analyze extracted tweets for memory monitoring
+   * @private
+   * @returns {Object} Analysis of extracted tweets
+   */
+  analyzeExtractedTweets() {
+    if (this.extractedTweets.size === 0) {
+      return {
+        totalItems: 0,
+        totalSizeMB: 0,
+        oldestItemHours: 0,
+        newestItemHours: 0,
+      };
+    }
+
+    const now = Date.now();
+    let oldestTime = now;
+    let newestTime = 0;
+    let totalSize = 0;
+
+    // Analyze tweets
+    for (const tweet of this.extractedTweets.values()) {
+      if (tweet.extractedAt) {
+        oldestTime = Math.min(oldestTime, tweet.extractedAt);
+        newestTime = Math.max(newestTime, tweet.extractedAt);
+      }
+
+      // Estimate size (rough calculation)
+      totalSize += JSON.stringify(tweet).length;
+    }
+
+    return {
+      totalItems: this.extractedTweets.size,
+      totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
+      oldestItemHours: Math.round(((now - oldestTime) / (1000 * 60 * 60)) * 10) / 10,
+      newestItemHours: Math.round(((now - newestTime) / (1000 * 60 * 60)) * 10) / 10,
+      itemTypes: {
+        tweets: this.extractedTweets.size,
+      },
+    };
   }
 
   /**

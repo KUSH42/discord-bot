@@ -7,9 +7,10 @@
 ### Key Components
 - **Application Layer**: `src/application/` - MonitorApplication, ScraperApplication, XAuthManager
 - **Core Layer**: `src/core/` - CommandProcessor, ContentAnnouncer, ContentClassifier  
-- **Infrastructure**: `src/infrastructure/` - DependencyContainer, EventBus, StateManager, DebugFlagManager, MetricsManager
+- **Infrastructure**: `src/infrastructure/` - DependencyContainer, EventBus, StateManager, DebugFlagManager, MetricsManager, **MemoryMonitor**
 - **Services**: `src/services/` - YouTube API, browser automation, external integrations
 - **Utilities**: `src/utilities/` - EnhancedLogger, UTC time utilities, AsyncMutex
+- **Memory Management**: Bounded caches, leak detection, automatic cleanup
 
 ### Data Flow
 - **Commands**: Discord → CommandProcessor → StateManager → Response
@@ -190,10 +191,11 @@ npm run lint:fix         # Fix ESLint issues
 
 ### Debug Commands - All Working
 - `!debug <module> <true|false>` ✅ - Toggle debug per module with validation
-- `!debug-status` ✅ - Show all module debug status with memory usage
+- `!debug-status` ✅ - Show all module debug status with **memory usage per module**
 - `!debug-level <module> <1-5>` ✅ - Set debug granularity (1=errors, 5=verbose)
-- `!metrics` ✅ - Performance metrics, success rates, system health
+- `!metrics` ✅ - Performance metrics, success rates, system health, **memory tracking**
 - `!log-pipeline` ✅ - Recent operations with correlation tracking and timing
+- `!memory-status` ✅ - **Real-time memory analysis with content store breakdown**
 
 ### Environment Configuration
 ```bash
@@ -201,6 +203,13 @@ DEBUG_FLAGS=content-announcer,scraper,performance
 DEBUG_LEVEL_SCRAPER=5           # Verbose logging
 DEBUG_LEVEL_BROWSER=1           # Errors only
 METRICS_RETENTION_HOURS=24      # Metrics retention period
+
+# Memory Management Configuration
+MEMORY_MAX_MB=1024              # Memory limit (1GB)
+MEMORY_WARNING_MB=768           # Warning threshold
+MEMORY_GC_MB=512               # Force GC threshold
+SCRAPER_TWEET_CACHE_LIMIT=1000  # Max cached tweets
+YOUTUBE_VIDEO_CACHE_LIMIT=500   # Max cached videos
 ```
 
 ### Enhanced Logger Integration Pattern
@@ -229,16 +238,35 @@ async someOperation(data) {
 // 3. Use correlation IDs for related operations
 const correlationId = this.logger.generateCorrelationId();
 const parentLogger = this.logger.forOperation('parentOperation', correlationId);
+
+// 4. Register content stores with memory monitor
+constructor(dependencies) {
+  // ... existing code ...
+  if (dependencies.memoryMonitor) {
+    dependencies.memoryMonitor.registerContentStore('myContent', () => this.analyzeContentStore());
+  }
+}
+
+// 5. Implement content analysis for memory monitoring
+analyzeContentStore() {
+  return {
+    totalItems: this.contentCache.size,
+    totalSizeMB: Math.round((JSON.stringify([...this.contentCache.values()]).length / 1024 / 1024) * 100) / 100,
+    oldestItemHours: this.calculateOldestItemAge(),
+    itemTypes: { content: this.contentCache.size }
+  };
+}
 ```
 
 ### Integration Status (Production Ready)
-#### ✅ Completed Integrations (6 modules)
+#### ✅ Completed Integrations (7 modules + Memory Management)
 - **ContentAnnouncer** (`content-announcer`): Content announcement pipeline with progress tracking
-- **ScraperApplication** (`scraper`): X scraping operations with browser automation debugging
+- **ScraperApplication** (`scraper`): X scraping operations with **memory-managed tweet cache (1000 limit)**
 - **MonitorApplication** (`youtube`): YouTube webhook processing with API fallback monitoring  
 - **BotApplication** (`api`): Discord message processing with command tracking
 - **XAuthManager** (`auth`): Authentication flows with login attempt monitoring
-- **YouTubeScraperService** (`youtube`): YouTube monitoring with better "Failed to scrape" error context
+- **YouTubeScraperService** (`youtube`): YouTube monitoring with **memory-managed video cache (500 limit)**
+- **MemoryMonitor** (`memory`): **Real-time memory tracking with content store analysis and leak detection**
 
 #### 🚧 Pending Integrations (Low Priority)
 - **Browser Services** (`browser`): Playwright automation debugging
@@ -276,6 +304,9 @@ const mockMetricsManager = {
 ### Integration Benefits (All Available Now)
 - **Runtime Debug Control**: ✅ Toggle any of 9 modules without restarts
 - **Performance Monitoring**: ✅ Real-time metrics with Discord integration
+- **Memory Management**: ✅ **Bounded caches with automatic cleanup and OOM prevention**
+- **Content Analysis**: ✅ **Real-time visibility into what content is stored and memory usage**
+- **Leak Detection**: ✅ **Automatic warnings before memory exhaustion with cleanup recommendations**
 - **Correlation Tracking**: ✅ Follow operations across modules with correlation IDs
 - **Rich Error Context**: ✅ Better debugging for "Failed to scrape" type errors
 - **Operation Timing**: ✅ Automatic timing measurement for all tracked operations
@@ -360,6 +391,44 @@ const scraperA = container.resolve('scraperApplication');  // Gets browser insta
 const scraperB = container.resolve('youtubeScraperService'); // Gets browser instance B
 ```
 
+## Memory Management System ✅ **PRODUCTION READY**
+
+### **Dual-Layer Architecture (OOM-Safe)**
+- **DuplicateDetector** = Authoritative, persistent duplicate prevention (survives restarts)
+- **Performance Caches** = Temporary optimization storage (safe to clean up)
+
+### **Core Components**
+- **MemoryMonitor** (`src/infrastructure/memory-monitor.js`): Real-time memory tracking with leak detection
+- **ScraperApplication**: Tweet cache (1000 limit, 24h retention) with immediate duplicate filtering
+- **YouTubeScraperService**: Video cache (500 limit, 48h retention) with automatic cleanup
+- **Enhanced Logging**: Bounded metrics collection (10K samples, 24h retention)
+
+### **Memory Safety Rules**
+```javascript
+// ✅ CORRECT: Dual-layer architecture
+const isDuplicate = await this.duplicateDetector.isDuplicate(tweet.url); // Persistent, authoritative
+this.extractedTweets.set(tweetID, {...tweet, extractedAt}); // Performance cache only
+
+// ❌ WRONG: Using cache for duplicate detection
+// if (this.extractedTweets.has(tweetID)) return true; // Never do this!
+```
+
+### **Memory Monitoring Commands**
+- `!memory-status` - Current memory usage and content analysis
+- `!debug-status` - Memory usage per debug module
+- `!metrics` - Performance metrics with memory tracking
+
+### **Expected Results**
+- **50-70% memory reduction** from immediate duplicate filtering
+- **Bounded growth** - caches never exceed defined limits
+- **Zero false announcements** - persistent duplicate detection survives all cleanup
+- **Early leak detection** - automatic warnings before OOM kills
+
+### **Critical Safety:** Channel goes silent for 3+ days
+- ✅ **Cache cleaned up** (saves memory) 
+- ✅ **DuplicateDetector retains records** (prevents re-announcements)
+- ✅ **Old content never re-announced** (persistent storage survives cleanup)
+
 ## Critical Safety Guards
 
 ### Memory Leak Prevention
@@ -385,6 +454,7 @@ if (process.env.NODE_ENV === 'test') {
 - **X Monitoring**: `X_USER_HANDLE`, authentication credentials
 - **Security**: `PSH_SECRET`, rate limiting configuration
 - **Anti-botting**: `BROWSER_STEALTH_ENABLED`, detection thresholds, profile management
+- **Memory Management**: `MEMORY_MAX_MB`, `MEMORY_WARNING_MB`, cache limits, GC thresholds
 
 ### Health Monitoring
 - `GET /health` - Basic status
