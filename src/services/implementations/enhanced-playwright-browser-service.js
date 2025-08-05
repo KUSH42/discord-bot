@@ -382,11 +382,14 @@ export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
       stealthArgs.push(`--user-agent=${userAgent}`);
     }
 
+    // Filter out userDataDir from options since it's not supported with browserType.launch()
+    const { userDataDir, ...filteredOptions } = options;
+
     return {
       headless: false, // Stealth mode requires headful browser
-      args: [...(options.args || []), ...stealthArgs],
+      args: [...(filteredOptions.args || []), ...stealthArgs],
       ignoreDefaultArgs: ['--enable-automation', '--enable-blink-features=AutomationControlled'],
-      ...options,
+      ...filteredOptions,
     };
   }
 

@@ -378,6 +378,20 @@ The application uses **separate browser instances** for X and YouTube scrapers t
 - **Dependency Injection**: Browser service registered as singleton but creates isolated instances per scraper
 - **Profile Isolation**: Each browser gets unique temporary profile directory (e.g., `profile-r2iRG5`, `profile-xjXqsz`)
 
+#### Enhanced Browser Services ✅ **FIXED: userDataDir Issue**
+- **EnhancedPlaywrightBrowserService** (`src/services/implementations/enhanced-playwright-browser-service.js`): Advanced browser service with stealth capabilities
+- **StealthBrowserFactory** (`src/services/implementations/stealth-browser-factory.js`): Factory for creating stealth-enabled browser instances
+- **Key Fix**: Resolved Playwright API error by properly filtering `userDataDir` from regular launch options
+
+**Critical API Usage**:
+```javascript
+// ✅ CORRECT: Use launchPersistentContext with userDataDir
+this.context = await chromium.launchPersistentContext(userDataDir, options);
+
+// ❌ INCORRECT: Never use userDataDir with regular launch (causes error)
+this.browser = await chromium.launch({ userDataDir, ...options }); // ❌ API Error!
+```
+
 #### Browser Environment Requirements
 **Display Server**: Requires Xvfb virtual display for headless operation
 ```bash

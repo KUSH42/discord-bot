@@ -53,6 +53,7 @@ The codebase includes robust rate limiting infrastructure that was extended:
 - ✅ **IntelligentRateLimiter** (`src/utilities/intelligent-rate-limiter.js`): Context-aware timing with time-of-day patterns and burst detection
 - ✅ **BrowserProfileManager** (`src/utilities/browser-profile-manager.js`): Persistent session management with cookie/localStorage restoration
 - ✅ **EnhancedPlaywrightBrowserService** (`src/services/implementations/enhanced-playwright-browser-service.js`): Integrated stealth browser service with all Phase 2 components
+- ✅ **StealthBrowserFactory** (`src/services/implementations/stealth-browser-factory.js`): Factory for creating stealth browser instances with proper API usage
 
 **Benefits Achieved:**
 - **User Agent Diversity**: 14 different browser/platform combinations with automatic hourly rotation
@@ -61,6 +62,7 @@ The codebase includes robust rate limiting infrastructure that was extended:
 - **Session Persistence**: Browser profiles survive restarts with cookie/localStorage restoration
 - **Stealth Integration**: JavaScript automation markers removed, canvas fingerprinting protection
 - **Comprehensive Testing**: 68 test cases ensuring reliability and correctness
+- **API Compatibility**: Fixed Playwright API usage (userDataDir with launchPersistentContext only)
 
 #### 💡 **Multi-Phase Approach: Maximum Effectiveness**
 - **Phase 1**: Immediate 50-70% improvement through enhanced rate limiting (minimal risk)
@@ -175,6 +177,28 @@ await browserService.click('#button'); // Human-like clicking
 - Configurable stealth features via environment variables
 - Comprehensive stealth statistics and monitoring
 - JavaScript automation marker removal
+- **Fixed Playwright API Usage**: Properly handles `userDataDir` with `launchPersistentContext()` only
+
+#### 🔧 **StealthBrowserFactory - Centralized Browser Creation**
+```javascript
+// Factory for creating stealth browser instances with proper API usage
+import { StealthBrowserFactory } from '../services/implementations/stealth-browser-factory.js';
+
+const factory = new StealthBrowserFactory(baseLogger, debugManager, metricsManager);
+const stealthBrowser = await factory.createStealthBrowser({
+  profileId: 'custom-profile',
+  stealthEnabled: true
+});
+
+// Or create a basic browser without stealth features
+const basicBrowser = await factory.createBasicBrowser();
+```
+
+**Critical API Fix Applied:**
+- ✅ **userDataDir filtering**: Automatically filters `userDataDir` from regular `chromium.launch()` calls
+- ✅ **Correct API usage**: Uses `launchPersistentContext()` for profile-based browsers
+- ✅ **Fallback handling**: Falls back to regular launch when profiles are disabled
+- ✅ **Error prevention**: Prevents "userDataDir option is not supported" errors
 
 ### Configuration and Environment Variables
 

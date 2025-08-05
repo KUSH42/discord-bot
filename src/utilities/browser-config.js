@@ -96,9 +96,13 @@ export function getYouTubeScrapingBrowserConfig(options = {}) {
 
 /**
  * Get browser configuration for profile management (can be more permissive)
+ *
+ * WARNING: If userDataDir is provided, the returned config should ONLY be used with
+ * chromium.launchPersistentContext(), NOT with chromium.launch()!
+ *
  * @param {Object} options - Additional options
  * @param {boolean} options.headless - Whether to run headless (overrides global HEADLESS_BROWSER setting)
- * @param {string} options.userDataDir - User data directory for profile
+ * @param {string} options.userDataDir - User data directory for profile (use with launchPersistentContext only!)
  * @param {string[]} options.additionalArgs - Additional arguments to include
  * @returns {Object} Browser configuration object
  */
@@ -110,6 +114,8 @@ export function getProfileBrowserConfig(options = {}) {
 
   if (options.userDataDir) {
     config.userDataDir = options.userDataDir;
+    // Add warning property for developers
+    config._WARNING = 'userDataDir requires launchPersistentContext(), not launch()';
   }
 
   // Add display if running in headless environment
