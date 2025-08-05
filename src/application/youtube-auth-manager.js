@@ -772,7 +772,7 @@ export class YouTubeAuthManager {
         authScore -= 5;
       } // Strong negative indicator
 
-      const isAuthenticated = authScore >= 1; // Reduced threshold for headless environments (was 3)
+      const isAuthenticated = authScore >= 3; // Require positive authentication indicators, not just absence of login prompts
 
       operation.success(`Authentication check completed with score ${authScore}`, {
         authenticated: isAuthenticated,

@@ -82,8 +82,9 @@ export class YouTubeScraperService {
     }
 
     try {
-      // Use quick authentication check for performance
-      return await this.authManager.isQuickAuthenticated();
+      // Use full authentication check for more reliable results
+      // The quick check is too strict and misses valid authentication states
+      return await this.authManager.isAuthenticated();
     } catch (error) {
       this.logger.debug('Authentication status check failed', { error: error.message });
       return false;
@@ -181,12 +182,12 @@ export class YouTubeScraperService {
           videosUrl: this.videosUrl,
           initialContentId: latestVideo.id,
           title: latestVideo.title,
-          isAuthenticated: this.isAuthenticated,
+          isAuthenticated: await this.getAuthenticationStatus(),
         });
       } else {
         return operation.success('YouTube scraper initialized but no videos found', {
           videosUrl: this.videosUrl,
-          isAuthenticated: this.isAuthenticated,
+          isAuthenticated: await this.getAuthenticationStatus(),
         });
       }
     } catch (error) {
@@ -1225,7 +1226,6 @@ export class YouTubeScraperService {
       successRate: Math.round(successRate * 100) / 100,
       isInitialized: this.isInitialized,
       isRunning: this.isRunning,
-      isAuthenticated: this.isAuthenticated,
       authEnabled: this.authEnabled,
       lastKnownContentId: null, // No longer tracked here
       videosUrl: this.videosUrl,
@@ -1282,7 +1282,8 @@ export class YouTubeScraperService {
       } else {
         health.status = 'no_videos_found';
         health.details.warning = 'No videos found during health check';
-        if (this.authEnabled && !this.isAuthenticated) {
+        const currentAuthStatus = await this.getAuthenticationStatus();
+        if (this.authEnabled && !currentAuthStatus) {
           health.details.possibleCause = 'Authentication enabled but not authenticated';
         }
       }
@@ -1294,7 +1295,7 @@ export class YouTubeScraperService {
         error: error.message,
         stack: error.stack,
         authEnabled: this.authEnabled,
-        isAuthenticated: this.isAuthenticated,
+        isAuthenticated: await this.getAuthenticationStatus(),
       });
     }
 

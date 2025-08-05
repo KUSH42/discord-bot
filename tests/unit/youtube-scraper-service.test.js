@@ -777,7 +777,7 @@ describe('YouTubeScraperService', () => {
 
         expect(health.status).toBe('healthy');
         expect(health.details.metrics.authEnabled).toBe(true);
-        expect(health.details.metrics.isAuthenticated).toBe(true);
+        // Note: isAuthenticated removed from metrics - checked during health check instead
       });
 
       it('should provide authentication failure hints when enabled but not authenticated', async () => {
