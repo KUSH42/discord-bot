@@ -24,6 +24,7 @@ import { DiscordClientService } from '../services/implementations/discord-client
 import { YouTubeApiService } from '../services/implementations/youtube-api-service.js';
 import { FetchHttpService } from '../services/implementations/fetch-http-service.js';
 import { PlaywrightBrowserService } from '../services/implementations/playwright-browser-service.js';
+import { StealthBrowserFactory } from '../services/implementations/stealth-browser-factory.js';
 
 // Core Logic
 import { CommandProcessor } from '../core/command-processor.js';
@@ -203,13 +204,41 @@ async function setupExternalServices(container, config) {
   });
 
   // YouTube scraper browser service - dedicated singleton for YouTube scraping
-  container.registerSingleton('youtubeBrowserService', c => {
-    return new PlaywrightBrowserService(
-      c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager')
-    );
-  });
+  container.registerSingleton(
+    'youtubeBrowserService',
+    c => {
+      return new PlaywrightBrowserService(
+        c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
+        c.resolve('debugFlagManager'),
+        c.resolve('metricsManager')
+      );
+    },
+
+    // Browser Service
+    // Browser Service - Use stealth factory if enabled
+    container.registerSingleton('browserService', async c => {
+      const config = c.resolve('config');
+      const logger = c.resolve('logger').child({ service: 'BrowserService' });
+
+      const stealthConfig = config.getBrowserStealthConfig();
+
+      if (stealthConfig.stealthEnabled) {
+        logger.info('Creating enhanced browser service with stealth capabilities', {
+          behaviorSimulation: stealthConfig.behaviorSimulationEnabled,
+          intelligentRateLimiting: stealthConfig.intelligentRateLimiting,
+          profilePersistence: stealthConfig.profilePersistence,
+        });
+        const stealthFactory = new StealthBrowserFactory(config, logger);
+        return await stealthFactory.createStealthBrowser({
+          purpose: 'x-monitoring',
+          stealthConfig,
+        });
+      } else {
+        logger.info('Creating standard browser service');
+        return new PlaywrightBrowserService();
+      }
+    })
+  );
 }
 
 /**
