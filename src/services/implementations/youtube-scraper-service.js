@@ -33,7 +33,6 @@ export class YouTubeScraperService {
     this.isInitialized = false;
     this.isRunning = false;
     this.scrapingInterval = null;
-    this.isAuthenticated = false;
     this.extractedDisplayName = null;
     this.consecutiveFailures = 0;
 
@@ -70,6 +69,24 @@ export class YouTubeScraperService {
     // Register with memory monitor if available
     if (this.memoryMonitor) {
       this.memoryMonitor.registerContentStore('youtubeVideos', () => this.analyzeVideoCache());
+    }
+  }
+
+  /**
+   * Get real-time authentication status instead of using cached value
+   * @returns {Promise<boolean>} True if currently authenticated
+   */
+  async getAuthenticationStatus() {
+    if (!this.authEnabled || !this.authManager) {
+      return false;
+    }
+
+    try {
+      // Use quick authentication check for performance
+      return await this.authManager.isQuickAuthenticated();
+    } catch (error) {
+      this.logger.debug('Authentication status check failed', { error: error.message });
+      return false;
     }
   }
 
@@ -146,7 +163,7 @@ export class YouTubeScraperService {
       // Perform authentication if enabled
       if (this.authEnabled && this.authManager) {
         operation.progress('Ensuring YouTube authentication');
-        this.isAuthenticated = await this.authManager.ensureAuthenticated();
+        await this.authManager.ensureAuthenticated();
       }
 
       operation.progress('Fetching initial content to establish baseline');
@@ -200,9 +217,10 @@ export class YouTubeScraperService {
       }
 
       // Start tracked operation for video fetching
+      const currentAuthStatus = await this.getAuthenticationStatus();
       const operation = this.logger.startOperation('fetchLatestVideo', {
         videosUrl: this.videosUrl,
-        isAuthenticated: this.isAuthenticated,
+        isAuthenticated: currentAuthStatus,
       });
 
       this.metrics.totalScrapingAttempts++;
@@ -600,10 +618,11 @@ export class YouTubeScraperService {
       }
 
       // Start tracked operation for live stream fetching
+      const currentAuthStatus = await this.getAuthenticationStatus();
       const operation = this.logger.startOperation('fetchActiveLiveStream', {
         liveStreamUrl: this.liveStreamUrl,
         streamsUrl: this.streamsUrl,
-        isAuthenticated: this.isAuthenticated,
+        isAuthenticated: currentAuthStatus,
       });
 
       try {
@@ -1009,10 +1028,11 @@ export class YouTubeScraperService {
     }
 
     // Start tracked operation for content scanning
+    const currentAuthStatus = await this.getAuthenticationStatus();
     const operation = this.logger.startOperation('scanForContent', {
       videosUrl: this.videosUrl,
       liveStreamUrl: this.liveStreamUrl,
-      isAuthenticated: this.isAuthenticated,
+      isAuthenticated: currentAuthStatus,
     });
 
     try {
