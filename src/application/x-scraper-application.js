@@ -10,7 +10,7 @@ import { createBrowserRateLimiter } from '../services/browser-rate-limiter.js';
  * X (Twitter) scraping application orchestrator
  * Coordinates browser automation, content classification, and announcements
  */
-export class XScraperApplication {
+export class XXXScraperApplication {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
     this.contentCoordinator = dependencies.contentCoordinator;
@@ -93,7 +93,7 @@ export class XScraperApplication {
       throw new Error('Scraper application is already running');
     }
 
-    const operation = this.logger.startOperation('startScraperApplication', {
+    const operation = this.logger.startOperation('startXXScraperApplication', {
       xUser: this.xUser,
       xUsername: this.xUsername,
       pollingInterval: { min: this.minInterval, max: this.maxInterval },
@@ -154,7 +154,7 @@ export class XScraperApplication {
       return;
     }
 
-    const operation = this.logger.startOperation('stopScraperApplication', {
+    const operation = this.logger.startOperation('stopXXScraperApplication', {
       isRunning: this.isRunning,
       stats: this.getStats(),
     });
@@ -201,7 +201,7 @@ export class XScraperApplication {
   async restart(options = {}) {
     const { maxRetries = 3, baseDelay = 5000 } = options;
 
-    const operation = this.logger.startOperation('restartScraperApplication', {
+    const operation = this.logger.startOperation('restartXXScraperApplication', {
       maxRetries,
       baseDelay,
       currentStats: this.getStats(),

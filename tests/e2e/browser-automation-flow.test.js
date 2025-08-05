@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { PlaywrightBrowserService } from '../../src/services/implementations/playwright-browser-service.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
-import { createScraperApplicationMocks } from '../fixtures/application-mocks.js';
+import { createXXScraperApplicationMocks } from '../fixtures/application-mocks.js';
 
 /**
  * End-to-End Browser Automation Flow Tests
@@ -33,7 +33,7 @@ describe('Browser Automation Flow E2E', () => {
     loggerMocks = createEnhancedLoggerMocks();
 
     // Create comprehensive application mocks
-    const mocks = createScraperApplicationMocks();
+    const mocks = createXXScraperApplicationMocks();
     mockConfig = mocks.config;
     mockStateManager = mocks.stateManager;
     contentCoordinator = mocks.contentCoordinator;
@@ -157,8 +157,8 @@ describe('Browser Automation Flow E2E', () => {
       metricsManager: loggerMocks.metricsManager,
     });
 
-    // Create ScraperApplication with proper dependencies object
-    scraperApp = new ScraperApplication({
+    // Create XXScraperApplication with proper dependencies object
+    scraperApp = new XXScraperApplication({
       config: mockConfig,
       stateManager: mockStateManager,
       contentCoordinator,

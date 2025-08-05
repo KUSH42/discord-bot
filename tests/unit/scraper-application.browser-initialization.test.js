@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
 
 describe('Browser Initialization', () => {
@@ -104,7 +104,7 @@ describe('Browser Initialization', () => {
     };
 
     // Create scraper application instance
-    scraperApp = new ScraperApplication({
+    scraperApp = new XXScraperApplication({
       browserService: mockBrowserService,
       contentClassifier: mockContentClassifier,
       contentAnnouncer: mockContentAnnouncer,

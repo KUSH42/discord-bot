@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('ScraperApplication Restart Functionality', () => {
+describe('XXScraperApplication Restart Functionality', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -113,7 +113,7 @@ describe('ScraperApplication Restart Functionality', () => {
     // Create mock delay function for direct control
     const mockDelay = jest.fn().mockResolvedValue();
 
-    // Create ScraperApplication instance
+    // Create XXScraperApplication instance
     const dependencies = {
       config: mockConfig,
       browserService: mockBrowserService,
@@ -135,7 +135,7 @@ describe('ScraperApplication Restart Functionality', () => {
       delay: mockDelay, // Inject mock delay for direct control
     };
 
-    scraperApp = new ScraperApplication(dependencies);
+    scraperApp = new XXScraperApplication(dependencies);
 
     // Store reference to mock delay for test access
     global.mockDelay = mockDelay;
@@ -157,7 +157,7 @@ describe('ScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      // Spy on the actual enhanced logger that ScraperApplication creates
+      // Spy on the actual enhanced logger that XXScraperApplication creates
       jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Mock the start and stop methods that restart() calls
@@ -172,7 +172,7 @@ describe('ScraperApplication Restart Functionality', () => {
 
       // Verify operation tracking
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartScraperApplication',
+        'restartXXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,
@@ -372,7 +372,7 @@ describe('ScraperApplication Restart Functionality', () => {
 
       // Verify operation was started
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartScraperApplication',
+        'restartXXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,
@@ -426,7 +426,7 @@ describe('ScraperApplication Restart Functionality', () => {
 
       // Assert - Verify operation was tracked
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartScraperApplication',
+        'restartXXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,

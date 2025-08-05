@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('ScraperApplication Authentication Verification', () => {
+describe('XXScraperApplication Authentication Verification', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -84,7 +84,7 @@ describe('ScraperApplication Authentication Verification', () => {
       persistentStorage: { get: jest.fn(), set: jest.fn() },
     };
 
-    scraperApp = new ScraperApplication(mockDependencies);
+    scraperApp = new XXScraperApplication(mockDependencies);
   });
 
   describe('verifyAuthentication', () => {

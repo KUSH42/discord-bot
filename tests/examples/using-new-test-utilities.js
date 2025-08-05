@@ -4,8 +4,8 @@
  */
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
-import { createScraperApplicationMocks, timerTestUtils, createPlaywrightMocks } from '../fixtures/test-helpers.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { createXXScraperApplicationMocks, timerTestUtils, createPlaywrightMocks } from '../fixtures/test-helpers.js';
 
 describe('Example: Simplified Test Creation', () => {
   let scraperApp;
@@ -15,8 +15,8 @@ describe('Example: Simplified Test Creation', () => {
   beforeEach(() => {
     // 🎯 BEFORE: Had to manually create 15+ mock objects across multiple files
     // 🎯 NOW: Single function call creates all necessary mocks with proper structure
-    mocks = createScraperApplicationMocks();
-    scraperApp = new ScraperApplication(mocks);
+    mocks = createXXScraperApplicationMocks();
+    scraperApp = new XXScraperApplication(mocks);
 
     // 🎯 BEFORE: Complex timer setup with multiple coordination patterns
     // 🎯 NOW: Simple utility setup for complex timer operations

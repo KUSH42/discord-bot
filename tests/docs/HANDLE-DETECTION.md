@@ -330,16 +330,16 @@ The handle detection utilities integrate seamlessly with your existing test infr
 ## Example Integration
 
 ```javascript
-import { createScraperApplicationMocks } from '../fixtures/test-helpers.js';
+import { createXXScraperApplicationMocks } from '../fixtures/test-helpers.js';
 import { debugOpenHandles, waitForHandleCleanup } from '../utils/open-handle-detector.js';
 
-describe('ScraperApplication', () => {
+describe('XXScraperApplication', () => {
   let scraperApp;
   let mocks;
   
   beforeEach(() => {
-    mocks = createScraperApplicationMocks();
-    scraperApp = new ScraperApplication(mocks);
+    mocks = createXXScraperApplicationMocks();
+    scraperApp = new XXScraperApplication(mocks);
   });
   
   afterEach(async () => {

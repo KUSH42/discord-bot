@@ -2,7 +2,7 @@
  * Test suite for tweet category classification with enhanced retweet detection
  */
 import { jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 
 describe('Tweet Category Classification', () => {
   let _scraperApp;
@@ -87,7 +87,7 @@ describe('Tweet Category Classification', () => {
     };
 
     // Create scraper application instance
-    _scraperApp = new ScraperApplication({
+    _scraperApp = new XXScraperApplication({
       browserService: mockBrowserService,
       config: mockConfig,
       stateManager: mockStateManager,

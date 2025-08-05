@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
-import { createScraperApplicationMocks } from '../fixtures/application-mocks.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { createXXScraperApplicationMocks } from '../fixtures/application-mocks.js';
 
-describe('ScraperApplication Edge Cases and Error Scenarios', () => {
+describe('XXScraperApplication Edge Cases and Error Scenarios', () => {
   let scraperApp;
   let mockDependencies;
   let mockBrowserService;
@@ -14,7 +14,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    mockDependencies = createScraperApplicationMocks();
+    mockDependencies = createXXScraperApplicationMocks();
 
     // Extract mocks from dependencies
     mockBrowserService = mockDependencies.browserService;
@@ -53,8 +53,8 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
     mockAuthManager.ensureAuthenticated = jest.fn().mockResolvedValue(undefined);
     mockAuthManager.isAuthenticated = jest.fn().mockResolvedValue(true);
 
-    // Create ScraperApplication instance using dependency injection
-    scraperApp = new ScraperApplication(mockDependencies);
+    // Create XXScraperApplication instance using dependency injection
+    scraperApp = new XXScraperApplication(mockDependencies);
   });
 
   afterEach(() => {
@@ -65,7 +65,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
   describe('Configuration Edge Cases', () => {
     it('should handle missing user handle gracefully', async () => {
       // Arrange - Create new mock with missing config value
-      const mockDepsWithMissingConfig = createScraperApplicationMocks();
+      const mockDepsWithMissingConfig = createXXScraperApplicationMocks();
       mockDepsWithMissingConfig.config.getRequired.mockImplementation(key => {
         if (key === 'X_USER_HANDLE') {
           throw new Error('X_USER_HANDLE is required but not provided');
@@ -74,14 +74,14 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
       });
 
       // Act & Assert - Constructor should throw when config is missing
-      expect(() => new ScraperApplication(mockDepsWithMissingConfig)).toThrow(
+      expect(() => new XXScraperApplication(mockDepsWithMissingConfig)).toThrow(
         'X_USER_HANDLE is required but not provided'
       );
     });
 
     it('should handle invalid polling interval', async () => {
       // Arrange - Create new mock with invalid polling interval
-      const mockDepsWithInvalidInterval = createScraperApplicationMocks();
+      const mockDepsWithInvalidInterval = createXXScraperApplicationMocks();
       mockDepsWithInvalidInterval.config.get.mockImplementation((key, defaultValue) => {
         if (key === 'X_QUERY_INTERVAL_MIN') {
           return '-1000'; // Invalid negative interval
@@ -90,7 +90,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
       });
 
       // Act & Assert - Constructor should handle invalid intervals gracefully
-      const app = new ScraperApplication(mockDepsWithInvalidInterval);
+      const app = new XXScraperApplication(mockDepsWithInvalidInterval);
       expect(app.minInterval).toBe(-1000); // Constructor just parses the value
     });
   });
@@ -164,7 +164,7 @@ describe('ScraperApplication Edge Cases and Error Scenarios', () => {
       await scraperApp.pollXProfile();
 
       // Assert - Should process the tweet successfully through ContentCoordinator
-      // Note: Classification now happens inside ContentCoordinator, not directly in ScraperApplication
+      // Note: Classification now happens inside ContentCoordinator, not directly in XXScraperApplication
       expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
         validTweet.tweetID,
         'scraper',

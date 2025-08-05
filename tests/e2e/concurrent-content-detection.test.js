@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { YouTubeScraperService } from '../../src/services/implementations/youtube-scraper-service.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 import { timerTestUtils } from '../fixtures/timer-test-utils.js';
@@ -154,8 +154,8 @@ describe('Concurrent Content Detection E2E', () => {
       loggerMocks.metricsManager
     );
 
-    // Create ScraperApplication (X scraping)
-    scraperApp = new ScraperApplication(
+    // Create XXScraperApplication (X scraping)
+    scraperApp = new XXScraperApplication(
       mockConfig,
       mockStateManager,
       contentCoordinator,

@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
 
-describe('ScraperApplication Initialization', () => {
+describe('XXScraperApplication Initialization', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -137,7 +137,7 @@ describe('ScraperApplication Initialization', () => {
       return values[key] ?? defaultValue;
     });
 
-    scraperApp = new ScraperApplication(mockDependencies);
+    scraperApp = new XXScraperApplication(mockDependencies);
   });
 
   afterEach(() => {

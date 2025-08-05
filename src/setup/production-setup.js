@@ -41,7 +41,7 @@ import { YouTubeScraperService } from '../services/implementations/youtube-scrap
 import { XAuthManager } from '../application/x-auth-manager.js';
 import { YouTubeAuthManager } from '../application/youtube-auth-manager.js';
 import { BotApplication } from '../application/bot-application.js';
-import { XScraperApplication } from '../application/x-scraper-application.js';
+import { XXXScraperApplication } from '../application/x-scraper-application.js';
 import { MonitorApplication } from '../application/yt-monitor-application.js';
 
 // Utils
@@ -363,7 +363,7 @@ async function setupApplicationServices(container, _config) {
 
   // Scraper Application (X/Twitter monitoring)
   container.registerSingleton('scraperApplication', c => {
-    return new XScraperApplication({
+    return new XXXScraperApplication({
       browserService: c.resolve('xBrowserService'),
       contentCoordinator: c.resolve('contentCoordinator'),
       contentClassifier: c.resolve('contentClassifier'),
@@ -371,7 +371,7 @@ async function setupApplicationServices(container, _config) {
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
       eventBus: c.resolve('eventBus'),
-      logger: c.resolve('logger').child({ service: 'ScraperApplication' }),
+      logger: c.resolve('logger').child({ service: 'XXScraperApplication' }),
       xAuthManager: c.resolve('xAuthManager'),
       duplicateDetector: c.resolve('duplicateDetector'),
       persistentStorage: c.resolve('persistentStorage'),

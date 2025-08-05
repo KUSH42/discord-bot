@@ -1,6 +1,6 @@
 // Debug script to understand why the retweet test is failing
 
-import { ScraperApplication } from './src/application/x-scraper-application.js';
+import { XXScraperApplication } from './src/application/x-scraper-application.js';
 import { ContentCoordinator } from './src/core/content-coordinator.js';
 import { ContentStateManager } from './src/core/content-state-manager.js';
 import { ContentAnnouncer } from './src/core/content-announcer.js';
@@ -110,7 +110,7 @@ async function debugRetweetTest() {
     mockLogger
   );
 
-  const scraperApp = new ScraperApplication(
+  const scraperApp = new XXScraperApplication(
     mockBrowserService,
     mockAuthManager,
     contentClassifier,

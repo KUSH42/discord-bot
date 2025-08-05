@@ -233,4 +233,4 @@ node test-mutex-fix.js
 
 - **PlaywrightBrowserService**: Enhanced with mutex-aware browser operations
 - **YouTubeScraperService**: Uses AsyncMutex for browser operation synchronization
-- **ScraperApplication**: Coordinates with mutex during shutdown procedures
+- **XXScraperApplication**: Coordinates with mutex during shutdown procedures

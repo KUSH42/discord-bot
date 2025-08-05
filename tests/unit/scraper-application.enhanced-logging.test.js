@@ -1,11 +1,11 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import {
   createMockDependenciesWithEnhancedLogging,
   createMockEnhancedLogger,
 } from '../utils/enhanced-logging-mocks.js';
 
-describe('ScraperApplication Enhanced Logging Integration', () => {
+describe('XXScraperApplication Enhanced Logging Integration', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -82,8 +82,8 @@ describe('ScraperApplication Enhanced Logging Integration', () => {
     mockDebugManager = mockDependencies.debugManager;
     mockMetricsManager = mockDependencies.metricsManager;
 
-    // Create ScraperApplication instance with dependencies object
-    scraperApp = new ScraperApplication({
+    // Create XXScraperApplication instance with dependencies object
+    scraperApp = new XXScraperApplication({
       config: mockConfig,
       browserService: mockBrowserService,
       xAuthManager: mockAuthManager,
@@ -126,8 +126,8 @@ describe('ScraperApplication Enhanced Logging Integration', () => {
       expect(mockLogger.generateCorrelationId).toBeDefined();
       expect(mockLogger.forOperation).toBeDefined();
 
-      // Verify that the ScraperApplication was created successfully with enhanced logging
-      expect(scraperApp).toBeInstanceOf(ScraperApplication);
+      // Verify that the XXScraperApplication was created successfully with enhanced logging
+      expect(scraperApp).toBeInstanceOf(XXScraperApplication);
       expect(scraperApp.logger).toBeDefined();
     });
 

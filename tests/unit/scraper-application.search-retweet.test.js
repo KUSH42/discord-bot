@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('Search and Retweet Logic', () => {
@@ -117,7 +117,7 @@ describe('Search and Retweet Logic', () => {
     };
 
     // Create scraper application instance
-    scraperApp = new ScraperApplication({
+    scraperApp = new XXScraperApplication({
       browserService: mockBrowserService,
       contentClassifier: mockContentClassifier,
       contentAnnouncer: mockContentAnnouncer,

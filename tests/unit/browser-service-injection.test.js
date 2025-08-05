@@ -46,7 +46,7 @@ jest.unstable_mockModule('playwright', () => ({
 const { DependencyContainer } = await import('../../src/infrastructure/dependency-container.js');
 const { Configuration } = await import('../../src/config/configurations.js');
 const { setupProductionServices } = await import('../../src/setup/production-setup.js');
-const { ScraperApplication } = await import('../../src/application/x-scraper-application.js');
+const { XXScraperApplication } = await import('../../src/application/x-scraper-application.js');
 
 describe('Browser Service Dependency Injection', () => {
   let container;
@@ -154,7 +154,7 @@ describe('Browser Service Dependency Injection', () => {
     it('should fail gracefully when browser service is null', () => {
       // Test the old behavior to ensure we catch it
       expect(() => {
-        new ScraperApplication({
+        new XXScraperApplication({
           browserService: null,
           contentCoordinator: {},
           contentClassifier: {},
@@ -173,7 +173,7 @@ describe('Browser Service Dependency Injection', () => {
     });
 
     it('should throw error when trying to start with null browser service', async () => {
-      const scraperApp = new ScraperApplication({
+      const scraperApp = new XXScraperApplication({
         browserService: null,
         contentCoordinator: {},
         contentClassifier: {},
@@ -233,7 +233,7 @@ describe('Browser Service Dependency Injection', () => {
 
       // Register everything except browser service
       brokenContainer.registerSingleton('scraperApplication', () => {
-        return new ScraperApplication({
+        return new XXScraperApplication({
           browserService: null, // This should cause issues
           contentCoordinator: {},
           contentClassifier: {},
