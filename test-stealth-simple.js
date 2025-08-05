@@ -5,11 +5,9 @@
  * Tests core stealth functionality without requiring full production setup
  */
 
-import { UserAgentManager } from './src/services/browser-stealth/user-agent-manager.js';
-import { HumanBehaviorSimulator } from './src/services/browser-stealth/human-behavior-simulator.js';
-import { IntelligentRateLimiter } from './src/services/browser-stealth/intelligent-rate-limiter.js';
-import { DetectionMonitor } from './src/services/browser-stealth/detection-monitor.js';
-import { PerformanceMonitor } from './src/services/browser-stealth/performance-monitor.js';
+import { UserAgentManager } from './src/utilities/user-agent-manager.js';
+import { HumanBehaviorSimulator } from './src/utilities/human-behavior-simulator.js';
+import { IntelligentRateLimiter } from './src/utilities/intelligent-rate-limiter.js';
 
 // Mock logger
 const mockLogger = {
@@ -62,18 +60,21 @@ async function testStealthComponents() {
     const viewport = userAgentManager.getMatchingViewport();
     console.log('   ✅ Matching Viewport:', viewport);
 
-    const platform = userAgentManager.getPlatform();
-    console.log('   ✅ Platform:', platform);
+    const platformInfo = userAgentManager.getPlatformInfo();
+    console.log('   ✅ Platform Info:', platformInfo);
 
-    const browser = userAgentManager.getBrowserName();
-    console.log('   ✅ Browser:', browser);
+    const poolInfo = userAgentManager.getPoolInfo();
+    console.log('   ✅ Pool Info:', {
+      totalAgents: poolInfo.totalAgents,
+      platforms: poolInfo.platforms,
+      browsers: poolInfo.browsers,
+    });
 
-    const status = userAgentManager.getRotationStatus();
-    console.log('   ✅ Rotation Status:', {
-      currentIndex: status.currentIndex,
-      totalAgents: status.totalUserAgents,
-      platform: status.platform,
-      browser: status.browserName,
+    const usageStats = userAgentManager.getUsageStats();
+    console.log('   ✅ Usage Stats:', {
+      totalRotations: usageStats.totalRotations,
+      uniqueAgentsUsed: usageStats.uniqueAgentsUsed,
+      agentDiversityPercent: usageStats.agentDiversityPercent,
     });
     console.log();
 
@@ -85,68 +86,21 @@ async function testStealthComponents() {
     console.log('   ✅ Next Interval:', `${Math.round(nextInterval / 1000)}s`);
 
     // Simulate some requests
-    rateLimiter.recordRequest(true);
-    rateLimiter.recordRequest(true);
-    rateLimiter.recordRequest(false); // Failed request
+    rateLimiter.recordRequest({ type: 'test', success: true });
+    rateLimiter.recordRequest({ type: 'test', success: true });
+    rateLimiter.recordRequest({ type: 'test', success: false });
 
-    const limiterStatus = rateLimiter.getStatus();
-    console.log('   ✅ Rate Limiter Status:', {
-      pattern: limiterStatus.currentPattern,
-      recentRequests: limiterStatus.recentRequests,
-      emergencyMode: limiterStatus.emergencyMode,
-      burstPenalty: Math.round(limiterStatus.burstPenalty * 100) / 100,
+    const statistics = rateLimiter.getStatistics();
+    console.log('   ✅ Rate Limiter Statistics:', {
+      totalRequests: statistics.totalRequests,
+      averageInterval: `${Math.round(statistics.averageInterval / 1000)}s`,
+      burstPenalty: Math.round(statistics.currentBurstPenalty * 100) / 100,
+      currentPattern: statistics.currentPattern,
     });
     console.log();
 
-    // 3. Test DetectionMonitor
-    console.log('3️⃣  Testing DetectionMonitor...');
-    const detectionMonitor = new DetectionMonitor(mockLogger, {
-      alertThreshold: 3,
-      monitoringWindow: 3600000,
-    });
-
-    // Simulate some requests
-    detectionMonitor.recordRequest(true);
-    detectionMonitor.recordRequest(true);
-    detectionMonitor.recordRequest(false, 'Test detection incident', 'http://example.com');
-
-    const detectionStatus = detectionMonitor.getStatus();
-    const detectionMetrics = detectionStatus.metrics;
-    console.log('   ✅ Detection Metrics:', {
-      totalRequests: detectionMetrics.totalRequests,
-      successfulRequests: detectionMetrics.successfulRequests,
-      detectionIncidents: detectionMetrics.detectionIncidents,
-      successRate: `${Math.round(detectionMetrics.successRate * 100)}%`,
-    });
-    console.log();
-
-    // 4. Test PerformanceMonitor
-    console.log('4️⃣  Testing PerformanceMonitor...');
-    const performanceMonitor = new PerformanceMonitor(mockLogger, {
-      samplingInterval: 30000,
-      maxSamples: 1000,
-    });
-
-    // Simulate some operations
-    const operation1 = performanceMonitor.startOperation();
-    await new Promise(resolve => setTimeout(resolve, 100));
-    performanceMonitor.endOperation(operation1, 'navigation');
-
-    const operation2 = performanceMonitor.startOperation();
-    await new Promise(resolve => setTimeout(resolve, 50));
-    performanceMonitor.endOperation(operation2, 'interaction');
-
-    const perfReport = performanceMonitor.getPerformanceReport();
-    console.log('   ✅ Performance Report:', {
-      samples: perfReport.samples,
-      averageTime: `${Math.round(perfReport.averageOperationTime || 0)}ms`,
-      grade: perfReport.performanceGrade,
-      memoryUsage: `${Math.round((perfReport.currentMetrics?.memoryUsage || 0) / 1024)}KB`,
-    });
-    console.log();
-
-    // 5. Test HumanBehaviorSimulator (without page)
-    console.log('5️⃣  Testing HumanBehaviorSimulator (Config Only)...');
+    // 3. Test HumanBehaviorSimulator (without page)
+    console.log('3️⃣  Testing HumanBehaviorSimulator (Config Only)...');
 
     // Mock page object for testing
     const mockPage = {
@@ -166,30 +120,28 @@ async function testStealthComponents() {
     const behaviorSimulator = new HumanBehaviorSimulator(mockPage, mockLogger);
 
     // Test configuration
-    const behaviorStatus = behaviorSimulator.getStatus();
-    console.log('   ✅ Behavior Simulator Status:', {
-      enabled: behaviorStatus.enabled,
-      mousePosition: behaviorStatus.mousePosition,
-      configEnabled: {
-        mouseMovements: behaviorStatus.config.mouseMovements.enabled,
-        scrolling: behaviorStatus.config.scrolling.enabled,
-        reading: behaviorStatus.config.reading.enabled,
-        interaction: behaviorStatus.config.interaction.enabled,
-      },
+    const behaviorConfig = behaviorSimulator.getConfiguration();
+    console.log('   ✅ Behavior Simulator Config:', {
+      enabled: behaviorConfig.enabled,
+      mouseMovements: behaviorConfig.mouseMovements?.enabled,
+      scrolling: behaviorConfig.scrolling?.enabled,
+      reading: behaviorConfig.reading?.enabled,
     });
 
     // Test delay generation
-    const delay = behaviorSimulator.generateNormalDelay(100, 500);
+    const delay = behaviorSimulator.randomDelay(100, 500);
     console.log('   ✅ Generated Delay:', `${delay}ms`);
+
+    // Test reading time calculation
+    const readingTime = behaviorSimulator.calculateReadingTime(1000);
+    console.log('   ✅ Reading Time for 1000 chars:', `${Math.round(readingTime / 1000)}s`);
     console.log();
 
-    // 6. Integration Summary
-    console.log('6️⃣  Integration Summary...');
+    // 4. Integration Summary
+    console.log('4️⃣  Integration Summary...');
     console.log('   🎯 All core components initialized successfully');
     console.log('   🔄 User agent rotation working');
     console.log('   ⏱️  Rate limiting active with emergency mode support');
-    console.log('   🔍 Detection monitoring tracking incidents');
-    console.log('   📊 Performance monitoring collecting metrics');
     console.log('   🎭 Behavior simulation configured');
     console.log();
 
