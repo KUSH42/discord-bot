@@ -284,10 +284,10 @@ The bot features a comprehensive, state-of-the-art anti-detection system designe
 - **Session Validation**: Health checks ensure session integrity before operations
 - **Graceful Recovery**: Automatic session refresh when authentication expires
 
-### 🔍 Real-Time Detection Monitoring
+### 🔍 Real-Time Detection Monitoring ✅ **FULLY OPERATIONAL**
 
 #### **Incident Classification & Tracking**
-- **15+ Detection Signatures**: Identifies bot detection patterns in responses, errors, and HTTP status codes
+- **18 Detection Signatures**: Identifies bot detection patterns across 6 categories (JavaScript challenges, rate limiting, browser fingerprinting, behavioral analysis, network-level, session analysis)
 - **Severity Scoring**: Critical/High/Medium/Low classification based on detection probability
 - **Pattern Analysis**: Tracks detection trends and frequency over time
 - **Incident History**: Maintains up to 1000 recent incidents with automatic cleanup
@@ -298,19 +298,25 @@ The bot features a comprehensive, state-of-the-art anti-detection system designe
 - **Alert Thresholds**: Configurable incident count triggers (3 incidents/hour default)
 - **Recommendation Engine**: Generates actionable optimization suggestions
 
-### 📊 Performance Monitoring & Optimization
+### 📊 Performance Monitoring & Optimization ✅ **FULLY OPERATIONAL**
 
-#### **Resource Usage Tracking**
-- **Memory Monitoring**: Tracks heap usage with 1GB alert threshold
-- **CPU Usage Analysis**: Monitors process CPU consumption with 80% alert threshold
-- **Operation Timing**: Measures navigation, interaction, and scraping performance
-- **Performance Grading**: A-F scoring system based on efficiency metrics
+#### **A-F Performance Grading System**
+- **Overall Grade**: Weighted average of all performance components (reliability=30%, memory=25%, navigation=25%, cpu=20%)
+- **Memory Grade**: A (<512MB), B (<1GB), C (<1.5GB), D (<2GB), F (≥2GB)
+- **Navigation Grade**: A (<5s), B (<10s), C (<20s), D (<30s), F (≥30s)
+- **Reliability Grade**: A (≥98%), B (≥95%), C (≥90%), D (≥80%), F (<80%)
 
-#### **Automatic Optimization**
-- **Profile Cleanup Triggers**: Memory-based automatic profile maintenance
-- **Performance Recommendations**: Automated suggestions for optimization
-- **Resource Limit Enforcement**: Prevents runaway resource consumption
-- **Health Check Integration**: Continuous monitoring with Discord command integration
+#### **Real-Time Resource Tracking**
+- **Memory Monitoring**: Heap usage tracking with configurable alert thresholds
+- **Navigation Performance**: Automatic timing measurement for all page loads
+- **Success Rate Calculation**: Tracks successful vs failed operations with trend analysis
+- **Performance Sample Retention**: Maintains last 1000 operations for analysis
+
+#### **Intelligent Recommendations**
+- **Automatic Suggestions**: Generated based on current performance grades
+- **Priority Classification**: High/Medium/Low priority recommendations with specific actions
+- **Resource Optimization**: Memory cleanup, navigation optimization, and reliability improvements
+- **Discord Integration**: Real-time performance reports via `!performance-metrics` command
 
 ### Configuration
 
@@ -827,11 +833,17 @@ and pull request via GitHub Actions.
 - **HTTP Endpoints**:
   - `GET /health`: Basic health status.
   - `GET /health/detailed`: Detailed status of all internal components.
+  - `GET /health/anti-bot-status`: **Anti-botting system status with performance grades**
+  - `GET /health/detection-metrics`: **Detection incident analysis with recent signatures**
+  - `GET /health/performance-impact`: **Resource usage and A-F performance grading**
   - `GET /ready`: Kubernetes-style readiness probe.
 - **Discord Commands**: Use `!health` and `!health-detailed` for real-time
   status updates in Discord.
 - **Component-Specific Health Commands**:
   - `!youtube-health`: Detailed YouTube monitor status with subscription info, processing stats, and error metrics in a rich embed format.
+  - `!stealth-status`: **Anti-botting system status with performance grades and emergency mode status**
+  - `!detection-report`: **Detailed detection monitoring with recent incidents and signature analysis**
+  - `!performance-metrics`: **A-F performance grading with recommendations and resource usage**
   - `!x-health`: Detailed X scraper status with authentication status, polling intervals, execution statistics, and content metrics in a rich embed format.
 
 ## Troubleshooting

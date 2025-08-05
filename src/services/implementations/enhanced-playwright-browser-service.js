@@ -11,7 +11,14 @@ import { chromium } from 'playwright';
  * and persistent browser profiles for advanced stealth characteristics
  */
 export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
-  constructor(baseLogger, debugManager, metricsManager, config = {}) {
+  constructor(
+    baseLogger,
+    debugManager,
+    metricsManager,
+    detectionMonitor = null,
+    performanceMonitor = null,
+    config = {}
+  ) {
     super(baseLogger, debugManager, metricsManager);
 
     // Add context property for persistent context support
@@ -48,6 +55,10 @@ export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
     this.behaviorSimulator = null;
     this.rateLimiter = null;
     this.profileManager = null;
+
+    // Monitoring components
+    this.detectionMonitor = detectionMonitor;
+    this.performanceMonitor = performanceMonitor;
 
     // Enhanced state tracking
     this.stealthFeatures = {
@@ -200,6 +211,9 @@ export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
       stealthEnabled: this.config.stealthEnabled,
     });
 
+    // Start performance monitoring
+    const performanceOp = this.performanceMonitor?.startOperation('navigation', { url });
+
     try {
       // Apply intelligent rate limiting
       if (this.rateLimiter) {
@@ -220,20 +234,54 @@ export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
         response = await super.goto(url, options, retries);
       }
 
+      // Analyze response for detection signatures
+      if (this.detectionMonitor && response) {
+        operation.progress('Analyzing for detection signatures');
+        const detectionAnalysis = await this.detectionMonitor.analyzeForDetection(this.page, response, {
+          url,
+          userAgent: this.userAgentManager?.getCurrentUserAgent(),
+          stealthEnabled: this.config.stealthEnabled,
+        });
+
+        if (detectionAnalysis.detected) {
+          operation.warn('Detection signatures found', {
+            signatures: detectionAnalysis.signatures,
+            analysis: detectionAnalysis.analysis,
+          });
+        }
+      }
+
+      // Record successful request for monitoring
+      if (this.detectionMonitor) {
+        this.detectionMonitor.recordSuccessfulRequest({ url, userAgent: this.userAgentManager?.getCurrentUserAgent() });
+      }
+
       // Save session after successful navigation
       if (this.profileManager && this.page) {
         await this.profileManager.saveSession(this.page);
       }
+
+      // End performance monitoring with success
+      performanceOp?.end(true, { url, statusCode: response?.status() });
 
       operation.success('Enhanced navigation completed', {
         url,
         behaviorSimulated: !!this.behaviorSimulator,
         rateLimited: !!this.rateLimiter,
         sessionSaved: !!this.profileManager,
+        detectionAnalyzed: !!this.detectionMonitor,
       });
 
       return response;
     } catch (error) {
+      // Record failed request for monitoring
+      if (this.detectionMonitor) {
+        this.detectionMonitor.recordFailedRequest({ url, error: error.message });
+      }
+
+      // End performance monitoring with failure
+      performanceOp?.end(false, { url, error: error.message });
+
       operation.error(error, 'Enhanced navigation failed');
       throw error;
     }
@@ -383,7 +431,7 @@ export class EnhancedPlaywrightBrowserService extends PlaywrightBrowserService {
     }
 
     // Filter out userDataDir from options since it's not supported with browserType.launch()
-    const { userDataDir, ...filteredOptions } = options;
+    const { userDataDir: _userDataDir, ...filteredOptions } = options;
 
     return {
       headless: false, // Stealth mode requires headful browser

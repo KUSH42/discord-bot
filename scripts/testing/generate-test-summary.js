@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import xml2js from 'xml2js';
+import { nowUTC, toISOStringUTC } from '../../src/utilities/utc-time.js';
 
 class TestSummaryGenerator {
   constructor() {

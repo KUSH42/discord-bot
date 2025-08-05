@@ -5,10 +5,12 @@ import { EnhancedPlaywrightBrowserService } from './enhanced-playwright-browser-
  * Provides a centralized way to create browser services with anti-botting capabilities
  */
 export class StealthBrowserFactory {
-  constructor(baseLogger, debugManager, metricsManager) {
+  constructor(baseLogger, debugManager, metricsManager, detectionMonitor = null, performanceMonitor = null) {
     this.baseLogger = baseLogger;
     this.debugManager = debugManager;
     this.metricsManager = metricsManager;
+    this.detectionMonitor = detectionMonitor;
+    this.performanceMonitor = performanceMonitor;
   }
 
   /**
@@ -21,6 +23,8 @@ export class StealthBrowserFactory {
       this.baseLogger,
       this.debugManager,
       this.metricsManager,
+      this.detectionMonitor,
+      this.performanceMonitor,
       {
         stealthEnabled: true,
         ...config,
@@ -48,6 +52,8 @@ export class StealthBrowserFactory {
       this.baseLogger,
       this.debugManager,
       this.metricsManager,
+      this.detectionMonitor,
+      this.performanceMonitor,
       browserConfig
     );
 

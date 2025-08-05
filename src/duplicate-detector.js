@@ -1,6 +1,8 @@
 // duplicate-detector.js
 // Duplicate detection utilities for YouTube videos and X/Twitter posts
 
+import { nowUTC } from './utilities/utc-time.js';
+
 /**
  * Regular expression for matching YouTube video URLs
  * Matches various YouTube URL formats and extracts the 11-character video ID

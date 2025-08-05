@@ -15,13 +15,17 @@ export class CommandProcessor {
     debugFlagManager = null,
     metricsManager = null,
     baseLogger = null,
-    memoryMonitor = null
+    memoryMonitor = null,
+    detectionMonitor = null,
+    performanceMonitor = null
   ) {
     this.config = config;
     this.state = stateManager;
     this.debugManager = debugFlagManager;
     this.metricsManager = metricsManager;
     this.memoryMonitor = memoryMonitor;
+    this.detectionMonitor = detectionMonitor;
+    this.performanceMonitor = performanceMonitor;
     this.commandPrefix = config.get('COMMAND_PREFIX', '!');
 
     // Create enhanced logger if components are available
@@ -439,6 +443,15 @@ export class CommandProcessor {
         case 'memory-status':
           return await this.handleMemoryStatus();
 
+        case 'stealth-status':
+          return await this.handleStealthStatus();
+
+        case 'detection-report':
+          return await this.handleDetectionReport();
+
+        case 'performance-metrics':
+          return await this.handlePerformanceMetrics();
+
         case 'delete':
           return await this.handleDelete(args, userId);
 
@@ -643,6 +656,9 @@ export class CommandProcessor {
       `**${this.commandPrefix}metrics**: Shows performance metrics and system statistics.`,
       `**${this.commandPrefix}memory-status**: Shows real-time memory analysis with content store breakdown.`,
       `**${this.commandPrefix}log-pipeline**: Shows recent pipeline activities with correlation tracking.`,
+      `**${this.commandPrefix}stealth-status**: Shows anti-botting system status and performance grades.`,
+      `**${this.commandPrefix}detection-report**: Shows detailed detection monitoring report with recent incidents.`,
+      `**${this.commandPrefix}performance-metrics**: Shows performance metrics with A-F grading and recommendations.`,
       `**${this.commandPrefix}health**: Shows bot health status and system information.`,
       `**${this.commandPrefix}health-detailed**: Shows detailed health status for all components.`,
       `**${this.commandPrefix}youtube-health**: Shows detailed YouTube monitor health status.`,
@@ -2286,5 +2302,218 @@ export class CommandProcessor {
       allowedUsers: this.getAllowedUserIds().length,
       commandPrefix: this.commandPrefix,
     };
+  }
+
+  /**
+   * Handle stealth-status command
+   */
+  async handleStealthStatus() {
+    if (!this.detectionMonitor || !this.performanceMonitor) {
+      return {
+        success: false,
+        message: '❌ Stealth monitoring is not available. Anti-botting system may not be enabled.',
+        requiresRestart: false,
+      };
+    }
+
+    try {
+      const detectionStats = this.detectionMonitor.getStatistics();
+      const performanceStats = this.performanceMonitor.getStatistics();
+
+      const stealthEnabled = this.config.get('BROWSER_STEALTH_ENABLED', 'false') === 'true';
+      const emergencyMode = detectionStats.emergencyMode?.active || false;
+
+      const statusEmoji = emergencyMode
+        ? '🚨'
+        : detectionStats.successRate > 95
+          ? '✅'
+          : detectionStats.successRate > 90
+            ? '⚠️'
+            : '❌';
+
+      const message = [
+        `${statusEmoji} **Anti-Botting System Status**`,
+        '',
+        `**System Status:** ${stealthEnabled ? 'Enabled' : 'Disabled'}`,
+        `**Success Rate:** ${detectionStats.successRate}%`,
+        `**Detection Rate:** ${detectionStats.detectionRate}%`,
+        `**Recent Incidents:** ${detectionStats.recentIncidents}`,
+        `**Emergency Mode:** ${emergencyMode ? 'ACTIVE' : 'Inactive'}`,
+        '',
+        `**Performance Grade:** ${performanceStats.grades?.overall || 'N/A'}`,
+        `- Memory: ${performanceStats.grades?.memory || 'N/A'} (${performanceStats.currentMetrics?.memoryUsageMB || 0}MB)`,
+        `- Navigation: ${performanceStats.grades?.navigation || 'N/A'} (${Math.round(performanceStats.currentMetrics?.averageNavigationTime / 1000 || 0)}s avg)`,
+        `- Reliability: ${performanceStats.grades?.reliability || 'N/A'}`,
+        '',
+        `**Total Operations:** ${detectionStats.totalRequests || 0}`,
+        `**Emergency Activations:** ${detectionStats.emergencyActivations || 0}`,
+      ].join('\n');
+
+      return {
+        success: true,
+        message,
+        requiresRestart: false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to get stealth status: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
+  }
+
+  /**
+   * Handle detection-report command
+   */
+  async handleDetectionReport() {
+    if (!this.detectionMonitor) {
+      return {
+        success: false,
+        message: '❌ Detection monitoring is not available. Anti-botting system may not be enabled.',
+        requiresRestart: false,
+      };
+    }
+
+    try {
+      const report = this.detectionMonitor.getDetectionReport();
+      const recentIncidents = report.incidents || [];
+
+      const message = [
+        '🔍 **Detection Monitoring Report**',
+        '',
+        `**Summary:**`,
+        `- Total Incidents: ${report.summary.totalIncidents}`,
+        `- Recent Incidents (1h): ${report.summary.recentIncidents}`,
+        `- Success Rate: ${report.summary.successRate}%`,
+        `- Detection Rate: ${report.summary.detectionRate}%`,
+        '',
+        `**Emergency Mode:** ${report.summary.emergencyMode?.active ? 'ACTIVE' : 'Inactive'}`,
+        report.summary.emergencyMode?.active ? `  - Reason: ${report.summary.emergencyMode.reason}` : '',
+        report.summary.emergencyMode?.active
+          ? `  - Expires: <t:${Math.floor(report.summary.emergencyMode.expiresAt / 1000)}:R>`
+          : '',
+        '',
+        `**Recent Detection Signatures:**`,
+      ];
+
+      if (recentIncidents.length === 0) {
+        message.push('  - No recent incidents ✅');
+      } else {
+        // Group incidents by signature
+        const signatureCounts = {};
+        recentIncidents.forEach(incident => {
+          signatureCounts[incident.signature] = (signatureCounts[incident.signature] || 0) + 1;
+        });
+
+        Object.entries(signatureCounts)
+          .slice(0, 5)
+          .forEach(([signature, count]) => {
+            const severity = recentIncidents.find(i => i.signature === signature)?.severity || 'unknown';
+            const severityEmoji =
+              severity === 'critical' ? '🔴' : severity === 'high' ? '🟠' : severity === 'medium' ? '🟡' : '🟢';
+            message.push(`  ${severityEmoji} ${signature}: ${count} incident${count > 1 ? 's' : ''}`);
+          });
+      }
+
+      message.push('');
+      message.push(`**Configuration:**`);
+      message.push(`- Monitoring: ${report.configuration.enabled ? 'Enabled' : 'Disabled'}`);
+      message.push(`- Alert Threshold: ${report.configuration.alertThreshold}`);
+      message.push(`- Emergency Threshold: ${report.configuration.emergencyModeThreshold}`);
+      message.push(`- Enabled Signatures: ${report.configuration.enabledSignatures}`);
+
+      return {
+        success: true,
+        message: message.filter(line => line !== '').join('\n'),
+        requiresRestart: false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to generate detection report: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
+  }
+
+  /**
+   * Handle performance-metrics command
+   */
+  async handlePerformanceMetrics() {
+    if (!this.performanceMonitor) {
+      return {
+        success: false,
+        message: '❌ Performance monitoring is not available.',
+        requiresRestart: false,
+      };
+    }
+
+    try {
+      const report = this.performanceMonitor.getPerformanceReport();
+      const recommendations = report.recommendations || [];
+
+      const gradeEmoji = grade => {
+        switch (grade) {
+          case 'A':
+            return '🟢';
+          case 'B':
+            return '🔵';
+          case 'C':
+            return '🟡';
+          case 'D':
+            return '🟠';
+          case 'F':
+            return '🔴';
+          default:
+            return '⚪';
+        }
+      };
+
+      const message = [
+        '📊 **Performance Metrics Report**',
+        '',
+        `**Overall Grade: ${gradeEmoji(report.grades.overall)} ${report.grades.overall}**`,
+        '',
+        `**Component Grades:**`,
+        `${gradeEmoji(report.grades.memory)} Memory: ${report.grades.memory} (${report.currentMetrics.memoryUsageMB}MB)`,
+        `${gradeEmoji(report.grades.navigation)} Navigation: ${report.grades.navigation} (${Math.round(report.currentMetrics.averageNavigationTime / 1000)}s avg)`,
+        `${gradeEmoji(report.grades.cpu)} CPU: ${report.grades.cpu} (${report.currentMetrics.cpuUsagePercent}%)`,
+        `${gradeEmoji(report.grades.reliability)} Reliability: ${report.grades.reliability} (${Math.round(report.currentMetrics.successRate * 100)}%)`,
+        '',
+        `**Statistics:**`,
+        `- Total Operations: ${report.statistics.totalOperations}`,
+        `- Successful: ${report.statistics.successfulOperations}`,
+        `- Failed: ${report.statistics.failedOperations}`,
+        `- Peak Memory: ${report.statistics.peakMemoryUsage}MB`,
+        `- Alerts Triggered: ${report.statistics.alertsTriggered}`,
+        '',
+        `**Recent Samples:**`,
+        `- Navigation: ${report.recentSamples.navigation?.length || 0} samples`,
+        `- Memory: ${report.recentSamples.memory?.length || 0} samples`,
+        `- Errors: ${report.recentSamples.errors?.length || 0} recent errors`,
+      ];
+
+      if (recommendations.length > 0) {
+        message.push('');
+        message.push('**Recommendations:**');
+        recommendations.slice(0, 3).forEach(rec => {
+          const priorityEmoji = rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢';
+          message.push(`${priorityEmoji} ${rec.message}`);
+        });
+      }
+
+      return {
+        success: true,
+        message: message.join('\n'),
+        requiresRestart: false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Failed to get performance metrics: ${error.message}`,
+        requiresRestart: false,
+      };
+    }
   }
 }

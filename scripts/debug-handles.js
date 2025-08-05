@@ -10,6 +10,7 @@
  */
 
 import detector from '../tests/utils/open-handle-detector.js';
+import { nowUTC } from '../src/utilities/utc-time.js';
 
 const args = process.argv.slice(2);
 const isMonitoring = args.includes('--monitor');
