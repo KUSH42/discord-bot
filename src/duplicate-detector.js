@@ -21,10 +21,8 @@ export const tweetUrlRegex =
  */
 export class DuplicateDetector {
   constructor(persistentStorage, logger) {
-    if (!persistentStorage) {
-      throw new Error('PersistentStorage is a required dependency for DuplicateDetector.');
-    }
-    this.storage = persistentStorage;
+    // Make persistentStorage optional - we'll use only in-memory caches and Discord history
+    this.storage = persistentStorage; // May be null - that's fine
     this.logger = logger;
     // In-memory cache for performance
     this.fingerprintCache = new Set();
@@ -34,6 +32,12 @@ export class DuplicateDetector {
     // Legacy compatibility cache
     this.knownVideoIds = new Set();
     this.knownTweetIds = new Set();
+
+    // Flag to indicate whether persistent storage is disabled
+    this.persistentStorageDisabled = !persistentStorage;
+    if (this.persistentStorageDisabled && this.logger) {
+      this.logger.info('PersistentStorage disabled - using only in-memory caches and Discord history');
+    }
   }
 
   /**
@@ -74,12 +78,16 @@ export class DuplicateDetector {
     if (this.fingerprintCache.has(fingerprint)) {
       return true;
     }
-    // Check persistent storage
-    const isDupe = await this.storage.hasFingerprint(fingerprint);
-    if (isDupe) {
-      this.fingerprintCache.add(fingerprint); // Cache for next time
+    // Check persistent storage only if available
+    if (!this.persistentStorageDisabled && this.storage) {
+      const isDupe = await this.storage.hasFingerprint(fingerprint);
+      if (isDupe) {
+        this.fingerprintCache.add(fingerprint); // Cache for next time
+      }
+      return isDupe;
     }
-    return isDupe;
+    // Without persistent storage, only rely on in-memory cache
+    return false;
   }
 
   /**
@@ -95,11 +103,14 @@ export class DuplicateDetector {
     const fingerprint = this._generateContentFingerprint(content);
     if (fingerprint) {
       this.fingerprintCache.add(fingerprint);
-      await this.storage.storeFingerprint(fingerprint, {
-        url: content.url,
-        title: content.title,
-        publishedAt: content.publishedAt,
-      });
+      // Store to persistent storage only if available
+      if (!this.persistentStorageDisabled && this.storage) {
+        await this.storage.storeFingerprint(fingerprint, {
+          url: content.url,
+          title: content.title,
+          publishedAt: content.publishedAt,
+        });
+      }
     }
     // Also mark the URL as seen for fallback checks
     await this.markAsSeenByUrl(content.url);
@@ -116,11 +127,17 @@ export class DuplicateDetector {
       return true;
     }
 
-    const exists = await this.storage.hasUrl(normalizedUrl);
-    if (exists) {
-      this.urlCache.add(normalizedUrl);
+    // Check persistent storage only if available
+    if (!this.persistentStorageDisabled && this.storage) {
+      const exists = await this.storage.hasUrl(normalizedUrl);
+      if (exists) {
+        this.urlCache.add(normalizedUrl);
+      }
+      return exists;
     }
-    return exists;
+
+    // Without persistent storage, only rely on in-memory cache
+    return false;
   }
 
   /**
@@ -130,7 +147,11 @@ export class DuplicateDetector {
   async markAsSeenByUrl(url) {
     const normalizedUrl = this._normalizeUrl(url);
     this.urlCache.add(normalizedUrl);
-    await this.storage.addUrl(normalizedUrl);
+
+    // Store to persistent storage only if available
+    if (!this.persistentStorageDisabled && this.storage) {
+      await this.storage.addUrl(normalizedUrl);
+    }
 
     // Also update legacy compatibility sets
     const videoMatches = [...url.matchAll(videoUrlRegex)];
@@ -413,15 +434,14 @@ export class DuplicateDetector {
           const videoMatches = [...(message.content || '').matchAll(videoUrlRegex)];
           for (const match of videoMatches) {
             const videoId = match[1];
-            if (videoId) {
+            const videoUrl = match[0];
+            if (videoId && videoUrl) {
               results.videoIdsFound.push(videoId);
-              if (!this.knownVideoIds.has(videoId)) {
-                this.knownVideoIds.add(videoId);
+              // Use modern duplicate detection system instead of legacy Sets
+              if (!(await this.isDuplicateByUrl(videoUrl))) {
+                await this.markAsSeenByUrl(videoUrl);
                 results.videoIdsAdded++;
               }
-              // Also add to URL cache for consistent duplicate checking
-              const normalizedUrl = this._normalizeUrl(match[0]);
-              this.urlCache.add(normalizedUrl);
             }
           }
           messagesProcessed++;
@@ -486,15 +506,14 @@ export class DuplicateDetector {
           const tweetMatches = [...(message.content || '').matchAll(tweetUrlRegex)];
           for (const match of tweetMatches) {
             const tweetId = match[1];
-            if (tweetId) {
+            const tweetUrl = match[0];
+            if (tweetId && tweetUrl) {
               results.tweetIdsFound.push(tweetId);
-              if (!this.knownTweetIds.has(tweetId)) {
-                this.knownTweetIds.add(tweetId);
+              // Use modern duplicate detection system instead of legacy Sets
+              if (!(await this.isDuplicateByUrl(tweetUrl))) {
+                await this.markAsSeenByUrl(tweetUrl);
                 results.tweetIdsAdded++;
               }
-              // Also add to URL cache for consistent duplicate checking
-              const normalizedUrl = this._normalizeUrl(match[0]);
-              this.urlCache.add(normalizedUrl);
             }
           }
           messagesProcessed++;

@@ -16,7 +16,7 @@ export default {
   collectCoverage: false,
 
   // Shorter timeout for faster feedback
-  testTimeout: 10000,
+  testTimeout: 5000,
 
   // Watch mode optimizations
   watchman: true,
@@ -28,8 +28,8 @@ export default {
     '<rootDir>/logs/',
   ],
 
-  // Only run tests related to changed files
-  onlyChanged: true,
+  // Only run tests related to changed files (use --onlyChanged flag instead)
+  // onlyChanged: true,
 
   // Clear terminal on each run
   clearMocks: true,

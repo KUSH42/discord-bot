@@ -14,6 +14,7 @@ import { StateManager } from '../infrastructure/state-manager.js';
 import { PersistentStorage } from '../infrastructure/persistent-storage.js';
 import { DebugFlagManager } from '../infrastructure/debug-flag-manager.js';
 import { MetricsManager } from '../infrastructure/metrics-manager.js';
+import { MemoryMonitor } from '../infrastructure/memory-monitor.js';
 
 // Core Logic
 import { DuplicateDetector } from '../duplicate-detector.js';
@@ -36,14 +37,17 @@ import { LivestreamStateMachine } from '../core/livestream-state-machine.js';
 import { YouTubeScraperService } from '../services/implementations/youtube-scraper-service.js';
 
 // Applications
-import { AuthManager } from '../application/auth-manager.js';
+import { XAuthManager } from '../application/x-auth-manager.js';
+import { YouTubeAuthManager } from '../application/youtube-auth-manager.js';
 import { BotApplication } from '../application/bot-application.js';
 import { ScraperApplication } from '../application/scraper-application.js';
 import { MonitorApplication } from '../application/monitor-application.js';
 
 // Utils
-import { DiscordTransport, LoggerUtils } from '../logger-utils.js';
-const { createConsoleLogFormat, createFileLogFormat } = LoggerUtils;
+import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../logger-utils.js';
+import { ProcessCleanup } from '../utilities/process-cleanup.js';
+import { CrashDetector } from '../utilities/crash-detector.js';
+const { createFileLogFormat, createSystemdSafeConsoleTransport } = LoggerUtils;
 
 /**
  * Set up all production services and dependencies
@@ -114,6 +118,23 @@ async function setupInfrastructureServices(container, config) {
       aggregationWindows: [60, 300, 900, 3600], // 1min, 5min, 15min, 1hour
     });
   });
+
+  // Memory Monitor for memory management and leak detection
+  // ✅ FIX: Increased memory limits to reasonable values for browser automation
+  container.registerSingleton('memoryMonitor', c => {
+    return new MemoryMonitor({
+      logger: c.resolve('logger').child({ service: 'MemoryMonitor' }),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+      config: {
+        maxMemoryMB: parseInt(process.env.MEMORY_MAX_MB, 10) || 3072, // 3GB (was 1GB) - browser automation needs more memory
+        warningThresholdMB: parseInt(process.env.MEMORY_WARNING_MB, 10) || 2048, // 2GB (was 768MB) - warning at 2GB
+        gcThresholdMB: parseInt(process.env.MEMORY_GC_MB, 10) || 1536, // 1.5GB (was 512MB) - GC at 1.5GB
+        checkIntervalMs: 30000, // 30 seconds
+        samplesRetention: 100,
+      },
+    });
+  });
 }
 
 /**
@@ -155,7 +176,7 @@ async function setupExternalServices(container, config) {
     return new FetchHttpService({
       timeout: 30000,
       headers: {
-        'User-Agent': 'Discord-YouTube-Bot/1.0',
+        'User-Agent': 'discord-youtube-bot/1.0',
       },
     });
   });
@@ -172,9 +193,22 @@ async function setupExternalServices(container, config) {
     return app;
   });
 
-  // Browser Service
-  container.registerSingleton('browserService', () => {
-    return new PlaywrightBrowserService();
+  // X scraper browser service - dedicated singleton for X scraping
+  container.registerSingleton('xBrowserService', c => {
+    return new PlaywrightBrowserService(
+      c.resolve('logger').child({ service: 'XBrowserService' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
+    );
+  });
+
+  // YouTube scraper browser service - dedicated singleton for YouTube scraping
+  container.registerSingleton('youtubeBrowserService', c => {
+    return new PlaywrightBrowserService(
+      c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
+    );
   });
 }
 
@@ -189,13 +223,14 @@ async function setupCoreServices(container, _config) {
       c.resolve('stateManager'),
       c.resolve('debugFlagManager'),
       c.resolve('metricsManager'),
-      c.resolve('logger').child({ service: 'CommandProcessor' })
+      c.resolve('logger').child({ service: 'CommandProcessor' }),
+      c.resolve('memoryMonitor')
     );
   });
 
   // Content Classifier
-  container.registerSingleton('contentClassifier', () => {
-    return new ContentClassifier();
+  container.registerSingleton('contentClassifier', c => {
+    return new ContentClassifier(c.resolve('logger'), c.resolve('debugFlagManager'), c.resolve('metricsManager'));
   });
 
   // Content Announcer
@@ -210,10 +245,10 @@ async function setupCoreServices(container, _config) {
     );
   });
 
-  // Duplicate Detector
+  // Duplicate Detector - with persistent storage disabled to avoid JSON corruption
   container.registerSingleton('duplicateDetector', c => {
     return new DuplicateDetector(
-      c.resolve('persistentStorage'),
+      null, // Disable persistent storage - rely only on Discord history and in-memory caches
       c.resolve('logger').child({ service: 'DuplicateDetector' })
     );
   });
@@ -233,8 +268,12 @@ async function setupCoreServices(container, _config) {
       c.resolve('contentStateManager'),
       c.resolve('contentAnnouncer'),
       c.resolve('duplicateDetector'),
+      c.resolve('contentClassifier'),
       c.resolve('logger').child({ service: 'ContentCoordinator' }),
-      c.resolve('config')
+      c.resolve('config'),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager'),
+      c.resolve('discordService')
     );
   });
 
@@ -269,13 +308,25 @@ async function setupApplicationServices(container, _config) {
     });
   });
 
-  // Auth Manager
-  container.registerSingleton('authManager', c => {
-    return new AuthManager({
-      browserService: c.resolve('browserService'),
+  // X Auth Manager
+  container.registerSingleton('xAuthManager', c => {
+    return new XAuthManager({
+      browserService: c.resolve('xBrowserService'),
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
-      logger: c.resolve('logger').child({ service: 'AuthManager' }),
+      logger: c.resolve('logger').child({ service: 'XAuthManager' }),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
+  });
+
+  // YouTube Auth Manager
+  container.registerSingleton('youtubeAuthManager', c => {
+    return new YouTubeAuthManager({
+      browserService: c.resolve('youtubeBrowserService'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      logger: c.resolve('logger').child({ service: 'YouTubeAuthManager' }),
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
     });
@@ -284,15 +335,15 @@ async function setupApplicationServices(container, _config) {
   // Scraper Application (X/Twitter monitoring)
   container.registerSingleton('scraperApplication', c => {
     return new ScraperApplication({
-      browserService: c.resolve('browserService'),
+      browserService: c.resolve('xBrowserService'),
+      contentCoordinator: c.resolve('contentCoordinator'),
       contentClassifier: c.resolve('contentClassifier'),
       discordService: c.resolve('discordService'),
-      contentAnnouncer: c.resolve('contentAnnouncer'),
       config: c.resolve('config'),
       stateManager: c.resolve('stateManager'),
       eventBus: c.resolve('eventBus'),
       logger: c.resolve('logger').child({ service: 'ScraperApplication' }),
-      authManager: c.resolve('authManager'),
+      xAuthManager: c.resolve('xAuthManager'),
       duplicateDetector: c.resolve('duplicateDetector'),
       persistentStorage: c.resolve('persistentStorage'),
       debugManager: c.resolve('debugFlagManager'),
@@ -329,6 +380,10 @@ async function setupApplicationServices(container, _config) {
       contentCoordinator: c.resolve('contentCoordinator'),
       debugManager: c.resolve('debugFlagManager'),
       metricsManager: c.resolve('metricsManager'),
+      browserService: c.resolve('youtubeBrowserService'),
+      youtubeAuthManager: c.resolve('youtubeAuthManager'),
+      stateManager: c.resolve('stateManager'),
+      memoryMonitor: c.resolve('memoryMonitor'),
     });
   });
 }
@@ -343,12 +398,10 @@ async function setupLogging(container, config) {
 
     // Create transports
     const transports = [
-      // Console transport
-      new winston.transports.Console({
+      // Systemd-safe console transport that handles EPIPE errors gracefully
+      LoggerUtils.createSystemdSafeConsoleTransport({
         level: logLevel,
-        format: createConsoleLogFormat(),
       }),
-
       // File transport with rotation
       new winston.transports.DailyRotateFile({
         level: logLevel,
@@ -367,6 +420,14 @@ async function setupLogging(container, config) {
       format: winston.format.combine(winston.format.timestamp(), winston.format.errors({ stack: true })),
       transports,
     });
+  });
+
+  // Setup crash detection system immediately after logger
+  container.registerSingleton('crashDetector', c => {
+    const logger = c.resolve('logger');
+    const crashDetector = new CrashDetector(logger);
+    crashDetector.setup();
+    return crashDetector;
   });
 }
 
@@ -389,7 +450,7 @@ async function setupDiscordLogging(container, config) {
       level: config.get('LOG_LEVEL', 'info'), // Only log warnings, errors, and above to Discord
       client: discordService.client,
       channelId: supportChannelId,
-      debugFlagManager,
+      debugManager: debugFlagManager,
       metricsManager,
       flushInterval: 1000, // 1 second to match send delay
       maxBufferSize: 20, // Match burst allowance
@@ -517,59 +578,159 @@ export function setupWebhookEndpoints(app, container) {
  */
 export function createShutdownHandler(container) {
   return async signal => {
-    const logger = container.resolve('logger');
-    logger.info(`Received ${signal}, starting graceful shutdown...`);
-
+    let logger;
     let hasError = false;
 
+    // Safe logging function that won't cause EPIPE cascades
+    const safeLog = (level, message, ...args) => {
+      try {
+        if (logger) {
+          logger[level](message, ...args);
+        } else {
+          console.log(`[${level.toUpperCase()}]: ${message}`, ...args);
+        }
+      } catch (_error) {
+        // If logging fails (EPIPE), use stderr directly
+        try {
+          process.stderr.write(`[${level.toUpperCase()}]: ${message}\n`);
+        } catch (_fallbackError) {
+          // Can't log - just continue with shutdown
+        }
+      }
+    };
+
     try {
-      // Stop applications
+      logger = container.resolve('logger');
+    } catch (error) {
+      // Logger might not be available during certain error conditions
+    }
+
+    safeLog('info', `Received ${signal}, starting graceful shutdown...`);
+
+    try {
+      // Stop applications with timeout to prevent hanging
+      const shutdownTimeout = 30000; // 30 seconds total timeout
+      const appTimeout = 8000; // 8 seconds per application
+
       const botApp = container.resolve('botApplication');
       const scraperApp = container.resolve('scraperApplication');
       const monitorApp = container.resolve('monitorApplication');
 
-      // Stop applications individually to handle failures gracefully
+      // Stop applications individually with timeouts
       try {
-        await botApp.stop();
+        await Promise.race([
+          botApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Bot stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Bot application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping bot application:', error);
+        safeLog('warn', 'Error stopping bot application:', error.message);
         hasError = true;
       }
 
       try {
-        await scraperApp.stop();
+        await Promise.race([
+          scraperApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Scraper stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Scraper application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping scraper application:', error);
+        safeLog('warn', 'Error stopping scraper application:', error.message);
         hasError = true;
       }
 
       try {
-        await monitorApp.stop();
+        await Promise.race([
+          monitorApp.stop(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Monitor stop timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Monitor application stopped successfully');
       } catch (error) {
-        logger.error('Error stopping monitor application:', error);
+        safeLog('warn', 'Error stopping monitor application:', error.message);
         hasError = true;
       }
 
-      // Dispose of container resources
+      // Explicitly dispose browser services first
       try {
-        await container.dispose();
+        const xBrowserService = container.resolve('xBrowserService');
+        const youtubeBrowserService = container.resolve('youtubeBrowserService');
+
+        safeLog('info', 'Disposing browser services...');
+        await Promise.race([
+          Promise.all([xBrowserService.dispose(), youtubeBrowserService.dispose()]),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Browser dispose timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Browser services disposed successfully');
       } catch (error) {
-        logger.error('Error disposing container:', error);
+        safeLog('warn', 'Error disposing browser services:', error.message);
         hasError = true;
       }
 
-      if (hasError) {
-        logger.error('Graceful shutdown completed with errors');
-        process.exit(1);
-        return; // For test compatibility when process.exit is mocked
+      // Dispose of container resources with timeout
+      try {
+        await Promise.race([
+          container.dispose(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Container dispose timeout')), appTimeout)),
+        ]);
+        safeLog('info', 'Container disposed successfully');
+      } catch (error) {
+        safeLog('warn', 'Error disposing container:', error.message);
+        hasError = true;
+      }
+
+      // Clean up zombie browser processes
+      try {
+        const logger = container.resolve('logger');
+        const processCleanup = new ProcessCleanup(logger);
+        await processCleanup.killZombieBrowsers();
+        safeLog('info', 'Zombie browser cleanup completed');
+      } catch (error) {
+        safeLog('warn', 'Could not cleanup zombie browsers:', error.message);
+      }
+
+      // Clean up lockfile if it exists
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const lockFile = path.join(process.cwd(), '.bot-running.lock');
+        if (fs.existsSync(lockFile)) {
+          fs.unlinkSync(lockFile);
+          safeLog('info', 'Removed process lockfile');
+        }
+      } catch (error) {
+        safeLog('warn', 'Could not remove lockfile:', error.message);
+      }
+
+      // Choose exit code based on signal type and errors
+      let exitCode = 0;
+
+      if (signal === 'uncaughtException' || signal === 'unhandledRejection') {
+        // For error-triggered shutdowns, use exit code 1 only if it's not EPIPE-related
+        exitCode = hasError ? 1 : 0;
+        safeLog('info', `Shutdown triggered by ${signal}, exit code: ${exitCode}`);
+      } else if (hasError) {
+        // For signal-triggered shutdowns with errors, still use exit code 0 for systemd restart
+        safeLog('warn', 'Graceful shutdown completed with non-critical errors, allowing restart');
+        exitCode = 0;
       } else {
-        logger.info('Graceful shutdown completed');
-        process.exit(0);
-        return; // For test compatibility when process.exit is mocked
+        safeLog('info', 'Graceful shutdown completed successfully');
+        exitCode = 0;
       }
+
+      // Small delay to allow final log writes
+      setTimeout(() => {
+        process.exit(exitCode);
+      }, 100);
+
+      return; // For test compatibility when process.exit is mocked
     } catch (error) {
-      logger.error('Error during shutdown:', error);
-      process.exit(1);
+      safeLog('error', 'Critical error during shutdown:', error.message);
+
+      // For critical shutdown errors, still try to exit gracefully for systemd
+      setTimeout(() => {
+        process.exit(0); // Use exit code 0 to allow systemd restart
+      }, 100);
+
       return; // For test compatibility when process.exit is mocked
     }
   };

@@ -1,15 +1,20 @@
 import { chromium } from 'playwright';
 import { BrowserService } from '../interfaces/browser-service.js';
+import { createEnhancedLogger } from '../../utilities/enhanced-logger.js';
 
 /**
  * Playwright-based browser service implementation
  * Provides browser automation capabilities using Playwright
  */
 export class PlaywrightBrowserService extends BrowserService {
-  constructor() {
+  constructor(baseLogger, debugManager, metricsManager) {
     super();
     this.browser = null;
     this.page = null;
+    this.isClosing = false; // Prevent multiple close operations
+
+    // Create enhanced logger for browser operations
+    this.logger = createEnhancedLogger('browser', baseLogger, debugManager, metricsManager);
   }
 
   /**
@@ -18,12 +23,53 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async launch(options = {}) {
-    if (this.browser) {
+    // Check if browser is actually running and connected
+    if (this.browser && this.browser.isConnected()) {
       throw new Error('Browser is already running');
     }
 
-    this.browser = await chromium.launch(options);
-    this.page = await this.browser.newPage();
+    // Clean up any disconnected browser references
+    if (this.browser && !this.browser.isConnected()) {
+      this.browser = null;
+      this.page = null;
+    }
+
+    const operation = this.logger.startOperation('launchBrowser', { options });
+
+    try {
+      operation.progress(`Launching browser with options: ${JSON.stringify(options, null, 1).replace(/\n/g, '')}`);
+      this.browser = await chromium.launch(options);
+      operation.progress(`Browser launched: ${!!this.browser}, Connected: ${this.browser?.isConnected()}`);
+
+      // Setup browser crash monitoring
+      this.setupBrowserMonitoring();
+
+      this.page = await this.browser.newPage();
+      operation.progress(`Page created: ${!!this.page}, Closed: ${this.page?.isClosed()}`);
+
+      // Setup page crash monitoring
+      this.setupPageMonitoring();
+
+      // Verify browser and page are ready
+      if (!this.browser || !this.page) {
+        const error = new Error('Failed to initialize browser or page after launch');
+        operation.error(error, 'Browser or page initialization failed', { browser: !!this.browser, page: !!this.page });
+        throw error;
+      }
+
+      operation.success('Browser and page launched successfully');
+    } catch (error) {
+      operation.error(error, 'Browser launch failed');
+      throw error;
+    }
+
+    if (!this.browser.isConnected()) {
+      throw new Error('Browser launched but not connected');
+    }
+
+    if (this.page.isClosed()) {
+      throw new Error('Page was closed immediately after creation');
+    }
   }
 
   /**
@@ -45,10 +91,19 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<Object>} Response object
    */
   async goto(url, options = {}, retries = 3) {
+    const operation = this.logger.startOperation('goto', { url, retries });
+
+    operation.progress(`Navigating to URL: ${url}`);
+    operation.progress(
+      `Browser state: browser=${!!this.browser}, page=${!!this.page}, browserConnected=${this.browser?.isConnected?.()}, pageClosed=${this.page?.isClosed?.()}`
+    );
+
     for (let i = 0; i < retries; i++) {
       // Validate browser state before each attempt
       if (!this.browser || !this.page) {
-        throw new Error('Browser or page not available');
+        const error = new Error(`Browser or page not available: browser=${!!this.browser}, page=${!!this.page}`);
+        operation.error(error, 'Browser or page not available');
+        throw error;
       }
 
       // Check if browser is still connected
@@ -62,7 +117,9 @@ export class PlaywrightBrowserService extends BrowserService {
       }
 
       try {
-        return await this.page.goto(url, options);
+        const result = await this.page.goto(url, options);
+        operation.success(`Successfully navigated to ${url}`);
+        return result;
       } catch (error) {
         // Check if error is due to closed browser/page - don't retry these
         if (
@@ -70,13 +127,16 @@ export class PlaywrightBrowserService extends BrowserService {
           error.message.includes('Browser connection lost') ||
           error.message.includes('Page has been closed')
         ) {
+          operation.error(error, 'Navigation failed due to browser connection loss');
           throw error;
         }
 
         if (i < retries - 1) {
+          operation.progress(`Navigation attempt ${i + 1} failed, retrying: ${error.message}`);
           // Use setTimeout instead of page.waitForTimeout to avoid using potentially closed page
           await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
         } else {
+          operation.error(error, `Navigation failed after ${retries} attempts`);
           throw error;
         }
       }
@@ -105,7 +165,9 @@ export class PlaywrightBrowserService extends BrowserService {
     if (!this.page) {
       throw new Error('No page available');
     }
-    return await this.page.waitForNavigation(options);
+    // Use waitForLoadState instead of deprecated waitForNavigation
+    await this.page.waitForLoadState(options.waitUntil || 'domcontentloaded', { timeout: options.timeout });
+    return null; // waitForNavigation returned response, but waitForLoadState doesn't
   }
 
   /**
@@ -118,7 +180,21 @@ export class PlaywrightBrowserService extends BrowserService {
     if (!this.page) {
       throw new Error('No page available');
     }
-    return await this.page.evaluate(script, ...args);
+
+    // Check if page is closed before attempting evaluation
+    if (this.page.isClosed()) {
+      throw new Error('Page is closed');
+    }
+
+    try {
+      return await this.page.evaluate(script, ...args);
+    } catch (error) {
+      // Provide more context for common navigation-related errors
+      if (error.message.includes('Execution context was destroyed')) {
+        throw new Error(`Execution context was destroyed (likely due to navigation): ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -210,17 +286,36 @@ export class PlaywrightBrowserService extends BrowserService {
   }
 
   /**
+   * Clear all cookies from the browser context
+   * @returns {Promise<void>}
+   */
+  async clearCookies() {
+    if (!this.page) {
+      throw new Error('No page available');
+    }
+    await this.page.context().clearCookies();
+  }
+
+  /**
    * Set user agent
    * @param {string} userAgent - User agent string
    * @returns {Promise<void>}
    */
   async setUserAgent(userAgent) {
+    const operation = this.logger.startOperation('setUserAgent', { userAgent });
+
+    operation.progress(`Setting user agent: ${userAgent}`);
     if (!this.page) {
-      throw new Error('No page available');
+      const error = new Error('No page available');
+      operation.error(error, 'No page available for setUserAgent');
+      throw error;
     }
+
+    operation.progress('Page available, setting headers...');
     await this.page.setExtraHTTPHeaders({
       'User-Agent': userAgent,
     });
+    operation.success('User agent set successfully');
   }
 
   /**
@@ -270,6 +365,14 @@ export class PlaywrightBrowserService extends BrowserService {
   }
 
   /**
+   * Get current page URL (alias for getCurrentUrl)
+   * @returns {Promise<string>} Current URL
+   */
+  async getUrl() {
+    return await this.getCurrentUrl();
+  }
+
+  /**
    * Check if element exists
    * @param {string} selector - CSS selector
    * @returns {Promise<boolean>} True if element exists
@@ -314,13 +417,52 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {Promise<void>}
    */
   async close() {
-    if (this.page) {
-      await this.page.close();
-      this.page = null;
+    // Prevent multiple concurrent close operations
+    if (this.isClosing) {
+      this.logger.debug('Browser close already in progress, skipping');
+      return;
     }
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
+
+    this.isClosing = true;
+
+    try {
+      // Close page first, with error handling for disconnected state
+      if (this.page) {
+        try {
+          if (!this.page.isClosed()) {
+            await this.page.close();
+          }
+        } catch (error) {
+          // Ignore errors when page is already closed or disconnected
+          if (
+            !error.message.includes('Target page, context or browser has been closed') &&
+            !error.message.includes('Browser connection lost')
+          ) {
+            throw error;
+          }
+        }
+        this.page = null;
+      }
+
+      // Close browser with error handling for disconnected state
+      if (this.browser) {
+        try {
+          if (this.browser.isConnected()) {
+            await this.browser.close();
+          }
+        } catch (error) {
+          // Ignore errors when browser is already closed or disconnected
+          if (
+            !error.message.includes('Target page, context or browser has been closed') &&
+            !error.message.includes('Browser connection lost')
+          ) {
+            throw error;
+          }
+        }
+        this.browser = null;
+      }
+    } finally {
+      this.isClosing = false;
     }
   }
 
@@ -329,7 +471,50 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {boolean} True if browser is running
    */
   isRunning() {
-    return this.browser !== null;
+    return this.browser !== null && this.browser.isConnected();
+  }
+
+  /**
+   * Check if browser is connected
+   * @returns {boolean} True if browser is connected
+   */
+  isConnected() {
+    return this.browser !== null && this.browser.isConnected();
+  }
+
+  /**
+   * Check if browser is closed
+   * @returns {boolean} True if browser is closed
+   */
+  isClosed() {
+    return this.browser === null || !this.browser.isConnected();
+  }
+
+  /**
+   * Wait for a function to return truthy value
+   * @param {Function} fn - Function to evaluate in page context
+   * @param {Object} options - Wait options
+   * @returns {Promise<*>} Function result
+   */
+  async waitForFunction(fn, options = {}) {
+    if (!this.page) {
+      throw new Error('No page available');
+    }
+
+    // Check if page is closed before attempting wait
+    if (this.page.isClosed()) {
+      throw new Error('Page is closed');
+    }
+
+    try {
+      return await this.page.waitForFunction(fn, options);
+    } catch (error) {
+      // Provide more context for common navigation-related errors
+      if (error.message.includes('Execution context was destroyed')) {
+        throw new Error(`Execution context was destroyed (likely due to navigation): ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -342,5 +527,102 @@ export class PlaywrightBrowserService extends BrowserService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Dispose of resources (for dependency container cleanup)
+   * @returns {Promise<void>}
+   */
+  async dispose() {
+    const operation = this.logger.startOperation('dispose', {
+      browserRunning: this.isRunning(),
+      pageAvailable: !!this.page,
+    });
+
+    try {
+      operation.progress('Disposing browser service resources');
+      await this.close();
+      operation.success('Browser service disposed successfully');
+    } catch (error) {
+      operation.error(error, 'Failed to dispose browser service');
+      throw error;
+    }
+  }
+
+  /**
+   * Setup browser process monitoring for crash detection
+   * @private
+   */
+  setupBrowserMonitoring() {
+    if (!this.browser) {
+      return;
+    }
+
+    // Monitor browser disconnections
+    this.browser.on('disconnected', () => {
+      this.logger.error('🚨 BROWSER CRASHED: Browser process disconnected unexpectedly', {
+        timestamp: new Date().toISOString(),
+        browserConnected: this.browser?.isConnected(),
+        pageExists: !!this.page,
+        pageClosed: this.page?.isClosed(),
+      });
+
+      // Clean up references
+      this.browser = null;
+      this.page = null;
+    });
+
+    this.logger.debug('Browser crash monitoring enabled');
+  }
+
+  /**
+   * Setup page monitoring for crash detection
+   * @private
+   */
+  setupPageMonitoring() {
+    if (!this.page) {
+      return;
+    }
+
+    // Monitor page crashes
+    this.page.on('crash', () => {
+      this.logger.error('🚨 PAGE CRASHED: Page process crashed unexpectedly', {
+        timestamp: new Date().toISOString(),
+        browserConnected: this.browser?.isConnected(),
+        pageExists: !!this.page,
+      });
+    });
+
+    // Monitor page close events (might indicate unexpected closure)
+    this.page.on('close', () => {
+      if (!this.isClosing) {
+        this.logger.warn('⚠️ PAGE CLOSED: Page closed unexpectedly (not during shutdown)', {
+          timestamp: new Date().toISOString(),
+          browserConnected: this.browser?.isConnected(),
+          isClosing: this.isClosing,
+        });
+      }
+    });
+
+    // Monitor console errors from the page
+    this.page.on('console', msg => {
+      if (msg.type() === 'error') {
+        this.logger.warn('🔍 PAGE CONSOLE ERROR:', {
+          message: msg.text(),
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // Monitor page errors
+    this.page.on('pageerror', error => {
+      this.logger.error('🚨 PAGE ERROR: JavaScript error on page', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    this.logger.debug('Page crash monitoring enabled');
   }
 }

@@ -45,7 +45,7 @@ Our testing strategy is guided by the following core principles:
 **Major fixes completed in 2025-07-21:**
 
 - **Timer Testing Resolution:** Implemented reliable patterns for testing async
-  timer-dependent code (see `tests/TIMER-TESTING-GUIDE.md`)
+  timer-dependent code (see `tests/TESTING.md`)
 - **Enhanced Duplicate Detection:** Complete test coverage for content
   fingerprinting and persistent storage integration
 - **YouTube Scraper Updates:** Updated tests for new architecture with content
@@ -91,6 +91,8 @@ Our testing strategy is guided by the following core principles:
   automation security
 - **Discord Integration Testing**: Full coverage of Discord bot commands,
   message processing, rate limiting integration, and health monitoring
+
+📚 **Quick Start Guide**: See `tests/TESTING.md` for practical testing patterns and utilities.
 
 For detailed information on recent fixes, see
 `docs/TEST-INFRASTRUCTURE-FIXES.md` and
@@ -572,7 +574,7 @@ beforeEach(() => {
   - **Critical Components:** 85-90% for well-tested modules
 - **Reporting:**
   - **Code Coverage:** Coverage is collected using Jest's `--coverage` flag and
-    uploaded to [Codecov](https://app.codecov.io/gh/KUSH42/discord-youtube-bot).
+    uploaded to [Codecov](https://app.codecov.io/gh/KUSH42/discord-bot).
     Merged reports are generated in CI.
   - **Test Results:** Test results and artifacts are uploaded to GitHub Actions
     for each run.
@@ -771,7 +773,7 @@ The test suite includes several performance optimizations:
 - **Performance Optimization:** Analyze test runtimes and suggest optimizations
   using the available performance configurations.
 - **CI Optimization:** Propose improvements to the GitHub Actions workflow
-  (`.github/workflows/test.yml`) for speed, efficiency, or robustness.
+  (`.github/workflows/ci.yml`) for speed, efficiency, or robustness.
 - **Code Generation:** Generate new test files and test cases, strictly adhering
   to the conventions defined in this document.
 - **Configuration Management:** Utilize appropriate Jest configurations (main,

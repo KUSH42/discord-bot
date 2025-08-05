@@ -1,4 +1,4 @@
-// index.js - Modern Discord YouTube Bot Entry Point
+// index.js - Modern Discord Bot Entry Point
 // © 2025 Marco Keller. All rights reserved. This software and its content are proprietary and confidential. Unauthorized reproduction or distribution is strictly prohibited.
 
 import { config } from '@dotenvx/dotenvx';
@@ -16,6 +16,103 @@ import { setupProductionServices, setupWebhookEndpoints, createShutdownHandler }
 // Load environment variables with encryption support
 config();
 
+let logger;
+
+/**
+ * Check if error is a write error (EPIPE, ECONNRESET, etc.)
+ */
+function isWriteError(error) {
+  if (!error) {
+    return false;
+  }
+  const writeErrorCodes = ['EPIPE', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'];
+  return writeErrorCodes.includes(error.code) || (error.message && error.message.includes('write EPIPE'));
+}
+
+/**
+ * Safe console logging that won't throw EPIPE errors
+ */
+function safeConsoleLog(message, ...args) {
+  try {
+    console.log(message, ...args);
+  } catch (_error) {
+    // If console.log fails, try stderr, then give up silently
+    try {
+      process.stderr.write(`${message}\n`);
+    } catch (_fallbackError) {
+      // Can't log - just give up silently
+    }
+  }
+}
+
+/**
+ * Check for existing bot instances to prevent conflicts
+ */
+async function checkForExistingInstances() {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    const lockFile = path.join(process.cwd(), '.bot-running.lock');
+
+    // Check for lockfile
+    if (fs.existsSync(lockFile)) {
+      try {
+        const lockContent = fs.readFileSync(lockFile, 'utf8');
+        const lockPid = parseInt(lockContent.trim(), 10);
+
+        // Check if the PID is still running
+        try {
+          process.kill(lockPid, 0); // Signal 0 checks if process exists
+          safeConsoleLog('❌ Found lockfile with active PID:', lockPid);
+          safeConsoleLog('   Kill existing instance with: kill', lockPid);
+          safeConsoleLog('   Or remove stale lockfile with: rm .bot-running.lock');
+          process.exit(1);
+        } catch (_error) {
+          // Process doesn't exist, remove stale lockfile
+          safeConsoleLog('🧹 Removing stale lockfile from PID:', lockPid);
+          fs.unlinkSync(lockFile);
+        }
+      } catch (_error) {
+        // Corrupted lockfile, remove it
+        safeConsoleLog('🧹 Removing corrupted lockfile');
+        fs.unlinkSync(lockFile);
+      }
+    }
+
+    // Check for existing node processes running index.js (excluding current process)
+    if (process.env.SKIP_INSTANCE_CHECK === 'true') {
+      safeConsoleLog('⚠️ Skipping instance check (SKIP_INSTANCE_CHECK=true)');
+    } else {
+      const { stdout } = await execAsync(`pgrep -f "node.*index\\.js" | grep -v ${process.pid} || true`);
+
+      if (stdout.trim()) {
+        const existingPids = stdout
+          .trim()
+          .split('\n')
+          .filter(pid => pid.trim());
+        if (existingPids.length > 0) {
+          safeConsoleLog('❌ Found existing bot instance(s) running:');
+          safeConsoleLog(`   PIDs: ${existingPids.join(', ')}`);
+          safeConsoleLog('   Kill existing instances with: pkill -f "node.*index\\.js"');
+          safeConsoleLog('   Or use the restart command in Discord: !restart');
+          process.exit(1);
+        }
+      }
+    }
+
+    // Create lockfile for this instance
+    fs.writeFileSync(lockFile, process.pid.toString());
+    safeConsoleLog('🔒 Created process lockfile with PID:', process.pid);
+  } catch (error) {
+    // If process check fails, log warning but continue (process might not have pgrep)
+    safeConsoleLog('⚠️  Could not chescraperck for existing bot instances:', error.message);
+  }
+}
+
 /**
  * Main application entry point
  * WARNING: This starts real production applications with infinite background processes
@@ -26,12 +123,16 @@ async function startBot() {
   if (process.env.NODE_ENV === 'test') {
     throw new Error('startBot() should not be called in test environment - it starts infinite background processes');
   }
+
+  // Check for existing bot processes to prevent zombie instances
+  await checkForExistingInstances();
+
   let container;
   try {
     const configuration = new Configuration();
     container = new DependencyContainer();
     await setupProductionServices(container, configuration);
-    const logger = container.resolve('logger');
+    logger = container.resolve('logger');
     logger.info('🚀 Starting Discord YouTube Bot...');
     const { hasErrors } = await startApplications(container, configuration);
     await startWebServer(container, configuration);
@@ -41,7 +142,7 @@ async function startBot() {
     const eventBus = container.resolve('eventBus');
     const contentStateManager = container.resolve('contentStateManager');
 
-    eventBus.on('bot.initialization.complete', event => {
+    eventBus.on('bot.initialization.complete', async event => {
       logger.info('Bot initialization complete - enabling comprehensive content evaluation logging', {
         timestamp: event.timestamp,
         historyScanned: event.historyScanned,
@@ -49,6 +150,35 @@ async function startBot() {
       });
 
       contentStateManager.markFullyInitialized();
+
+      // Initialize Discord channel scanning for ContentCoordinator duplicate detection
+      try {
+        const contentCoordinator = container.resolve('contentCoordinator');
+        const discordService = container.resolve('discordService');
+        const config = container.resolve('config');
+
+        logger.info('Starting ContentCoordinator Discord channel scanning for race condition prevention');
+        const scanResults = await contentCoordinator.initializeDiscordChannelScanning(discordService, config);
+
+        if (scanResults.scanned) {
+          logger.info('ContentCoordinator Discord channel scanning completed successfully', {
+            totalScanned: scanResults.results.totalScanned,
+            totalAdded: scanResults.results.totalAdded,
+            youtubeResults: scanResults.results.youtube,
+            xResults: scanResults.results.x,
+          });
+        } else {
+          logger.info('ContentCoordinator Discord channel scanning skipped', {
+            reason: scanResults.reason,
+          });
+        }
+      } catch (scanError) {
+        logger.error('ContentCoordinator Discord channel scanning failed, continuing without it', {
+          error: scanError.message,
+          stack: scanError.stack,
+        });
+        // Don't exit - continue without Discord scanning
+      }
     });
 
     if (hasErrors) {
@@ -81,9 +211,10 @@ async function main() {
   let restartUnsubscribe;
   try {
     container = await startBot();
+    const logger = container.resolve('logger');
+    logger.info('Created new container...');
     const eventBus = container.resolve('eventBus');
     restartUnsubscribe = eventBus.on('bot.request_restart', async () => {
-      const logger = container.resolve('logger');
       logger.info('Restarting bot...');
       // Clean up the restart listener before disposing
       if (restartUnsubscribe) {
@@ -97,10 +228,7 @@ async function main() {
 
       // Add a small delay to ensure Discord client is fully destroyed before creating new one
       logger.info('Waiting for cleanup completion...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      logger.info('Creating new container...');
-      container = await startBot();
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Re-register the restart listener for the new container
       const newEventBus = container.resolve('eventBus');
@@ -140,13 +268,36 @@ async function startApplications(container, config) {
   const logger = container.resolve('logger').child({ service: 'Main' });
   let hasErrors = false;
 
-  // Start Discord Bot
-  const botApp = container.resolve('botApplication');
-  await botApp.start();
+  // Start Discord Bot (includes YouTube Scraper Service)
+  let botAppStart;
+  try {
+    logger.info('Starting Discord Bot Application...');
+    const botApp = container.resolve('botApplication');
+    botAppStart = botApp.start();
+    logger.info('✅ Discord Bot Application started successfully');
+  } catch (error) {
+    hasErrors = true;
+    logger.error('❌ Failed to start Discord Bot Application:', error.message);
+    throw error; // Bot is essential, fail startup if it can't start
+  }
 
   // Start YouTube Monitor
+  let monitorAppStart;
+  logger.info('Starting YouTube Monitor...');
   const monitorApp = container.resolve('monitorApplication');
-  await monitorApp.start();
+  monitorAppStart = monitorApp.start();
+
+  // Start Memory Monitor
+  try {
+    logger.info('Starting Memory Monitor...');
+    const memoryMonitor = container.resolve('memoryMonitor');
+    memoryMonitor.start();
+    logger.info('✅ Memory Monitor started successfully');
+  } catch (error) {
+    hasErrors = true;
+    logger.error('❌ Failed to start Memory Monitor:', error.message);
+    logger.warn('Memory monitoring will be disabled - bot will continue normally');
+  }
 
   // Start X Scraper (if enabled)
   const xUser = config.get('X_USER_HANDLE');
@@ -154,6 +305,7 @@ async function startApplications(container, config) {
     try {
       const scraperApp = container.resolve('scraperApplication');
       await scraperApp.start();
+      logger.info('✅ X Scraper started successfully');
     } catch (error) {
       hasErrors = true;
       logger.error('❌ Failed to start X Scraper application:', error.message);
@@ -162,6 +314,9 @@ async function startApplications(container, config) {
   } else {
     logger.info('X Scraper disabled (no X_USER_HANDLE configured)');
   }
+
+  // Wait for all applications to start
+  await Promise.all([botAppStart, monitorAppStart]);
 
   return { hasErrors };
 }
@@ -172,6 +327,8 @@ async function startApplications(container, config) {
 async function startWebServer(container, config) {
   const logger = container.resolve('logger');
   const app = container.resolve('expressApp');
+  const port = config.get('PSH_PORT', 3000);
+  logger.info(`START 🌐 Web server on port ${port}`);
 
   // Set up rate limiting
   const webhookLimiter = rateLimit({
@@ -213,10 +370,22 @@ async function startWebServer(container, config) {
     res.status(404).json({ error: 'Not Found' });
   });
 
-  // Start server
-  const port = config.get('PSH_PORT', 3000);
+  // Start server with port conflict detection
   const server = app.listen(port, () => {
     logger.info(`🌐 Web server listening on port ${port}`);
+  });
+
+  // Handle port conflicts and other server errors
+  server.on('error', error => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(`❌ Port ${port} is already in use. Another service is running on this port.`);
+      logger.error('Please check for existing bot instances or change PSH_PORT in your .env file');
+      logger.error(`Try: pkill -f "node.*index\\.js" or lsof -i :${port} to identify the conflicting process`);
+      process.exit(1);
+    } else {
+      logger.error(`❌ Server error: ${error.message}`, { error: error.code, port });
+      process.exit(1);
+    }
   });
 
   // Store server reference for graceful shutdown
@@ -235,17 +404,52 @@ function setupGracefulShutdown(container) {
   process.on('SIGUSR1', () => shutdownHandler('SIGUSR1'));
   process.on('SIGUSR2', () => shutdownHandler('SIGUSR2'));
 
-  // Handle uncaught exceptions
+  // Handle uncaught exceptions with EPIPE protection
   process.on('uncaughtException', async error => {
-    const logger = container.resolve('logger');
-    logger.error('Uncaught Exception:', error);
+    // Check if this is an EPIPE error from logging system - don't cascade shutdown
+    if (isWriteError(error)) {
+      // Safe console log without triggering winston
+      safeConsoleLog('INFO: Received uncaughtException, starting graceful shutdown...');
+      try {
+        const logger = container.resolve('logger');
+        // Try to use file logging only for EPIPE errors
+        if (logger._readableState) {
+          // Winston logger - get file transport only
+          const fileTransport = logger.transports.find(t => t.filename);
+          if (fileTransport) {
+            fileTransport.log({ level: 'info', message: 'Received uncaughtException, starting graceful shutdown...' });
+          }
+        }
+      } catch (_logError) {
+        // Ignore logging errors during EPIPE cascade
+      }
+      return; // Don't shutdown for EPIPE errors - they're recoverable
+    }
+
+    // For non-EPIPE errors, proceed with normal error handling
+    try {
+      const logger = container.resolve('logger');
+      logger.error('Uncaught Exception:', error);
+    } catch (_logError) {
+      safeConsoleLog('ERROR: Failed to log uncaught exception:', error);
+    }
     await shutdownHandler('uncaughtException');
   });
 
-  // Handle unhandled promise rejections
+  // Handle unhandled promise rejections with EPIPE protection
   process.on('unhandledRejection', async (reason, promise) => {
-    const logger = container.resolve('logger');
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Check if this is an EPIPE-related rejection
+    if (reason && isWriteError(reason)) {
+      safeConsoleLog('INFO: Ignoring EPIPE-related unhandled rejection');
+      return; // Don't shutdown for EPIPE-related rejections
+    }
+
+    try {
+      const logger = container.resolve('logger');
+      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    } catch (_logError) {
+      safeConsoleLog('ERROR: Failed to log unhandled rejection:', reason);
+    }
     await shutdownHandler('unhandledRejection');
   });
 }

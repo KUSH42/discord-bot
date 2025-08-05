@@ -1,13 +1,14 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { AuthManager } from '../../src/application/auth-manager.js';
+import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { Configuration } from '../../src/infrastructure/configuration.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
-import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
+import { DuplicateDetector } from '../../src/duplicate-detector.js';
 
 describe('Credential Handling Security Tests', () => {
   let authManager;
   let configuration;
   let stateManager;
+  let duplicateDetector;
   let mockBrowser;
   let mockLogger;
   let mockDebugManager;
@@ -30,12 +31,6 @@ describe('Credential Handling Security Tests', () => {
       PSH_SECRET: 'test_psh_secret_456',
     };
 
-    // Create enhanced logging mocks
-    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
-    mockLogger = enhancedLoggingMocks.logger;
-    mockDebugManager = enhancedLoggingMocks.debugManager;
-    mockMetricsManager = enhancedLoggingMocks.metricsManager;
-
     mockBrowser = {
       setCookies: jest.fn().mockResolvedValue(),
       getCookies: jest.fn().mockResolvedValue([
@@ -52,10 +47,40 @@ describe('Credential Handling Security Tests', () => {
       },
     };
 
+    // Enhanced logging mock setup - using the proper pattern from CLAUDE.md
+    mockDebugManager = {
+      isEnabled: jest.fn(() => false),
+      getLevel: jest.fn(() => 1),
+      toggleFlag: jest.fn(),
+      setLevel: jest.fn(),
+    };
+
+    mockMetricsManager = {
+      recordMetric: jest.fn(),
+      startTimer: jest.fn(() => ({ end: jest.fn() })),
+      incrementCounter: jest.fn(),
+      setGauge: jest.fn(),
+    };
+
+    mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      startOperation: jest.fn(() => ({
+        progress: jest.fn(),
+        success: jest.fn(),
+        error: jest.fn(),
+      })),
+      generateCorrelationId: jest.fn(() => 'test-correlation-id'),
+      forOperation: jest.fn(() => mockLogger),
+    };
+
     configuration = new Configuration();
     stateManager = new StateManager();
+    duplicateDetector = new DuplicateDetector();
 
-    authManager = new AuthManager({
+    authManager = new XAuthManager({
       browserService: mockBrowser,
       config: configuration,
       stateManager,
@@ -97,10 +122,11 @@ describe('Credential Handling Security Tests', () => {
         expect(messageStr).not.toContain('test_secure_user');
       });
 
-      // Verify that the error was logged (enhanced logger uses structured logging)
-      expect(mockLogger.error).toHaveBeenCalled();
-      const errorCalls = mockLogger.error.mock.calls;
-      expect(errorCalls.some(call => call[0].includes('Non-recoverable authentication error'))).toBe(true);
+      // Verify that the error was logged
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Non-recoverable authentication error:',
+        'Simulated authentication failure'
+      );
     });
 
     it('should securely store session cookies without exposure', async () => {
@@ -224,10 +250,8 @@ describe('Credential Handling Security Tests', () => {
 
       await authManager.ensureAuthenticated();
 
-      // Should handle gracefully and proceed to login (enhanced logger uses structured logging)
-      expect(mockLogger.warn).toHaveBeenCalled();
-      const warnCalls = mockLogger.warn.mock.calls;
-      expect(warnCalls.some(call => call[0].includes('Invalid saved cookies format'))).toBe(true);
+      // Should handle gracefully and proceed to login
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Invalid saved cookies format'));
       expect(authManager.loginToX).toHaveBeenCalled();
     });
 
@@ -245,7 +269,7 @@ describe('Credential Handling Security Tests', () => {
 
       // Create new instance with potentially malicious config
       const testConfig = new Configuration();
-      const maliciousAuthManager = new AuthManager({
+      const maliciousAuthManager = new XAuthManager({
         browserService: mockBrowser,
         config: testConfig,
         stateManager,
@@ -322,22 +346,15 @@ describe('Credential Handling Security Tests', () => {
 
       await authManager.ensureAuthenticated();
 
-      // Verify expired cookies are cleared securely (enhanced logger uses structured logging)
+      // Verify expired cookies are cleared securely
       expect(deleteSpy).toHaveBeenCalledWith('x_session_cookies');
-      expect(mockLogger.warn).toHaveBeenCalled();
-      const warnCalls = mockLogger.warn.mock.calls;
-      expect(
-        warnCalls.some(
-          call => call[0].includes('Saved cookies failed') || call[0].includes('Clearing expired session cookies')
-        )
-      ).toBe(true);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Clearing expired session cookies');
 
       // Verify the deletion process doesn't log sensitive data
       const deletionLogs = mockLogger.warn.mock.calls.flat();
       deletionLogs.forEach(log => {
-        const logString = typeof log === 'object' ? JSON.stringify(log) : String(log);
-        expect(logString).not.toContain('expired_token_123');
-        expect(logString).not.toContain('expired_session');
+        expect(log).not.toContain('expired_token_123');
+        expect(log).not.toContain('expired_session');
       });
     });
 
@@ -392,11 +409,9 @@ describe('Credential Handling Security Tests', () => {
 
       await authManager.ensureAuthenticated();
 
-      // Verify that failed authentication clears potentially malicious cookies (enhanced logger uses structured logging)
+      // Verify that failed authentication clears potentially malicious cookies
       expect(deleteSpy).toHaveBeenCalledWith('x_session_cookies');
-      expect(mockLogger.warn).toHaveBeenCalled();
-      const warnCalls = mockLogger.warn.mock.calls;
-      expect(warnCalls.some(call => call[0].includes('Saved cookies failed'))).toBe(true);
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Saved cookies failed'));
     });
 
     it('should implement secure cookie validation', () => {
@@ -448,7 +463,7 @@ describe('Credential Handling Security Tests', () => {
       delete process.env.TWITTER_PASSWORD;
 
       expect(() => {
-        new AuthManager({
+        new XAuthManager({
           browserService: mockBrowser,
           config: new Configuration(),
           stateManager,
@@ -477,8 +492,8 @@ describe('Credential Handling Security Tests', () => {
 
         const config = new Configuration();
 
-        // Should still create AuthManager but may have validation warnings
-        const authMgr = new AuthManager({
+        // Should still create XAuthManager but may have validation warnings
+        const authMgr = new XAuthManager({
           browserService: mockBrowser,
           config,
           stateManager,
@@ -508,7 +523,7 @@ describe('Credential Handling Security Tests', () => {
       });
 
       const config = new Configuration();
-      const authMgr = new AuthManager({
+      const authMgr = new XAuthManager({
         browserService: mockBrowser,
         config,
         stateManager,
@@ -542,7 +557,7 @@ describe('Credential Handling Security Tests', () => {
         global.gc();
       }
 
-      // Check that credentials are not lingering in AuthManager instance
+      // Check that credentials are not lingering in XAuthManager instance
       expect(authManager.twitterUsername).toBeNull();
       expect(authManager.twitterPassword).toBeNull();
 
@@ -569,7 +584,7 @@ describe('Credential Handling Security Tests', () => {
       // Clear large objects
       largeObjects.length = 0;
 
-      // Verify credentials are cleared from AuthManager instance
+      // Verify credentials are cleared from XAuthManager instance
       expect(authManager.twitterUsername).toBeNull();
       expect(authManager.twitterPassword).toBeNull();
       // Verify test data is cleared

@@ -1,3 +1,4 @@
+/* eslint timezone-safety/require-utc-imports: 0 */
 /**
  * UTC time utilities to ensure timezone-safe operations
  * All functions return UTC dates to avoid timezone issues

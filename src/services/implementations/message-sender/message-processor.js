@@ -160,7 +160,21 @@ export class MessageProcessor {
     try {
       // Send based on content type
       if (typeof message.content === 'string') {
-        return await message.channel.send(message.content);
+        // For string content, create options object with content and message options
+        const sendOptions = {
+          content: message.content,
+          ...message.options,
+        };
+
+        // Convert suppressEmbeds boolean to Discord.js v14 MessageFlags
+        if (sendOptions.suppressEmbeds) {
+          // Import MessageFlags dynamically to avoid circular imports
+          const { MessageFlags } = await import('discord.js');
+          sendOptions.flags = MessageFlags.SuppressEmbeds;
+          delete sendOptions.suppressEmbeds; // Remove the boolean option
+        }
+
+        return await message.channel.send(sendOptions);
       } else if (message.content && typeof message.content === 'object') {
         // Merge content and options
         const sendOptions = { ...message.content, ...message.options };
@@ -263,7 +277,7 @@ export class MessageProcessor {
           result.description = truncated.replace(/[A-Za-z0-9]{24,}/g, '[REDACTED]');
         }
         if (message.content.title) {
-          result.title = message.content.title.substring(0, 50);
+          result.title = message.content.title.substring(0, 120);
         }
       }
 

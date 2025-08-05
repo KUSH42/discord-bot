@@ -96,9 +96,22 @@ describe('DebugFlagManager', () => {
       debugManager.setLevel('content-announcer', 4);
     });
 
-    it('should return false if module is disabled', () => {
+    it('should return true for errors and warnings even if module is disabled', () => {
       debugManager.toggle('content-announcer', false);
-      expect(debugManager.shouldLog('content-announcer', 1)).toBe(false);
+      expect(debugManager.shouldLog('content-announcer', 1)).toBe(true); // error - always allowed
+      expect(debugManager.shouldLog('content-announcer', 2)).toBe(true); // warn - always allowed
+    });
+
+    it('should return true for info level if module level permits, regardless of debug flag', () => {
+      debugManager.toggle('content-announcer', false);
+      debugManager.setLevel('content-announcer', 3); // info level
+      expect(debugManager.shouldLog('content-announcer', 3)).toBe(true); // info allowed by level
+    });
+
+    it('should return false for debug/verbose if module is disabled', () => {
+      debugManager.toggle('content-announcer', false);
+      expect(debugManager.shouldLog('content-announcer', 4)).toBe(false); // debug - requires flag
+      expect(debugManager.shouldLog('content-announcer', 5)).toBe(false); // verbose - requires flag
     });
 
     it('should return true for message level <= module level', () => {
@@ -127,7 +140,7 @@ describe('DebugFlagManager', () => {
 
     it('should log the change', () => {
       debugManager.toggle('content-announcer', true);
-      expect(mockLogger.info).toHaveBeenLastCalledWith('Debug flag changed', {
+      expect(mockLogger.info).toHaveBeenLastCalledWith('Debug flag changed: content-announcer true', {
         module: 'content-announcer',
         enabled: true,
         previousState: false,

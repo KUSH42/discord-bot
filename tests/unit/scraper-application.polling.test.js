@@ -105,12 +105,17 @@ describe('Polling Logic', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
         hasUrl: jest.fn().mockResolvedValue(false),
         addUrl: jest.fn().mockResolvedValue(),
+      },
+      duplicateDetector: {
+        isDuplicate: jest.fn().mockReturnValue(false),
+        addContent: jest.fn(),
+        clear: jest.fn(),
       },
     });
   });

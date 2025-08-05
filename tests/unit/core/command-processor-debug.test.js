@@ -8,6 +8,7 @@ describe('CommandProcessor - Debug Commands', () => {
   let stateManager;
   let mockDebugManager;
   let mockMetricsManager;
+  let mockMemoryMonitor;
 
   beforeEach(() => {
     mockConfig = {
@@ -91,7 +92,38 @@ describe('CommandProcessor - Debug Commands', () => {
       }),
     };
 
-    commandProcessor = new CommandProcessor(mockConfig, stateManager, mockDebugManager, mockMetricsManager);
+    mockMemoryMonitor = {
+      getStats: jest.fn(() => ({
+        peakMemoryMB: 256,
+        averageMemoryMB: 128,
+        gcExecutions: 5,
+        warningsIssued: 2,
+        contentStores: {
+          tweetCache: {
+            totalItems: 500,
+            totalSizeMB: 12.5,
+            oldestItemHours: 24,
+          },
+        },
+        thresholds: {
+          warningMB: 768,
+          maxMB: 1024,
+          gcMB: 512,
+        },
+      })),
+      getDetailedContentAnalysis: jest.fn(() => ({
+        recommendations: ['Sample recommendation'],
+      })),
+    };
+
+    commandProcessor = new CommandProcessor(
+      mockConfig,
+      stateManager,
+      mockDebugManager,
+      mockMetricsManager,
+      null, // baseLogger
+      mockMemoryMonitor
+    );
   });
 
   describe('debug command validation', () => {
@@ -468,6 +500,147 @@ describe('CommandProcessor - Debug Commands', () => {
       const result = await commandProcessor.processCommand('metrics', [], '987654321098765432');
 
       expect(result.success).toBe(true);
+    });
+
+    it('should allow memory-status commands for any user', async () => {
+      const result = await commandProcessor.processCommand('memory-status', [], '987654321098765432');
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('memory-status command', () => {
+    beforeEach(() => {
+      // Enhanced mock setup for comprehensive testing
+      mockMemoryMonitor.getStats.mockReturnValue({
+        peakMemoryMB: 256,
+        averageMemoryMB: 128,
+        gcExecutions: 5,
+        warningsIssued: 2,
+        contentStores: {
+          tweetCache: {
+            totalItems: 500,
+            totalSizeMB: 12.5,
+            oldestItemHours: 24,
+          },
+          videoCache: {
+            totalItems: 200,
+            totalSizeMB: 8.3,
+            oldestItemHours: 48,
+          },
+        },
+        thresholds: {
+          warningMB: 768,
+          maxMB: 1024,
+          gcMB: 512,
+        },
+      });
+
+      mockMemoryMonitor.getDetailedContentAnalysis.mockReturnValue({
+        recommendations: [
+          'tweetCache: Consider reducing cache size (500 items)',
+          'Memory pressure detected - consider reducing cache sizes',
+        ],
+      });
+    });
+
+    it('should show comprehensive memory status', async () => {
+      const result = await commandProcessor.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('💾 Memory Status Report');
+      expect(result.message).toContain('📊 Peak: 256 MB | Avg: 128 MB');
+      expect(result.message).toContain('⚠️ Warning: 768 MB | Max: 1024 MB');
+      expect(result.message).toContain('🗑️ GC Executions: 5 | Warnings: 2');
+      expect(result.message).toContain('📦 Content Stores:');
+      expect(result.message).toContain('tweetCache**: 500 items, 12.5 MB');
+      expect(result.message).toContain('videoCache**: 200 items, 8.3 MB');
+      expect(result.message).toContain('💡 Recommendations:');
+      expect(result.message).toContain('✅ **Status**: Healthy');
+      expect(result.memoryData).toBeDefined();
+    });
+
+    it('should handle high memory usage status', async () => {
+      // Mock current memory to exceed warning threshold
+      const originalMemoryUsage = process.memoryUsage;
+      process.memoryUsage = jest.fn(() => ({
+        heapUsed: 800 * 1024 * 1024, // 800MB (above warning threshold)
+        heapTotal: 900 * 1024 * 1024,
+        external: 50 * 1024 * 1024,
+        rss: 950 * 1024 * 1024,
+      }));
+
+      const result = await commandProcessor.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('⚠️ **Status**: High Memory Usage');
+
+      process.memoryUsage = originalMemoryUsage;
+    });
+
+    it('should handle critical memory usage status', async () => {
+      // Mock current memory to exceed max threshold
+      const originalMemoryUsage = process.memoryUsage;
+      process.memoryUsage = jest.fn(() => ({
+        heapUsed: 1100 * 1024 * 1024, // 1100MB (above max threshold)
+        heapTotal: 1200 * 1024 * 1024,
+        external: 50 * 1024 * 1024,
+        rss: 1250 * 1024 * 1024,
+      }));
+
+      const result = await commandProcessor.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('🚨 **Status**: Critical Memory Usage');
+
+      process.memoryUsage = originalMemoryUsage;
+    });
+
+    it('should handle content store errors', async () => {
+      mockMemoryMonitor.getStats.mockReturnValue({
+        ...mockMemoryMonitor.getStats(),
+        contentStores: {
+          errorStore: {
+            error: 'Failed to analyze store',
+          },
+        },
+        thresholds: {
+          warningMB: 768,
+          maxMB: 1024,
+          gcMB: 512,
+        },
+      });
+
+      const result = await commandProcessor.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('❌ **errorStore**: Error - Failed to analyze store');
+    });
+
+    it('should handle missing memory monitor', async () => {
+      // Create processor without memory monitor
+      const processorWithoutMemory = new CommandProcessor(
+        mockConfig,
+        stateManager,
+        mockDebugManager,
+        mockMetricsManager
+      );
+
+      const result = await processorWithoutMemory.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('❌ Memory monitor is not available.');
+    });
+
+    it('should handle memory monitor errors', async () => {
+      mockMemoryMonitor.getStats.mockImplementation(() => {
+        throw new Error('Memory monitor error');
+      });
+
+      const result = await commandProcessor.processCommand('memory-status', [], '123456789012345678');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('❌ Failed to get memory status: Memory monitor error');
     });
   });
 

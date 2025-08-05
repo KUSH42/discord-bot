@@ -192,7 +192,7 @@ describe('Production Setup Validation', () => {
       // Verify all dependencies are properly injected
       expect(scraperApp.browser).toBeDefined();
       expect(scraperApp.classifier).toBeDefined();
-      expect(scraperApp.announcer).toBeDefined();
+      expect(scraperApp.contentCoordinator).toBeDefined();
       expect(scraperApp.config).toBeDefined();
       expect(scraperApp.state).toBeDefined();
       expect(scraperApp.eventBus).toBeDefined();

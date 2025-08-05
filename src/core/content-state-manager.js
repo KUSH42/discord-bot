@@ -1,4 +1,5 @@
 import { nowUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
  * Unified Content State Management System
@@ -6,10 +7,10 @@ import { nowUTC } from '../utilities/utc-time.js';
  * Tracks content through its complete lifecycle
  */
 export class ContentStateManager {
-  constructor(configManager, persistentStorage, logger, stateManager = null) {
+  constructor(configManager, persistentStorage, baseLogger, debugManager, metricsManager, stateManager = null) {
     this.configManager = configManager;
     this.storage = persistentStorage;
-    this.logger = logger;
+    this.logger = createEnhancedLogger('state', baseLogger, debugManager, metricsManager);
     this.stateManager = stateManager;
 
     // In-memory cache for active content states
@@ -22,6 +23,11 @@ export class ContentStateManager {
     this.isFullyInitialized = false;
     this.initializationTime = null;
 
+    // Register with memory monitor if available
+    if (metricsManager && metricsManager.memoryMonitor) {
+      metricsManager.memoryMonitor.registerContentStore('contentStates', () => this.analyzeContentStates());
+    }
+
     // Initialize from persistent storage
     this.initializeFromStorage();
   }
@@ -30,13 +36,21 @@ export class ContentStateManager {
    * Initialize content states from persistent storage
    */
   async initializeFromStorage() {
+    const operation = this.logger.startOperation('initializeFromStorage');
+
     try {
+      operation.progress('Loading stored content states');
       const storedStates = await this.storage.getAllContentStates();
+
+      let loadedCount = 0;
+      let skippedCount = 0;
+      const maxAge = this.getMaxContentAgeMs();
+
+      operation.progress('Processing stored states', { totalStates: Object.keys(storedStates || {}).length });
 
       for (const [contentId, state] of Object.entries(storedStates || {})) {
         // Only load recent states to prevent memory bloat
         const age = nowUTC().getTime() - new Date(state.lastUpdated).getTime();
-        const maxAge = this.getMaxContentAgeMs();
 
         if (age <= maxAge * 2) {
           // Keep states up to 2x max age for safety
@@ -45,17 +59,20 @@ export class ContentStateManager {
             firstSeen: new Date(state.firstSeen),
             lastUpdated: new Date(state.lastUpdated),
           });
+          loadedCount++;
+        } else {
+          skippedCount++;
         }
       }
 
-      this.logger.info('Content state manager initialized', {
-        loadedStates: this.contentStates.size,
+      operation.success('Content state manager initialized', {
+        loadedStates: loadedCount,
+        skippedStates: skippedCount,
         botStartTime: this.botStartTime.toISOString(),
+        maxAgeHours: maxAge / (60 * 60 * 1000),
       });
     } catch (error) {
-      this.logger.warn('❌ Failed to initialize from storage, starting fresh', {
-        error: error.message,
-      });
+      operation.error(error, 'Failed to initialize from storage, starting fresh');
     }
   }
 
@@ -86,41 +103,56 @@ export class ContentStateManager {
    * @param {Object} [initialState.metadata] - Additional metadata
    */
   async addContent(contentId, initialState) {
-    if (!contentId || typeof contentId !== 'string') {
-      throw new Error('Content ID must be a non-empty string');
-    }
-
-    const now = new Date();
-    const publishedAt = initialState.publishedAt ? new Date(initialState.publishedAt) : now;
-
-    const contentState = {
-      id: contentId,
-      type: initialState.type || 'unknown',
-      state: initialState.state || 'published',
-      firstSeen: now,
-      lastUpdated: now,
-      publishedAt,
-      announced: false,
-      source: initialState.source || 'unknown',
-      url: initialState.url || null,
-      title: initialState.title || null,
-      metadata: initialState.metadata || {},
-    };
-
-    // Store in memory cache
-    this.contentStates.set(contentId, contentState);
-
-    // Persist to storage
-    await this.persistContentState(contentId, contentState);
-
-    this.logger.debug('Content added to state management', {
+    const operation = this.logger.startOperation('addContent', {
       contentId,
-      type: contentState.type,
-      state: contentState.state,
-      source: contentState.source,
+      type: initialState.type,
+      source: initialState.source,
     });
 
-    return contentState;
+    try {
+      if (!contentId || typeof contentId !== 'string') {
+        throw new Error('Content ID must be a non-empty string');
+      }
+
+      operation.progress('Creating content state object');
+      const now = new Date();
+      const publishedAt = initialState.publishedAt ? new Date(initialState.publishedAt) : now;
+
+      const contentState = {
+        id: contentId,
+        type: initialState.type || 'unknown',
+        state: initialState.state || 'published',
+        firstSeen: now,
+        lastUpdated: now,
+        publishedAt,
+        announced: false,
+        source: initialState.source || 'unknown',
+        url: initialState.url || null,
+        title: initialState.title || null,
+        metadata: initialState.metadata || {},
+      };
+
+      operation.progress('Storing in memory cache');
+      // Store in memory cache
+      this.contentStates.set(contentId, contentState);
+
+      operation.progress('Persisting to storage');
+      // Persist to storage
+      await this.persistContentState(contentId, contentState);
+
+      operation.success('Content added to state management', {
+        contentId,
+        type: contentState.type,
+        state: contentState.state,
+        source: contentState.source,
+        totalStates: this.contentStates.size,
+      });
+
+      return contentState;
+    } catch (error) {
+      operation.error(error, 'Failed to add content to state management', { contentId });
+      throw error;
+    }
   }
 
   /**
@@ -318,36 +350,51 @@ export class ContentStateManager {
    * @param {number} [olderThanHours] - Remove content older than this (defaults to config)
    */
   async cleanup(olderThanHours) {
-    const maxAge = olderThanHours ? olderThanHours * 60 * 60 * 1000 : this.getMaxContentAgeMs() * 2; // Default to 2x max age
+    const operation = this.logger.startOperation('cleanup', { olderThanHours });
 
-    const cutoffTime = nowUTC().getTime() - maxAge;
-    const toRemove = [];
-
-    for (const [contentId, state] of this.contentStates.entries()) {
-      if (state.lastUpdated.getTime() < cutoffTime) {
-        toRemove.push(contentId);
-      }
-    }
-
-    // Remove from memory
-    toRemove.forEach(id => this.contentStates.delete(id));
-
-    // Remove from persistent storage
     try {
-      await this.storage.removeContentStates(toRemove);
-    } catch (error) {
-      this.logger.warn('Failed to remove content states from storage', {
-        error: error.message,
-        removedFromMemory: toRemove.length,
-      });
-    }
+      const maxAge = olderThanHours ? olderThanHours * 60 * 60 * 1000 : this.getMaxContentAgeMs() * 2; // Default to 2x max age
+      const cutoffTime = nowUTC().getTime() - maxAge;
 
-    if (toRemove.length > 0) {
-      this.logger.info('Content state cleanup completed', {
-        removedCount: toRemove.length,
-        remainingCount: this.contentStates.size,
+      operation.progress('Identifying old content states', {
+        totalStates: this.contentStates.size,
         maxAgeHours: maxAge / (60 * 60 * 1000),
       });
+
+      const toRemove = [];
+      for (const [contentId, state] of this.contentStates.entries()) {
+        if (state.lastUpdated.getTime() < cutoffTime) {
+          toRemove.push(contentId);
+        }
+      }
+
+      if (toRemove.length === 0) {
+        operation.success('No content states to cleanup', { totalStates: this.contentStates.size });
+        return;
+      }
+
+      operation.progress('Removing from memory', { toRemove: toRemove.length });
+      // Remove from memory
+      toRemove.forEach(id => this.contentStates.delete(id));
+
+      operation.progress('Removing from persistent storage');
+      // Remove from persistent storage
+      try {
+        await this.storage.removeContentStates(toRemove);
+        operation.success('Content state cleanup completed', {
+          removedCount: toRemove.length,
+          remainingCount: this.contentStates.size,
+          maxAgeHours: maxAge / (60 * 60 * 1000),
+        });
+      } catch (storageError) {
+        operation.error(storageError, 'Failed to remove content states from storage', {
+          removedFromMemory: toRemove.length,
+          remainingInMemory: this.contentStates.size,
+        });
+      }
+    } catch (error) {
+      operation.error(error, 'Content state cleanup failed');
+      throw error;
     }
   }
 
@@ -421,6 +468,52 @@ export class ContentStateManager {
       bySource,
       botStartTime: this.botStartTime.toISOString(),
       maxContentAge: this.getMaxContentAgeMs() / (60 * 60 * 1000), // hours
+    };
+  }
+
+  /**
+   * Analyze content states for memory monitoring
+   * @returns {Object} Memory analysis data
+   */
+  analyzeContentStates() {
+    const states = Array.from(this.contentStates.values());
+    const now = nowUTC();
+
+    // Calculate memory usage estimate
+    const memoryEstimate = JSON.stringify(states).length / 1024 / 1024; // MB
+
+    // Find oldest item
+    let oldestItemHours = 0;
+    if (states.length > 0) {
+      const oldestTimestamp = Math.min(...states.map(s => s.lastUpdated.getTime()));
+      oldestItemHours = (now.getTime() - oldestTimestamp) / (60 * 60 * 1000);
+    }
+
+    // Count by type and state
+    const byType = {};
+    const byState = {};
+    const bySource = {};
+
+    states.forEach(state => {
+      byType[state.type] = (byType[state.type] || 0) + 1;
+      byState[state.state] = (byState[state.state] || 0) + 1;
+      bySource[state.source] = (bySource[state.source] || 0) + 1;
+    });
+
+    return {
+      totalItems: states.length,
+      totalSizeMB: Math.round(memoryEstimate * 100) / 100,
+      oldestItemHours: Math.round(oldestItemHours * 100) / 100,
+      itemTypes: {
+        ...byType,
+        announced: states.filter(s => s.announced).length,
+        unannounced: states.filter(s => !s.announced).length,
+      },
+      breakdown: {
+        byType,
+        byState,
+        bySource,
+      },
     };
   }
 

@@ -50,7 +50,12 @@ async function testAsyncMutex() {
 async function testBrowserService() {
   console.log('\nTesting PlaywrightBrowserService validation...');
 
-  const browserService = new PlaywrightBrowserService();
+  // Create minimal mock dependencies for manual testing
+  const mockLogger = { info: console.log, error: console.error, debug: console.log, warn: console.warn };
+  const mockDebugManager = { isEnabled: () => false, getLevel: () => 1 };
+  const mockMetricsManager = { recordMetric: () => {}, startTimer: () => ({ end: () => {} }) };
+
+  const browserService = new PlaywrightBrowserService(mockLogger, mockDebugManager, mockMetricsManager);
 
   // Test health check on uninitialized browser
   console.log('Browser healthy (uninitialized):', browserService.isHealthy());

@@ -295,7 +295,7 @@ export class MetricsManager {
    * Update aggregated data for time windows
    * @private
    */
-  updateAggregations(type, name, value, timestamp, tags) {
+  updateAggregations(type, name, value, timestamp, _tags) {
     const now = Math.floor(timestamp / 1000); // Convert to seconds
 
     for (const windowSeconds of this.aggregationWindows) {
@@ -386,6 +386,32 @@ export class MetricsManager {
 
     // Sort by window start time and limit results
     return results.sort((a, b) => b.windowStart - a.windowStart).slice(0, limit);
+  }
+
+  /**
+   * Get recent operations from timer metrics (for log pipeline)
+   * @param {number} limit - Maximum number of recent operations to return
+   * @returns {Array} Recent operations with timing data
+   */
+  getRecentOperations(limit = 10) {
+    const recentOps = [];
+
+    // Collect recent timer samples across all metrics
+    for (const [name, metric] of this.timers.entries()) {
+      for (const sample of metric.samples.slice(-5)) {
+        // Last 5 samples per metric
+        recentOps.push({
+          operation: name,
+          timestamp: sample.timestamp,
+          duration: sample.value,
+          tags: sample.tags,
+          success: !sample.tags.error, // Assume success unless error tag present
+        });
+      }
+    }
+
+    // Sort by timestamp (most recent first) and limit results
+    return recentOps.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
   }
 
   /**

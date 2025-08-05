@@ -72,7 +72,7 @@ export class ContentAnnouncer {
       type: content?.type,
       contentId: content?.id,
       url: content?.url,
-      title: content?.title?.substring(0, 50),
+      title: content?.title?.substring(0, 120),
       author: content?.author,
       publishedAt: content?.publishedAt,
       isOld: content?.isOld,
@@ -118,12 +118,12 @@ export class ContentAnnouncer {
         result.skipped = true;
         result.reason = skipReason;
 
-        operation.success('Content announcement skipped', {
+        const skipInfo = {
           reason: skipReason,
           postingEnabled: this.state.get('postingEnabled', true),
           announcementEnabled: this.state.get('announcementEnabled', true),
           botStartTime: this.state.get('botStartTime'),
-        });
+        };
 
         return result;
       }
@@ -270,8 +270,10 @@ export class ContentAnnouncer {
    * @returns {boolean} True if should announce
    */
   shouldAnnounceYouTubeContent(content) {
+    const announceOldTweets = this.config.getBoolean('ANNOUNCE_OLD_TWEETS', false);
+
     // Check if content is new enough
-    if (content.publishedAt && this.state.get('botStartTime')) {
+    if (!announceOldTweets && content.publishedAt && this.state.get('botStartTime')) {
       const publishedTime = new Date(content.publishedAt);
       const botStartTime = this.state.get('botStartTime');
 
@@ -319,7 +321,7 @@ export class ContentAnnouncer {
       const botStartTime = this.state.get('botStartTime');
 
       if (publishedTime < botStartTime) {
-        return 'Content was published before bot started';
+        return `Content was published before bot started (published: ${publishedTime.toISOString()}, bot started: ${botStartTime.toISOString()})`;
       }
     }
 
@@ -370,6 +372,16 @@ export class ContentAnnouncer {
   formatYouTubeMessage(content, options) {
     const { title, url, type, channelTitle } = content;
 
+    // Debug logging if channel title is missing
+    if (!channelTitle) {
+      this.logger.warn('YouTube content missing channelTitle', {
+        contentId: content.id,
+        url: content.url,
+        title: content.title?.substring(0, 100),
+        availableFields: Object.keys(content),
+      });
+    }
+
     let emoji = '📺';
     let typeText = 'video';
 
@@ -391,11 +403,12 @@ export class ContentAnnouncer {
         typeText = 'uploaded a new video';
     }
 
+    /*
     if (options.useEmbed && type === 'livestream') {
       return {
         embeds: [
           {
-            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Channel'} is now live!`,
+            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Unknown Channel'} is now live!`,
             description: this.sanitizeContent(title),
             url,
             color: 0xff0000, // Red for live
@@ -411,8 +424,11 @@ export class ContentAnnouncer {
         ],
       };
     }
+    */
 
-    return `${emoji} **${this.sanitizeContent(channelTitle) || 'Channel'}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
+    // Use better fallback that shows we're missing the channel name
+    const displayChannelTitle = this.sanitizeContent(channelTitle) || 'Unknown Channel';
+    return `${emoji} **${displayChannelTitle}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
   }
 
   /**
@@ -422,9 +438,9 @@ export class ContentAnnouncer {
    * @returns {string} Formatted message
    */
   formatXMessage(content) {
-    const { author, url, type, retweetedBy } = content;
+    const { author, authorDisplayName, url, type, retweetedBy } = content;
     let emoji = '🐦';
-    let actionText = 'posted';
+    let actionText = 'tweeted';
 
     switch (type) {
       case 'reply':
@@ -441,7 +457,7 @@ export class ContentAnnouncer {
         break;
       default:
         emoji = '🐦';
-        actionText = 'posted';
+        actionText = 'tweeted';
     }
 
     let finalUrl = url;
@@ -451,9 +467,10 @@ export class ContentAnnouncer {
       finalUrl = this.convertToVxTwitter(url);
     }
 
-    let message = `${emoji} **${author}** ${actionText}:\n${finalUrl}`;
+    const displayName = authorDisplayName || author;
+    let message = `${emoji} **${displayName}** ${actionText}:\n${finalUrl}`;
     if (type === 'retweet' && retweetedBy) {
-      message = `${emoji} **${retweetedBy}** retweeted:\n**${author}**: ${finalUrl}`;
+      message = `${emoji} **${retweetedBy}** retweeted:\n**${displayName}**: ${finalUrl}`;
     }
 
     return message;

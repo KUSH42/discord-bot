@@ -140,9 +140,12 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       monitorApp.startScheduledContentPolling();
 
       expect(monitorApp.scheduledContentPollTimerId).toBeTruthy();
-      expect(mockLogger.info).toHaveBeenCalledWith('Scheduled content polling started', {
-        interval: 3600000,
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Scheduled content polling started',
+        expect.objectContaining({
+          interval: 3600000,
+        })
+      );
     });
 
     it('should stop existing polling before starting new one', () => {
@@ -209,7 +212,7 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       jest.advanceTimersByTime(5000);
       await Promise.resolve();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error in scheduled content polling loop:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith('Error in scheduled content polling loop:', expect.any(Object));
 
       // Should continue polling despite error
       jest.advanceTimersByTime(3600000);
@@ -226,7 +229,7 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       monitorApp.stopScheduledContentPolling();
 
       expect(monitorApp.scheduledContentPollTimerId).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith('Scheduled content polling stopped.');
+      expect(mockLogger.info).toHaveBeenCalledWith('Scheduled content polling stopped.', expect.any(Object));
     });
 
     it('should handle case when no timer is set', () => {
@@ -263,7 +266,7 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
     it('should fetch scheduled content and add new items', async () => {
       await monitorApp.pollScheduledContent();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Polling for scheduled content...');
+      expect(mockLogger.debug).toHaveBeenCalledWith('Polling for scheduled content...', expect.any(Object));
       expect(mockYoutubeService.getScheduledContent).toHaveBeenCalledWith('UCTestChannel');
 
       expect(mockContentStateManager.addContent).toHaveBeenCalledTimes(2);
@@ -369,9 +372,12 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       monitorApp.startLiveStatePolling();
 
       expect(monitorApp.liveStatePollTimerId).toBeTruthy();
-      expect(mockLogger.info).toHaveBeenCalledWith('Live state transition polling started', {
-        interval: 60000,
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Live state transition polling started',
+        expect.objectContaining({
+          interval: 60000,
+        })
+      );
     });
 
     it('should call pollLiveStateTransitions immediately', async () => {
@@ -449,7 +455,7 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error in live state polling loop:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith('Error in live state polling loop:', expect.any(Object));
     });
   });
 
@@ -460,7 +466,7 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
       monitorApp.stopLiveStatePolling();
 
       expect(monitorApp.liveStatePollTimerId).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith('Live state transition polling stopped.');
+      expect(mockLogger.info).toHaveBeenCalledWith('Live state transition polling stopped.', expect.any(Object));
     });
 
     it('should handle case when no timer is set', () => {
@@ -494,21 +500,39 @@ describe('MonitorApplication - Scheduled Content Polling', () => {
 
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('No scheduled content to poll for state changes.');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'No scheduled content to poll for state changes.',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockYoutubeService.checkScheduledContentStates).not.toHaveBeenCalled();
     });
 
     it('should check states for scheduled content', async () => {
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Polling state for 2 scheduled item(s)...');
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Polling state for 2 scheduled item(s)...',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockYoutubeService.checkScheduledContentStates).toHaveBeenCalledWith(['live1', 'live2']);
     });
 
     it('should detect and handle state transitions', async () => {
       await monitorApp.pollLiveStateTransitions();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('State transition detected for live1: scheduled -> live');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'State transition detected for live1: scheduled -> live',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(mockLivestreamStateMachine.transitionState).toHaveBeenCalledWith('live1', 'live');
     });
 

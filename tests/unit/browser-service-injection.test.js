@@ -92,14 +92,14 @@ describe('Browser Service Dependency Injection', () => {
   });
 
   describe('Browser Service Registration', () => {
-    it('should register browser service in container', async () => {
+    it('should register X browser service in container', async () => {
       await setupProductionServices(container, config);
 
-      const browserService = container.resolve('browserService');
-      expect(browserService).toBeDefined();
-      expect(browserService).toHaveProperty('launch');
-      expect(browserService).toHaveProperty('close');
-      expect(browserService).toHaveProperty('isRunning');
+      const xBrowserService = container.resolve('xBrowserService');
+      expect(xBrowserService).toBeDefined();
+      expect(xBrowserService).toHaveProperty('launch');
+      expect(xBrowserService).toHaveProperty('close');
+      expect(xBrowserService).toHaveProperty('isRunning');
     });
 
     it('should inject browser service into scraper application', async () => {
@@ -114,7 +114,7 @@ describe('Browser Service Dependency Injection', () => {
     it('should provide browser service with required methods', async () => {
       await setupProductionServices(container, config);
 
-      const browserService = container.resolve('browserService');
+      const browserService = container.resolve('xBrowserService');
 
       // Check all required methods exist
       const requiredMethods = [
@@ -156,13 +156,18 @@ describe('Browser Service Dependency Injection', () => {
       expect(() => {
         new ScraperApplication({
           browserService: null,
+          contentCoordinator: {},
           contentClassifier: {},
-          contentAnnouncer: {},
+          discordService: {},
           config,
           stateManager: { get: () => ({}) },
           eventBus: { emit: jest.fn() },
           logger: { info: jest.fn(), error: jest.fn(), child: jest.fn().mockReturnThis() },
+          xAuthManager: {},
+          duplicateDetector: {},
           persistentStorage: { get: jest.fn(), set: jest.fn(), delete: jest.fn() },
+          debugManager: { isEnabled: jest.fn(() => false) },
+          metricsManager: { recordMetric: jest.fn() },
         });
       }).not.toThrow();
     });
@@ -170,13 +175,18 @@ describe('Browser Service Dependency Injection', () => {
     it('should throw error when trying to start with null browser service', async () => {
       const scraperApp = new ScraperApplication({
         browserService: null,
+        contentCoordinator: {},
         contentClassifier: {},
-        contentAnnouncer: {},
+        discordService: {},
         config,
         stateManager: { get: () => ({}) },
         eventBus: { emit: jest.fn() },
         logger: { info: jest.fn(), error: jest.fn(), child: jest.fn().mockReturnThis() },
+        xAuthManager: {},
+        duplicateDetector: {},
         persistentStorage: { get: jest.fn(), set: jest.fn(), delete: jest.fn() },
+        debugManager: { isEnabled: jest.fn(() => false) },
+        metricsManager: { recordMetric: jest.fn() },
       });
 
       await expect(scraperApp.start()).rejects.toThrow();
@@ -196,14 +206,14 @@ describe('Browser Service Dependency Injection', () => {
     it('should start browser service in not running state', async () => {
       await setupProductionServices(container, config);
 
-      const browserService = container.resolve('browserService');
+      const browserService = container.resolve('xBrowserService');
       expect(browserService.isRunning()).toBe(false);
     });
 
     it('should handle browser service disposal', async () => {
       await setupProductionServices(container, config);
 
-      const browserService = container.resolve('browserService');
+      const browserService = container.resolve('xBrowserService');
 
       // Should not throw when disposing
       await expect(browserService.dispose()).resolves.not.toThrow();
@@ -225,13 +235,18 @@ describe('Browser Service Dependency Injection', () => {
       brokenContainer.registerSingleton('scraperApplication', () => {
         return new ScraperApplication({
           browserService: null, // This should cause issues
+          contentCoordinator: {},
           contentClassifier: {},
-          contentAnnouncer: {},
+          discordService: {},
           config,
           stateManager: { get: () => ({}) },
           eventBus: { emit: jest.fn() },
           logger: { info: jest.fn(), error: jest.fn(), child: jest.fn().mockReturnThis() },
+          xAuthManager: {},
+          duplicateDetector: {},
           persistentStorage: { get: jest.fn(), set: jest.fn(), delete: jest.fn() },
+          debugManager: { isEnabled: jest.fn(() => false) },
+          metricsManager: { recordMetric: jest.fn() },
         });
       });
 

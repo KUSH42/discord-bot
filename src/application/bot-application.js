@@ -1,6 +1,7 @@
 import { exec as defaultExec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { ChannelType } from 'discord.js';
 import { CommandRateLimit } from '../rate-limiter.js';
 import { nowUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
@@ -226,7 +227,7 @@ export class BotApplication {
 
       // Delay restart to ensure the message is sent
       setTimeout(() => {
-        this.exec(`sudo systemctl restart ${serviceName}`, restartError => {
+        this.exec(`systemctl restart ${serviceName}`, restartError => {
           if (restartError) {
             this.logger.error(`systemctl restart failed: ${restartError}`);
             // We cannot reply here as the bot might be down
@@ -318,7 +319,7 @@ export class BotApplication {
       messageId: message.id,
       authorId: message.author?.id,
       channelId: message.channel?.id,
-      contentPreview: message.content?.substring(0, 50) || 'empty',
+      contentPreview: message.content?.substring(0, 120) || 'empty',
       instanceId: this.instanceId,
     });
 
@@ -429,6 +430,22 @@ export class BotApplication {
       };
 
       operation.progress(`Processing command: ${command}`);
+
+      // Special handling for colorize command - DM only
+      if (command === 'colorize') {
+        if (message.channel.type !== ChannelType.DM) {
+          await message.reply(
+            '🎨 The colorize command only works in direct messages. Please DM me to use this command.'
+          );
+          return operation.success('Colorize command attempted outside DM', {
+            command,
+            userId: user.id,
+            channelType: message.channel.type,
+            action: 'rejected_not_dm',
+          });
+        }
+      }
+
       const result = await this.commandProcessor.processCommand(command, args, user.id, appStats);
 
       operation.progress('Handling command result');
@@ -502,6 +519,11 @@ export class BotApplication {
           }
         } else {
           await message.reply(result.message);
+
+          // Handle additional message for multi-part responses (e.g., readme command)
+          if (result.additionalMessage) {
+            await message.channel.send(result.additionalMessage);
+          }
         }
       }
 
@@ -541,8 +563,20 @@ export class BotApplication {
         result.scraperAction = null; // Consume the flag to prevent duplicate processing
         await this.handleScraperAction(scraperAction, userId, message);
       }
+
+      // Handle delete actions (consume the flag)
+      if (result.deleteAction) {
+        const { deleteAction } = result;
+        result.deleteAction = null; // Consume the flag to prevent duplicate processing
+        await this.handleDeleteAction(deleteAction, result, message);
+      }
     } catch (error) {
-      this.logger.error('Error handling command result:', error);
+      this.logger.error(`Error handling command result: ${error.message}`, {
+        stack: error.stack,
+        command,
+        userId: user?.id,
+        resultKeys: result ? Object.keys(result) : 'no result',
+      });
     }
   }
 
@@ -827,7 +861,15 @@ export class BotApplication {
       // Get duplicate detector from monitor application
       const duplicateDetector = this.monitorApplication?.duplicateDetector;
       if (!duplicateDetector) {
-        this.logger.debug('Duplicate detector not available, skipping Discord history scanning');
+        this.logger.warn('⚠️ YouTube Monitor duplicate detector not available - YouTube duplicate detection disabled!');
+        this.logger.warn('This means old YouTube videos may be re-announced as new content');
+
+        // Emit event with error flag
+        this.eventBus.emit('bot.initialization.complete', {
+          timestamp: nowUTC(),
+          historyScanned: false,
+          error: 'YouTube Monitor duplicate detector not available',
+        });
         return;
       }
 
@@ -838,7 +880,7 @@ export class BotApplication {
           const youtubeChannel = await this.discord.fetchChannel(youtubeChannelId);
           if (youtubeChannel) {
             // Suppress Discord history scanning logs - only log summary
-            const videoResults = await duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 1000);
+            const videoResults = await duplicateDetector.scanDiscordChannelForVideos(youtubeChannel, 100);
 
             // Single summary log for Discord history scan (not actual YouTube scraping)
             this.logger.info(
@@ -869,7 +911,7 @@ export class BotApplication {
             try {
               const channel = await this.discord.fetchChannel(channelConfig.id);
               if (channel) {
-                const tweetResults = await scraperDuplicateDetector.scanDiscordChannelForTweets(channel, 1000);
+                const tweetResults = await scraperDuplicateDetector.scanDiscordChannelForTweets(channel, 100);
                 totalTwitterResults.messagesScanned += tweetResults.messagesScanned;
                 totalTwitterResults.tweetIdsAdded += tweetResults.tweetIdsAdded;
                 totalTwitterResults.channelsScanned++;
@@ -1143,6 +1185,125 @@ export class BotApplication {
     } catch (error) {
       this.logger.error(`Error handling scraper action ${action}:`, error);
       await message.channel.send('❌ An error occurred while processing the scraper command.');
+    }
+  }
+
+  /**
+   * Handle delete message actions
+   * @param {string} action - The delete action type ('single' or 'bulk')
+   * @param {Object} result - Command result containing delete parameters
+   * @param {Object} message - The Discord message object
+   * @returns {Promise<void>}
+   */
+  async handleDeleteAction(action, result, message) {
+    try {
+      switch (action) {
+        case 'single':
+          await this.deleteSingleMessage(result.messageId, message);
+          break;
+        case 'bulk':
+          await this.deleteBulkMessages(result.channelId, result.count, message);
+          break;
+        default:
+          await message.channel.send(`❓ Unknown delete action: ${action}`);
+          this.logger.warn(`Unknown delete action requested: ${action} by user ${result.userId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error handling delete action ${action}:`, error);
+      await message.channel.send('❌ An error occurred while processing the delete command.');
+    }
+  }
+
+  /**
+   * Delete a single message by ID
+   * @param {string} messageId - Discord message ID to delete
+   * @param {Object} commandMessage - The original command message
+   * @returns {Promise<void>}
+   */
+  async deleteSingleMessage(messageId, commandMessage) {
+    try {
+      // Try to fetch and delete the message
+      const targetMessage = await commandMessage.channel.messages.fetch(messageId).catch(() => null);
+
+      if (!targetMessage) {
+        await commandMessage.reply('❌ Message not found. It may have already been deleted or is too old.');
+        return;
+      }
+
+      // Check if the message is from this bot
+      if (targetMessage.author.id !== this.discord.client.user.id) {
+        await commandMessage.reply('❌ Can only delete messages sent by this bot.');
+        return;
+      }
+
+      await targetMessage.delete();
+      await commandMessage.reply(`✅ Deleted message \`${messageId}\`.`);
+
+      this.logger.info(`Deleted single message ${messageId} in channel ${commandMessage.channel.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete message ${messageId}:`, error);
+      await commandMessage.reply(`❌ Failed to delete message: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete multiple recent messages from the bot in a channel
+   * @param {string} channelId - Discord channel ID
+   * @param {number} count - Number of messages to delete (1-50)
+   * @param {Object} commandMessage - The original command message
+   * @returns {Promise<void>}
+   */
+  async deleteBulkMessages(channelId, count, commandMessage) {
+    try {
+      // Fetch the target channel
+      const targetChannel = await this.discord.client.channels.fetch(channelId).catch(() => null);
+
+      if (!targetChannel) {
+        await commandMessage.reply('❌ Channel not found or not accessible.');
+        return;
+      }
+
+      // Fetch recent messages from the channel
+      const messages = await targetChannel.messages.fetch({ limit: 100 });
+
+      // Filter to only bot messages and get the most recent ones
+      const botMessages = messages
+        .filter(msg => msg.author.id === this.discord.client.user.id)
+        .sort((a, b) => b.createdTimestamp - a.createdTimestamp)
+        .first(count);
+
+      if (botMessages.length === 0) {
+        await commandMessage.reply(`❌ No bot messages found in channel <#${channelId}>.`);
+        return;
+      }
+
+      // Delete messages one by one (Discord.js handles rate limiting)
+      let deletedCount = 0;
+      const errors = [];
+
+      for (const msg of botMessages) {
+        try {
+          await msg.delete();
+          deletedCount++;
+        } catch (error) {
+          errors.push(`${msg.id}: ${error.message}`);
+        }
+      }
+
+      // Send result message
+      let resultMessage = `✅ Deleted ${deletedCount}/${count} bot messages from <#${channelId}>.`;
+      if (errors.length > 0 && errors.length <= 3) {
+        resultMessage += `\n⚠️ Errors: ${errors.join(', ')}`;
+      } else if (errors.length > 3) {
+        resultMessage += `\n⚠️ ${errors.length} messages failed to delete (too old or other errors).`;
+      }
+
+      await commandMessage.reply(resultMessage);
+
+      this.logger.info(`Deleted ${deletedCount} bot messages from channel ${channelId} (requested: ${count})`);
+    } catch (error) {
+      this.logger.error(`Failed to delete bulk messages from channel ${channelId}:`, error);
+      await commandMessage.reply(`❌ Failed to delete messages: ${error.message}`);
     }
   }
 
