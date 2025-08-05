@@ -282,10 +282,9 @@ async function startApplications(container, config) {
   }
 
   // Start YouTube Monitor
-  let monitorAppStart;
   logger.info('Starting YouTube Monitor...');
   const monitorApp = container.resolve('monitorApplication');
-  monitorAppStart = monitorApp.start();
+  const monitorAppStart = monitorApp.start();
 
   // Start Memory Monitor
   try {
@@ -366,7 +365,7 @@ async function startWebServer(container, config) {
   });
 
   // 404 handler
-  app.use((req, res) => {
+  app.use((_req, res) => {
     res.status(404).json({ error: 'Not Found' });
   });
 

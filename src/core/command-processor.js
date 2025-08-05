@@ -1041,7 +1041,7 @@ export class CommandProcessor {
           recentCrashes = crashDetector.getRecentCrashes(5);
           crashDetectorStatus = '✅ Active';
         }
-      } catch (error) {
+      } catch (_error) {
         // Crash detector not available
       }
 

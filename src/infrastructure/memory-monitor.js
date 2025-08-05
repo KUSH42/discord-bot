@@ -1,4 +1,4 @@
-import { nowUTC, timestampUTC } from '../utilities/utc-time.js';
+import { timestampUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**

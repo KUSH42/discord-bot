@@ -1,5 +1,4 @@
 import { splitMessage } from '../discord-utils.js';
-import { nowUTC } from '../utilities/utc-time.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
 
 /**
@@ -118,12 +117,13 @@ export class ContentAnnouncer {
         result.skipped = true;
         result.reason = skipReason;
 
-        const skipInfo = {
+        // Log skip info for debugging
+        this.logger.debug('Content announcement skipped', {
           reason: skipReason,
           postingEnabled: this.state.get('postingEnabled', true),
           announcementEnabled: this.state.get('announcementEnabled', true),
           botStartTime: this.state.get('botStartTime'),
-        };
+        });
 
         return result;
       }
@@ -369,7 +369,7 @@ export class ContentAnnouncer {
    * @param {Object} options - Options
    * @returns {string|Object} Formatted message
    */
-  formatYouTubeMessage(content, options) {
+  formatYouTubeMessage(content, _options) {
     const { title, url, type, channelTitle } = content;
 
     // Debug logging if channel title is missing
