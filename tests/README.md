@@ -270,7 +270,7 @@ criticality:
   functions: 85%,
   lines: 85%
 },
-'src/application/scraper-application.js': {
+'src/application/x-scraper-application.js': {
   statements: 75%,
   branches: 60%,
   functions: 80%,

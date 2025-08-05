@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { XAuthManager } from '../../src/application/x-auth-manager.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { PlaywrightBrowserService } from '../../src/services/implementations/playwright-browser-service.js';

@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('ScraperApplication Initialization', () => {

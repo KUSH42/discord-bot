@@ -8,7 +8,7 @@ Fixed critical memory leaks that caused OOM kills after ~12 hours. Implemented p
 - `MEMORY_LEAK_ANALYSIS.md` - Detailed technical analysis and safety verification
 
 ## 🔧 **Files Modified**
-- `src/application/scraper-application.js` - Added bounded tweet cache with duplicate filtering
+- `src/application/x-scraper-application.js` - Added bounded tweet cache with duplicate filtering
 - `src/services/implementations/youtube-scraper-service.js` - Added bounded video cache
 - `CLAUDE.md` - Updated with memory management documentation
 

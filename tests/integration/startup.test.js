@@ -44,7 +44,7 @@ describe('Application Startup Integration Test', () => {
     jest.spyOn(MonitorApplication.prototype, 'start').mockResolvedValue();
     jest.spyOn(MonitorApplication.prototype, 'stop').mockResolvedValue();
 
-    const scraperAppModule = await import('../../src/application/scraper-application.js');
+    const scraperAppModule = await import('../../src/application/x-scraper-application.js');
     ScraperApplication = scraperAppModule.ScraperApplication;
     jest.spyOn(ScraperApplication.prototype, 'start').mockResolvedValue();
     jest.spyOn(ScraperApplication.prototype, 'stop').mockResolvedValue();

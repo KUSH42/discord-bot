@@ -7,7 +7,7 @@ import {
   createMockEnhancedLogger,
 } from '../utils/enhanced-logging-mocks.js';
 import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';

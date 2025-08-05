@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ScraperApplication Health Monitoring', () => {

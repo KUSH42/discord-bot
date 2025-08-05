@@ -52,7 +52,7 @@ The enhanced logging system consists of:
 #### ScraperApplication (X/Twitter) ✅ FULLY INTEGRATED
 - **Status**: ✅ Complete
 - **Module Name**: `scraper`
-- **Location**: `src/application/scraper-application.js`
+- **Location**: `src/application/x-scraper-application.js`
 - **Features**: Operation tracking for browser setup, polling cycles, tweet processing, authentication verification
 - **Commands**: `!debug scraper true/false`, `!debug-level scraper 1-5`
 - **Benefits**: Runtime debug control for X scraping, detailed browser automation visibility, polling operation tracking

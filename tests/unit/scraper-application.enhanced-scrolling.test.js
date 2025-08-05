@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('Enhanced Scrolling and Profile Navigation', () => {

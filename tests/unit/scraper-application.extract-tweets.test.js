@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 
 describe('ScraperApplication Tweet Extraction', () => {
   let scraperApp;

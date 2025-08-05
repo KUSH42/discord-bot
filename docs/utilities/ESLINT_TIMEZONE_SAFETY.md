@@ -129,7 +129,7 @@ The rules are automatically enabled in the ESLint configuration. To check for vi
 npm run lint
 
 # Check specific file
-npx eslint src/application/scraper-application.js
+npx eslint src/application/x-scraper-application.js
 
 # Auto-fix where possible
 npm run lint:fix
@@ -139,7 +139,7 @@ npm run lint:fix
 
 ```
 error: Use UTC methods instead of local timezone methods. Use getUTCHours instead (timezone-safety/enforce-utc-timestamps)
-  → src/application/scraper-application.js:45:23
+  → src/application/x-scraper-application.js:45:23
     43 |   calculateNextInterval() {
     44 |     const currentHour = new Date().getHours();
        |                                    ^^^^^^^^

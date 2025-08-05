@@ -4,7 +4,7 @@
  */
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { ScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createScraperApplicationMocks, timerTestUtils, createPlaywrightMocks } from '../fixtures/test-helpers.js';
 
 describe('Example: Simplified Test Creation', () => {

@@ -1,8 +1,4 @@
-import {
-  validateEnvironmentVariables,
-  validateDiscordChannelId,
-  validateYouTubeChannelId,
-} from '../config-validator.js';
+import { validateEnvironmentVariables, validateDiscordChannelId, validateYouTubeChannelId } from '../env-validator.js';
 
 /**
  * Centralized configuration management with validation
@@ -73,7 +69,7 @@ export class Configuration {
    */
   validateAll() {
     try {
-      // Use existing validation from config-validator
+      // Use existing validation from env-validator
       const validationResult = validateEnvironmentVariables(this.env);
 
       // Additional specific validations
