@@ -1036,6 +1036,17 @@ export class YouTubeScraperService {
     });
 
     try {
+      // Proactively re-authenticate if not authenticated and auth is enabled
+      if (!currentAuthStatus && this.authEnabled && this.authManager) {
+        operation.progress('Not authenticated, attempting re-authentication');
+        const authResult = await this.authManager.ensureAuthenticated();
+        if (authResult) {
+          operation.progress('Re-authentication successful');
+        } else {
+          operation.progress('Re-authentication failed, continuing with limited access');
+        }
+      }
+
       operation.progress('Fetching both livestream and video content concurrently');
 
       // Fetch both potential new content types concurrently
