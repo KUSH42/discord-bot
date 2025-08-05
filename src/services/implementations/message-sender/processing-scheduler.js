@@ -59,24 +59,24 @@ export class ProcessingScheduler {
     if (!callback || typeof callback !== 'function') {
       throw new Error('Callback must be a function');
     }
-
+    /*
     const operation = this.logger.startOperation('scheduleCallback', {
       testMode: this.testMode,
       requestedDelay: delay,
     });
-
+    */
     this.metrics.totalSchedules++;
     const actualDelay = delay !== null ? delay : this.calculateDelay();
 
-    operation.progress(`Calculated delay: ${actualDelay}ms`);
+    // operation.progress(`Calculated delay: ${actualDelay}ms`);
 
     let result;
     if (this.testMode) {
       result = this.scheduleTestMode(callback, actualDelay);
-      operation.success('Scheduled in test mode', { actualDelay, mode: 'immediate' });
+      // operation.success('Scheduled in test mode', { actualDelay, mode: 'immediate' });
     } else {
       result = this.scheduleProduction(callback, actualDelay);
-      operation.success('Scheduled in production mode', { actualDelay, mode: 'timeout' });
+      // operation.success('Scheduled in production mode', { actualDelay, mode: 'timeout' });
     }
 
     return result;
