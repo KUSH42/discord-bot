@@ -19,6 +19,7 @@ describe('YouTubeAuthManager', () => {
     mockPage = {
       url: jest.fn().mockResolvedValue('https://www.youtube.com/'),
       evaluate: jest.fn(),
+      isClosed: jest.fn().mockReturnValue(false),
     };
 
     mockBrowserService = {
@@ -29,6 +30,7 @@ describe('YouTubeAuthManager', () => {
       waitForSelector: jest.fn().mockResolvedValue(),
       type: jest.fn().mockResolvedValue(),
       click: jest.fn().mockResolvedValue(),
+      getCookies: jest.fn().mockResolvedValue([]),
       page: mockPage,
     };
 
@@ -604,6 +606,20 @@ describe('YouTubeAuthManager', () => {
     });
 
     it('should return true when authentication score is positive', async () => {
+      // Mock authentication cookies
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'SAPISID', value: 'test-sapisid-value' },
+        { name: 'LOGIN_INFO', value: 'test-login-info' },
+      ]);
+
+      // Mock the protected endpoint access check to return success
+      jest.spyOn(youtubeAuthManager, 'testProtectedEndpointAccess').mockResolvedValue({
+        hasAccess: true,
+        statusCode: 200,
+        finalUrl: 'https://www.youtube.com/feed/library',
+        pageTitle: 'Library',
+      });
+
       mockBrowserService.evaluate.mockResolvedValue({
         hasAvatar: true, // +3 score
         hasSignIn: false, // +2 score (no sign in button)
@@ -640,6 +656,20 @@ describe('YouTubeAuthManager', () => {
     });
 
     it('should provide detailed authentication indicators in logs', async () => {
+      // Mock authentication cookies
+      mockBrowserService.getCookies.mockResolvedValue([
+        { name: 'SAPISID', value: 'test-sapisid-value' },
+        { name: 'LOGIN_INFO', value: 'test-login-info' },
+      ]);
+
+      // Mock the protected endpoint access check to return success
+      jest.spyOn(youtubeAuthManager, 'testProtectedEndpointAccess').mockResolvedValue({
+        hasAccess: true,
+        statusCode: 200,
+        finalUrl: 'https://www.youtube.com/feed/library',
+        pageTitle: 'Library',
+      });
+
       const authIndicators = {
         hasAvatar: true,
         hasSignIn: false,
@@ -666,6 +696,14 @@ describe('YouTubeAuthManager', () => {
     });
 
     it('should include debug information in logs', async () => {
+      // Mock the protected endpoint access check to succeed so we get to the debug logging
+      jest.spyOn(youtubeAuthManager, 'testProtectedEndpointAccess').mockResolvedValue({
+        hasAccess: true,
+        statusCode: 200,
+        finalUrl: 'https://www.youtube.com/feed/library',
+        pageTitle: 'Library',
+      });
+
       const authIndicators = {
         hasAvatar: false,
         hasSignIn: true,

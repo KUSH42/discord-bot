@@ -220,12 +220,16 @@ describe('ContentStateManager', () => {
     it('should log debug information', async () => {
       await stateManager.addContent(contentId, initialState);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Content added to state management', {
-        contentId,
-        type: 'youtube_video',
-        state: 'published',
-        source: 'webhook',
-      });
+      // Enhanced logger operation.success() calls info, not debug
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content added to state management'),
+        expect.objectContaining({
+          contentId,
+          type: 'youtube_video',
+          state: 'published',
+          source: 'webhook',
+        })
+      );
     });
 
     it('should handle persistence failures gracefully', async () => {
@@ -236,10 +240,13 @@ describe('ContentStateManager', () => {
 
       expect(result).toBeDefined();
       expect(stateManager.contentStates.has(contentId)).toBe(true);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -302,11 +309,14 @@ describe('ContentStateManager', () => {
 
       await stateManager.updateContentState(contentId, updates);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Content state updated', {
-        contentId,
-        updates: ['state', 'announced'],
-        newState: 'live',
-      });
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('Content state updated'),
+        expect.objectContaining({
+          contentId,
+          updates: ['state', 'announced'],
+          newState: 'live',
+        })
+      );
     });
 
     it('should handle persistence failures gracefully', async () => {
@@ -317,10 +327,13 @@ describe('ContentStateManager', () => {
 
       expect(result.state).toBe('live');
       expect(stateManager.contentStates.get(contentId).state).toBe('live');
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -608,11 +621,14 @@ describe('ContentStateManager', () => {
       expect(stateManager.contentStates.has('old-2')).toBe(false);
 
       expect(mockPersistentStorage.removeContentStates).toHaveBeenCalledWith(['old-1', 'old-2']);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state cleanup completed', {
-        removedCount: 2,
-        remainingCount: 2,
-        maxAgeHours: expect.any(Number),
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content state cleanup completed'),
+        expect.objectContaining({
+          removedCount: 2,
+          remainingCount: 2,
+          maxAgeHours: expect.any(Number),
+        })
+      );
     });
 
     it('should use custom age threshold', async () => {
@@ -632,7 +648,10 @@ describe('ContentStateManager', () => {
 
       await stateManager.cleanup();
 
-      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('No content states to cleanup'),
+        expect.any(Object)
+      );
     });
   });
 
@@ -685,10 +704,13 @@ describe('ContentStateManager', () => {
 
       await stateManager.persistContentState(contentId, contentState);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -781,7 +803,7 @@ describe('ContentStateManager', () => {
       expect(stateManager.contentStates.size).toBe(0);
       expect(stateManager.botStartTime.getTime()).toBeGreaterThan(originalBotStartTime.getTime());
       expect(mockPersistentStorage.clearAllContentStates).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager reset');
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Content state manager reset'));
     });
   });
 
@@ -800,7 +822,7 @@ describe('ContentStateManager', () => {
 
       expect(stateManager.cleanup).toHaveBeenCalled();
       expect(stateManager.contentStates.size).toBe(0);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager destroyed');
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Content state manager destroyed'));
     });
   });
 
@@ -852,10 +874,13 @@ describe('ContentStateManager', () => {
       expect(stateManager.contentStates.has('old-content')).toBe(false);
 
       // Should log the storage error
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to remove content states from storage', {
-        error: 'Storage cleanup failed',
-        removedFromMemory: 1,
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to remove content states from storage'),
+        expect.objectContaining({
+          error: 'Storage cleanup failed',
+          removedFromMemory: 1,
+        })
+      );
     });
 
     it('should handle initializeFromStorage with malformed date strings', async () => {
