@@ -28,7 +28,7 @@ describe('Configuration', () => {
     };
 
     // Import Configuration dynamically to avoid import issues
-    const module = await import('../../src/infrastructure/configuration.js');
+    const module = await import('../../src/config/configurations.js');
     Configuration = module.Configuration;
   });
 

@@ -8,7 +8,7 @@ import {
   validateLogLevel,
   validateBooleanEnvVar,
   parseBooleanEnvVar,
-} from '../../src/config-validator.js';
+} from '../../src/env-validator.js';
 
 describe('Configuration Validation Tests', () => {
   let originalEnv;

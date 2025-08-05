@@ -5,7 +5,7 @@
  * Tests that all components can be initialized and work together
  */
 
-import { Configuration } from './src/infrastructure/configuration.js';
+import { Configuration } from './src/config/configurations.js';
 import { DependencyContainer } from './src/infrastructure/dependency-container.js';
 import { setupProductionServices } from './src/setup/production-setup.js';
 

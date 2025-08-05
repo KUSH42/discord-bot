@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { DependencyContainer } from '../../src/infrastructure/dependency-container.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { setupProductionServices } from '../../src/setup/production-setup.js';
 import { createEnhancedLoggerMocks } from '../fixtures/enhanced-logger-factory.js';
 import { timerTestUtils } from '../fixtures/timer-test-utils.js';

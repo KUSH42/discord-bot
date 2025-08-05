@@ -1,7 +1,7 @@
 // /home/xush/Documents/prog/discord-bot/tests/integration/startup.test.js
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { DependencyContainer } from '../../src/infrastructure/dependency-container.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { setupProductionServices } from '../../src/setup/production-setup.js';
 
 describe('Application Startup Integration Test', () => {
@@ -39,7 +39,7 @@ describe('Application Startup Integration Test', () => {
     jest.spyOn(BotApplication.prototype, 'start').mockResolvedValue();
     jest.spyOn(BotApplication.prototype, 'stop').mockResolvedValue();
 
-    const monitorAppModule = await import('../../src/application/monitor-application.js');
+    const monitorAppModule = await import('../../src/application/yt-monitor-application.js');
     MonitorApplication = monitorAppModule.MonitorApplication;
     jest.spyOn(MonitorApplication.prototype, 'start').mockResolvedValue();
     jest.spyOn(MonitorApplication.prototype, 'stop').mockResolvedValue();

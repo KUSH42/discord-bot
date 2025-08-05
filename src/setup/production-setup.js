@@ -7,7 +7,7 @@ import 'winston-daily-rotate-file';
 
 // Infrastructure
 // Infrastructure classes imported for JSDoc type annotations
-// import { Configuration } from '../infrastructure/configuration.js';
+// import { Configuration } from '../config/configurations.js';
 // import { DependencyContainer } from '../infrastructure/dependency-container.js';
 import { EventBus } from '../infrastructure/event-bus.js';
 import { StateManager } from '../infrastructure/state-manager.js';
@@ -41,8 +41,8 @@ import { YouTubeScraperService } from '../services/implementations/youtube-scrap
 import { XAuthManager } from '../application/x-auth-manager.js';
 import { YouTubeAuthManager } from '../application/youtube-auth-manager.js';
 import { BotApplication } from '../application/bot-application.js';
-import { ScraperApplication } from '../application/scraper-application.js';
-import { MonitorApplication } from '../application/monitor-application.js';
+import { XScraperApplication } from '../application/x-scraper-application.js';
+import { MonitorApplication } from '../application/yt-monitor-application.js';
 
 // Utils
 import { DiscordTransport, LoggerUtils, SystemdSafeConsoleTransport } from '../logger-utils.js';
@@ -363,7 +363,7 @@ async function setupApplicationServices(container, _config) {
 
   // Scraper Application (X/Twitter monitoring)
   container.registerSingleton('scraperApplication', c => {
-    return new ScraperApplication({
+    return new XScraperApplication({
       browserService: c.resolve('xBrowserService'),
       contentCoordinator: c.resolve('contentCoordinator'),
       contentClassifier: c.resolve('contentClassifier'),

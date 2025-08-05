@@ -49,7 +49,7 @@ describe('Production Setup', () => {
   let config;
 
   beforeAll(async () => {
-    ({ Configuration } = await import('../../../src/infrastructure/configuration.js'));
+    ({ Configuration } = await import('../../../src/config/configurations.js'));
     ({ DependencyContainer } = await import('../../../src/infrastructure/dependency-container.js'));
     ({ setupProductionServices } = await import('../../../src/setup/production-setup.js'));
   });

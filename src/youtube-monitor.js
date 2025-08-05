@@ -5,7 +5,7 @@ import { config } from '@dotenvx/dotenvx';
 import { pathToFileURL } from 'url';
 
 // Infrastructure
-import { Configuration } from './infrastructure/configuration.js';
+import { Configuration } from './config/configurations.js';
 import { DependencyContainer } from './infrastructure/dependency-container.js';
 
 // Setup

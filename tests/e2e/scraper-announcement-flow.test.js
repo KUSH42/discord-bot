@@ -6,7 +6,7 @@ import {
   createMockMetricsManager,
   createMockEnhancedLogger,
 } from '../utils/enhanced-logging-mocks.js';
-import { MonitorApplication } from '../../src/application/monitor-application.js';
+import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
 import { ScraperApplication } from '../../src/application/scraper-application.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';

@@ -2,7 +2,7 @@ import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals
 import { CommandProcessor } from '../../src/core/command-processor.js';
 import { ContentClassifier } from '../../src/core/content-classifier.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
 
 describe('Application Input Validation Security Tests', () => {

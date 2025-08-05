@@ -264,7 +264,7 @@ criticality:
   functions: 80%,
   lines: 85%
 },
-'src/application/monitor-application.js': {
+'src/application/yt-monitor-application.js': {
   statements: 85%,
   branches: 75%,
   functions: 85%,

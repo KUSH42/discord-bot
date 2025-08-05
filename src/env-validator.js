@@ -1,4 +1,4 @@
-// config-validator.js
+// env-validator.js
 // Configuration validation utilities for environment variables and security settings
 
 /**

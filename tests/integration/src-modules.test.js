@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { validateEnvironmentVariables } from '../../src/config-validator.js';
+import { validateEnvironmentVariables } from '../../src/env-validator.js';
 import { DuplicateDetector, videoUrlRegex, tweetUrlRegex } from '../../src/duplicate-detector.js';
 import { CommandRateLimit } from '../../src/rate-limiter.js';
 import { splitMessage, DiscordManager } from '../../src/discord-utils.js';

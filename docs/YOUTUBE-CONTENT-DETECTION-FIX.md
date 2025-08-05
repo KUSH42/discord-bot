@@ -301,7 +301,7 @@ this.lockTimeout = 30000; // 30 seconds }
 
 Goal: Ensure webhook notifications are properly received and processed
 
-Implementation: // Enhanced: src/application/monitor-application.js class
+Implementation: // Enhanced: src/application/yt-monitor-application.js class
 EnhancedMonitorApplication { async processWebhookNotification(xmlBody) { const
 notificationId = this.generateNotificationId(xmlBody);
 

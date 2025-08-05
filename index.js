@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { pathToFileURL } from 'url';
 
 // Infrastructure
-import { Configuration } from './src/infrastructure/configuration.js';
+import { Configuration } from './src/config/configurations.js';
 import { DependencyContainer } from './src/infrastructure/dependency-container.js';
 
 // Setup

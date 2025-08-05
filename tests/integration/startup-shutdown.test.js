@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { DependencyContainer } from '../../src/infrastructure/dependency-container.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { setupProductionServices, createShutdownHandler } from '../../src/setup/production-setup.js';
 // DO NOT import real main - it starts production applications
 // import { main } from '../../index.js';

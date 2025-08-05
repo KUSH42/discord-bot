@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { CommandProcessor } from '../../src/core/command-processor.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
 
 describe('CommandProcessor', () => {

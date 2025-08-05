@@ -116,7 +116,7 @@ src/
 │   ├── content-state-manager.js # Unified content state management and persistence (100% test coverage)
 │   └── livestream-state-machine.js # Livestream transition tracking (scheduled → live → ended) (95.37% test coverage)
 ├── 🏗️ infrastructure/        # Foundation layer
-│   ├── configuration.js      # Environment configuration management
+│   ├── configurations.js      # Environment configuration management
 │   ├── debug-flag-manager.js # Module-specific debug controls with runtime toggling
 │   ├── dependency-container.js # Dependency injection container
 │   ├── event-bus.js          # Event-driven communication

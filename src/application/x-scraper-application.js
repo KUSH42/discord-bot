@@ -1,4 +1,4 @@
-import { delay } from '../utils/delay.js';
+import { delay } from '../utilities/delay.js';
 import { nowUTC, toISOStringUTC, daysAgoUTC } from '../utilities/utc-time.js';
 import { getXScrapingBrowserConfig } from '../utilities/browser-config.js';
 import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
@@ -10,7 +10,7 @@ import { createBrowserRateLimiter } from '../services/browser-rate-limiter.js';
  * X (Twitter) scraping application orchestrator
  * Coordinates browser automation, content classification, and announcements
  */
-export class ScraperApplication {
+export class XScraperApplication {
   constructor(dependencies) {
     this.browser = dependencies.browserService;
     this.contentCoordinator = dependencies.contentCoordinator;

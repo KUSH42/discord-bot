@@ -44,7 +44,7 @@ jest.unstable_mockModule('playwright', () => ({
 }));
 
 const { DependencyContainer } = await import('../../src/infrastructure/dependency-container.js');
-const { Configuration } = await import('../../src/infrastructure/configuration.js');
+const { Configuration } = await import('../../src/config/configurations.js');
 const { setupProductionServices } = await import('../../src/setup/production-setup.js');
 const { ScraperApplication } = await import('../../src/application/scraper-application.js');
 

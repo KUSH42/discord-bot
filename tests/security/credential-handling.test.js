@@ -1,6 +1,6 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { XAuthManager } from '../../src/application/x-auth-manager.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
 

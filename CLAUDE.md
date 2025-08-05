@@ -502,7 +502,7 @@ if (process.env.NODE_ENV === 'test') {
 - Discord commands for real-time monitoring
 
 ### Configuration Validation
-- **Startup Validation**: `src/config-validator.js` validates required variables
+- **Startup Validation**: `src/env-validator.js` validates required variables
 - **Type Checking**: Ensure proper data types and formats
 - **Security Checks**: Verify sensitive values are encrypted
 - **Default Values**: Provide sensible defaults where appropriate
