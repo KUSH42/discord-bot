@@ -47,16 +47,16 @@ beforeEach(() => {
 - **Enhanced Logger Factory** (`enhanced-logger-factory.js`): Pre-configured mocks for enhanced logging system
 - **Timer Test Utils** (`timer-test-utils.js`): Advanced async timer coordination patterns
 - **Playwright Mocks** (`playwright-mocks.js`): Complete browser automation mocks with all required methods
-- **Application Mocks** (`application-mocks.js`): Standardized dependency injection for XXScraperApplication, MonitorApplication, ContentAnnouncer
+- **Application Mocks** (`application-mocks.js`): Standardized dependency injection for XScraperApplication, MonitorApplication, ContentAnnouncer
 
 **Usage Example:**
 ```javascript
-import { createXXScraperApplicationMocks, timerTestUtils } from '../fixtures/test-helpers.js';
+import { createXScraperApplicationMocks, timerTestUtils } from '../fixtures/test-helpers.js';
 
 // ✅ BEFORE: 50+ lines of manual mock setup
 // ✅ NOW: 3 lines with comprehensive, tested mocks
-const mocks = createXXScraperApplicationMocks();
-const scraperApp = new XXScraperApplication(mocks);
+const mocks = createXScraperApplicationMocks();
+const scraperApp = new XScraperApplication(mocks);
 const timerUtils = timerTestUtils.setupComplexTimerTest();
 ```
 

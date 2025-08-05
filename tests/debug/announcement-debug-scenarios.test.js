@@ -3,7 +3,7 @@ import { ContentAnnouncer } from '../../src/core/content-announcer.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 
 /**
  * Debug-focused test scenarios to identify announcement bugs
@@ -246,7 +246,7 @@ describe('Announcement Debug Scenarios', () => {
 
     // Create applications
     monitorApp = new MonitorApplication(mockDependencies);
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
 
     // Store references for test analysis
     mockDependencies.discordMessages = discordMessages;

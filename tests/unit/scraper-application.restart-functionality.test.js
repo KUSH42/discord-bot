@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('XXScraperApplication Restart Functionality', () => {
+describe('XScraperApplication Restart Functionality', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -10,9 +10,9 @@ describe('XXScraperApplication Restart Functionality', () => {
   let mockAuthManager;
   let mockContentAnnouncer;
   let mockContentClassifier;
-  let mockLogger;
-  let mockDebugManager;
-  let mockMetricsManager;
+  let _mockLogger;
+  let _mockDebugManager;
+  let _mockMetricsManager;
 
   beforeEach(() => {
     // Mock timers first
@@ -45,6 +45,18 @@ describe('XXScraperApplication Restart Functionality', () => {
           MAX_SCROLLS: '50',
         };
         return values[key] || defaultValue;
+      }),
+      getBoolean: jest.fn((key, defaultValue) => {
+        const values = {
+          BROWSER_HUMANIZED_DELAYS: true,
+          BROWSER_TIME_AWARE_LIMITING: true,
+          ENABLE_RETWEET_PROCESSING: true,
+        };
+        const value = values[key];
+        if (value === undefined) {
+          return defaultValue;
+        }
+        return value;
       }),
     };
 
@@ -102,9 +114,9 @@ describe('XXScraperApplication Restart Functionality', () => {
     });
 
     // Extract mocks from dependencies
-    mockLogger = mockDependencies.logger;
-    mockDebugManager = mockDependencies.debugManager;
-    mockMetricsManager = mockDependencies.metricsManager;
+    _mockLogger = mockDependencies.logger;
+    _mockDebugManager = mockDependencies.debugManager;
+    _mockMetricsManager = mockDependencies.metricsManager;
     mockAuthManager.getCurrentSession = jest.fn(() => ({
       isValid: true,
       expiresAt: Date.now() + 3600000,
@@ -113,7 +125,7 @@ describe('XXScraperApplication Restart Functionality', () => {
     // Create mock delay function for direct control
     const mockDelay = jest.fn().mockResolvedValue();
 
-    // Create XXScraperApplication instance
+    // Create XScraperApplication instance
     const dependencies = {
       config: mockConfig,
       browserService: mockBrowserService,
@@ -135,7 +147,7 @@ describe('XXScraperApplication Restart Functionality', () => {
       delay: mockDelay, // Inject mock delay for direct control
     };
 
-    scraperApp = new XXScraperApplication(dependencies);
+    scraperApp = new XScraperApplication(dependencies);
 
     // Store reference to mock delay for test access
     global.mockDelay = mockDelay;
@@ -157,7 +169,7 @@ describe('XXScraperApplication Restart Functionality', () => {
         success: jest.fn(),
         error: jest.fn(),
       };
-      // Spy on the actual enhanced logger that XXScraperApplication creates
+      // Spy on the actual enhanced logger that XScraperApplication creates
       jest.spyOn(scraperApp.logger, 'startOperation').mockReturnValue(mockOperation);
 
       // Mock the start and stop methods that restart() calls
@@ -172,7 +184,7 @@ describe('XXScraperApplication Restart Functionality', () => {
 
       // Verify operation tracking
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartXXScraperApplication',
+        'restartXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,
@@ -372,7 +384,7 @@ describe('XXScraperApplication Restart Functionality', () => {
 
       // Verify operation was started
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartXXScraperApplication',
+        'restartXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,
@@ -426,7 +438,7 @@ describe('XXScraperApplication Restart Functionality', () => {
 
       // Assert - Verify operation was tracked
       expect(scraperApp.logger.startOperation).toHaveBeenCalledWith(
-        'restartXXScraperApplication',
+        'restartXScraperApplication',
         expect.objectContaining({
           maxRetries: 3,
           baseDelay: 5000,

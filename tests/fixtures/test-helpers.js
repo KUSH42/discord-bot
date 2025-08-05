@@ -11,7 +11,7 @@ import { createEnhancedLoggerMocks, createMockContentCoordinator } from './enhan
 import { timerTestUtils } from './timer-test-utils.js';
 import { createPlaywrightMocks, mockPlaywrightModule } from './playwright-mocks.js';
 import {
-  createXXScraperApplicationMocks,
+  createXScraperApplicationMocks,
   createMonitorApplicationMocks,
   createContentAnnouncerMocks,
 } from './application-mocks.js';
@@ -549,7 +549,7 @@ export {
   timerTestUtils,
   createPlaywrightMocks,
   mockPlaywrightModule,
-  createXXScraperApplicationMocks,
+  createXScraperApplicationMocks,
   createMonitorApplicationMocks,
   createContentAnnouncerMocks,
 };
@@ -575,7 +575,7 @@ export default {
     mockModule: mockPlaywrightModule,
   },
   applications: {
-    createScraperMocks: createXXScraperApplicationMocks,
+    createScraperMocks: createXScraperApplicationMocks,
     createMonitorMocks: createMonitorApplicationMocks,
     createAnnouncerMocks: createContentAnnouncerMocks,
   },

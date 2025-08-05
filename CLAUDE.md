@@ -5,7 +5,7 @@
 **Discord Content Announcement Bot** - Monitors YouTube/X content, announces to Discord channels.
 
 ### Key Components
-- **Application Layer**: `src/application/` - MonitorApplication, XXScraperApplication, XAuthManager
+- **Application Layer**: `src/application/` - MonitorApplication, XScraperApplication, XAuthManager
 - **Core Layer**: `src/core/` - CommandProcessor, ContentAnnouncer, ContentClassifier  
 - **Infrastructure**: `src/infrastructure/` - DependencyContainer, EventBus, StateManager, DebugFlagManager, MetricsManager, **MemoryMonitor**
 - **Services**: `src/services/` - YouTube API, browser automation, external integrations
@@ -16,7 +16,7 @@
 ### Data Flow
 - **Commands**: Discord → CommandProcessor → StateManager → Response
 - **YouTube**: PubSubHubbub webhook → MonitorApplication → ContentAnnouncer → Discord
-- **X Monitoring**: XXScraperApplication → XAuthManager → Browser → ContentClassifier → Discord
+- **X Monitoring**: XScraperApplication → XAuthManager → Browser → ContentClassifier → Discord
 
 ## Development Standards
 
@@ -286,7 +286,7 @@ analyzeContentStore() {
 ### Integration Status (Production Ready)
 #### ✅ Completed Integrations (8 modules + Memory Management + Sampling)
 - **ContentAnnouncer** (`content-announcer`): Content announcement pipeline with progress tracking
-- **XXScraperApplication** (`scraper`): X scraping operations with **memory-managed tweet cache (1000 limit)**
+- **XScraperApplication** (`scraper`): X scraping operations with **memory-managed tweet cache (1000 limit)**
 - **MonitorApplication** (`youtube`): YouTube webhook processing with API fallback monitoring  
 - **BotApplication** (`api`): Discord message processing with command tracking
 - **XAuthManager** (`auth`): Authentication flows with login attempt monitoring
@@ -645,7 +645,7 @@ The detection monitoring system is **fully operational** and ready for productio
 
 ### **Core Components**
 - **MemoryMonitor** (`src/infrastructure/memory-monitor.js`): Real-time memory tracking with leak detection
-- **XXScraperApplication**: Tweet cache (1000 limit, 24h retention) with immediate duplicate filtering
+- **XScraperApplication**: Tweet cache (1000 limit, 24h retention) with immediate duplicate filtering
 - **YouTubeScraperService**: Video cache (500 limit, 48h retention) with automatic cleanup
 - **Enhanced Logging**: Bounded metrics collection (10K samples, 24h retention)
 

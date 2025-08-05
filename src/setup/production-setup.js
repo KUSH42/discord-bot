@@ -41,7 +41,7 @@ import { YouTubeScraperService } from '../services/implementations/youtube-scrap
 import { XAuthManager } from '../application/x-auth-manager.js';
 import { YouTubeAuthManager } from '../application/youtube-auth-manager.js';
 import { BotApplication } from '../application/bot-application.js';
-import { XXXScraperApplication } from '../application/x-scraper-application.js';
+import { XScraperApplication } from '../application/x-scraper-application.js';
 import { MonitorApplication } from '../application/yt-monitor-application.js';
 
 // Utils
@@ -234,13 +234,23 @@ async function setupCoreServices(container, _config) {
   // Content Coordinator
   container.registerSingleton('contentCoordinator', c => {
     return new ContentCoordinator(
-      c.resolve('duplicateDetector'),
-      c.resolve('contentAnnouncer'),
       c.resolve('contentStateManager'),
+      c.resolve('contentAnnouncer'),
+      c.resolve('duplicateDetector'),
+      c.resolve('contentClassifier'),
       c.resolve('logger').child({ service: 'ContentCoordinator' }),
+      c.resolve('config'),
       c.resolve('debugFlagManager'),
       c.resolve('metricsManager'),
-      c.resolve('memoryMonitor')
+      c.resolve('discordService')
+    );
+  });
+
+  // Livestream State Machine
+  container.registerSingleton('livestreamStateMachine', c => {
+    return new LivestreamStateMachine(
+      c.resolve('contentStateManager'),
+      c.resolve('logger').child({ service: 'LivestreamStateMachine' })
     );
   });
 }
@@ -251,44 +261,61 @@ async function setupCoreServices(container, _config) {
 async function setupApplicationServices(container, _config) {
   // XX Scraper Application Service
   container.registerSingleton('scraperApplication', c => {
-    return new XXXScraperApplication(
-      c.resolve('xBrowserService'),
-      c.resolve('contentCoordinator'),
-      c.resolve('xAuthManager'),
-      c.resolve('config'),
-      c.resolve('logger').child({ service: 'XXScraperApplication' }),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager'),
-      c.resolve('memoryMonitor')
-    );
+    return new XScraperApplication({
+      browserService: c.resolve('xBrowserService'),
+      contentCoordinator: c.resolve('contentCoordinator'),
+      contentClassifier: c.resolve('contentClassifier'),
+      discordService: c.resolve('discordService'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      eventBus: c.resolve('eventBus'),
+      logger: c.resolve('logger').child({ service: 'XScraperApplication' }),
+      xAuthManager: c.resolve('xAuthManager'),
+      duplicateDetector: c.resolve('duplicateDetector'),
+      persistentStorage: c.resolve('persistentStorage'),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+      memoryMonitor: c.resolve('memoryMonitor'),
+    });
   });
 
   // Monitor Application Service (PubSubHubbub + API fallback)
   container.registerSingleton('monitorApplication', c => {
-    return new MonitorApplication(
-      c.resolve('youtubeApiService'),
-      c.resolve('eventBus'),
-      c.resolve('logger').child({ service: 'MonitorApplication' }),
-      c.resolve('config'),
-      c.resolve('contentCoordinator'),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager')
-    );
+    return new MonitorApplication({
+      youtubeService: c.resolve('youtubeService'),
+      httpService: c.resolve('httpService'),
+      contentClassifier: c.resolve('contentClassifier'),
+      contentAnnouncer: c.resolve('contentAnnouncer'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      eventBus: c.resolve('eventBus'),
+      logger: c.resolve('logger').child({ service: 'MonitorApplication' }),
+      contentStateManager: c.resolve('contentStateManager'),
+      livestreamStateMachine: c.resolve('livestreamStateMachine'),
+      contentCoordinator: c.resolve('contentCoordinator'),
+      duplicateDetector: c.resolve('duplicateDetector'),
+      persistentStorage: c.resolve('persistentStorage'),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
   });
 
   // Bot Application Service
   container.registerSingleton('botApplication', c => {
-    return new BotApplication(
-      c.resolve('discordService'),
-      c.resolve('stateManager'),
-      c.resolve('commandProcessor'),
-      c.resolve('scraperApplication'),
-      c.resolve('monitorApplication'),
-      c.resolve('logger').child({ service: 'BotApplication' }),
-      c.resolve('config'),
-      c.resolve('debugFlagManager'),
-      c.resolve('metricsManager')
-    );
+    return new BotApplication({
+      exec,
+      discordService: c.resolve('discordService'),
+      commandProcessor: c.resolve('commandProcessor'),
+      eventBus: c.resolve('eventBus'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      logger: c.resolve('logger').child({ service: 'BotApplication' }),
+      scraperApplication: c.resolve('scraperApplication'),
+      monitorApplication: c.resolve('monitorApplication'),
+      youtubeScraperService: c.resolve('youtubeScraperService'),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
   });
 
   // YouTube Scraper Service
@@ -432,505 +459,75 @@ async function setupExternalServices(container, config) {
   });
 
   // YouTube scraper browser service - dedicated singleton for YouTube scraping
-  container.registerSingleton(
-    'youtubeBrowserService',
-    c => {
-      return new PlaywrightBrowserService(
-        c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
-        c.resolve('debugFlagManager'),
-        c.resolve('metricsManager')
-      );
-    },
+  container.registerSingleton('youtubeBrowserService', c => {
+    return new PlaywrightBrowserService(
+      c.resolve('logger').child({ service: 'YouTubeBrowserService' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager')
+    );
+  });
 
-    // Stealth Browser Factory for enhanced browser services
-    container.registerSingleton(
-      'stealthBrowserFactory',
-      c => {
-        return new StealthBrowserFactory(
-          c.resolve('logger').child({ service: 'StealthBrowserFactory' }),
-          c.resolve('debugFlagManager'),
-          c.resolve('metricsManager'),
-          c.resolve('detectionMonitor'),
-          c.resolve('performanceMonitor')
-        );
-      },
+  // Stealth Browser Factory for enhanced browser services
+  container.registerSingleton('stealthBrowserFactory', c => {
+    return new StealthBrowserFactory(
+      c.resolve('logger').child({ service: 'StealthBrowserFactory' }),
+      c.resolve('debugFlagManager'),
+      c.resolve('metricsManager'),
+      c.resolve('detectionMonitor'),
+      c.resolve('performanceMonitor')
+    );
+  });
 
-      // Browser Service - Use stealth factory if enabled
-      container.registerSingleton('browserService', async c => {
-        const config = c.resolve('config');
-        const logger = c.resolve('logger').child({ service: 'BrowserService' });
+  // Browser Service - Use stealth factory if enabled
+  container.registerSingleton('browserService', async c => {
+    const config = c.resolve('config');
+    const logger = c.resolve('logger').child({ service: 'BrowserService' });
 
-        const stealthConfig = config.getBrowserStealthConfig();
+    const stealthConfig = config.getBrowserStealthConfig();
 
-        if (stealthConfig.stealthEnabled) {
-          logger.info('Creating enhanced browser service with stealth capabilities', {
-            behaviorSimulation: stealthConfig.behaviorSimulationEnabled,
-            intelligentRateLimiting: stealthConfig.intelligentRateLimiting,
-            profilePersistence: stealthConfig.profilePersistence,
-          });
-          const stealthFactory = c.resolve('stealthBrowserFactory');
-          return await stealthFactory.createStealthBrowser({
-            purpose: 'x-monitoring',
-            stealthConfig,
-          });
-        } else {
-          logger.info('Creating standard browser service');
-          const stealthFactory = c.resolve('stealthBrowserFactory');
-          return await stealthFactory.createBasicBrowser({
-            purpose: 'standard',
-          });
-        }
-      })
-    ),
-
-    /**
-     * Set up core business logic services
-     */
-    async (container, _config) => {
-      // Command Processor
-      container.registerSingleton('commandProcessor', c => {
-        return new CommandProcessor(
-          c.resolve('config'),
-          c.resolve('stateManager'),
-          c.resolve('debugFlagManager'),
-          c.resolve('metricsManager'),
-          c.resolve('logger').child({ service: 'CommandProcessor' }),
-          c.resolve('memoryMonitor'),
-          c.resolve('detectionMonitor'),
-          c.resolve('performanceMonitor')
-        );
+    if (stealthConfig.stealthEnabled) {
+      logger.info('Creating enhanced browser service with stealth capabilities', {
+        behaviorSimulation: stealthConfig.behaviorSimulationEnabled,
+        intelligentRateLimiting: stealthConfig.intelligentRateLimiting,
+        profilePersistence: stealthConfig.profilePersistence,
       });
-
-      // Content Classifier
-      container.registerSingleton('contentClassifier', c => {
-        return new ContentClassifier(c.resolve('logger'), c.resolve('debugFlagManager'), c.resolve('metricsManager'));
+      const stealthFactory = c.resolve('stealthBrowserFactory');
+      return await stealthFactory.createStealthBrowser({
+        purpose: 'x-monitoring',
+        stealthConfig,
       });
-
-      // Content Announcer
-      container.registerSingleton('contentAnnouncer', c => {
-        return new ContentAnnouncer(
-          c.resolve('discordService'),
-          c.resolve('config'),
-          c.resolve('stateManager'),
-          c.resolve('logger').child({ service: 'ContentAnnouncer' }),
-          c.resolve('debugFlagManager'),
-          c.resolve('metricsManager')
-        );
+    } else {
+      logger.info('Creating standard browser service');
+      const stealthFactory = c.resolve('stealthBrowserFactory');
+      return await stealthFactory.createBasicBrowser({
+        purpose: 'standard',
       });
-
-      // Duplicate Detector - with persistent storage disabled to avoid JSON corruption
-      container.registerSingleton('duplicateDetector', c => {
-        return new DuplicateDetector(
-          null, // Disable persistent storage - rely only on Discord history and in-memory caches
-          c.resolve('logger').child({ service: 'DuplicateDetector' })
-        );
-      });
-
-      // Content State Manager
-      container.registerSingleton('contentStateManager', c => {
-        return new ContentStateManager(
-          c.resolve('config'),
-          c.resolve('persistentStorage'),
-          c.resolve('logger').child({ service: 'ContentStateManager' })
-        );
-      });
-
-      // Content Coordinator
-      container.registerSingleton('contentCoordinator', c => {
-        return new ContentCoordinator(
-          c.resolve('contentStateManager'),
-          c.resolve('contentAnnouncer'),
-          c.resolve('duplicateDetector'),
-          c.resolve('contentClassifier'),
-          c.resolve('logger').child({ service: 'ContentCoordinator' }),
-          c.resolve('config'),
-          c.resolve('debugFlagManager'),
-          c.resolve('metricsManager'),
-          c.resolve('discordService')
-        );
-      });
-
-      // Livestream State Machine
-      (container.registerSingleton('livestreamStateMachine', c => {
-        return new LivestreamStateMachine(
-          c.resolve('contentStateManager'),
-          c.resolve('logger').child({ service: 'LivestreamStateMachine' })
-        );
-      }),
-        /**
-         * Set up application services
-         */
-        async function setupApplicationServices(container, _config) {
-          // Bot Application
-          container.registerSingleton('botApplication', c => {
-            return new BotApplication({
-              exec,
-              discordService: c.resolve('discordService'),
-              commandProcessor: c.resolve('commandProcessor'),
-              eventBus: c.resolve('eventBus'),
-              config: c.resolve('config'),
-              stateManager: c.resolve('stateManager'),
-              logger: c.resolve('logger').child({ service: 'BotApplication' }),
-              scraperApplication: c.resolve('scraperApplication'),
-              monitorApplication: c.resolve('monitorApplication'),
-              youtubeScraperService: c.resolve('youtubeScraperService'),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-            });
-          });
-
-          // X Auth Manager
-          container.registerSingleton('xAuthManager', c => {
-            return new XAuthManager({
-              browserService: c.resolve('xBrowserService'),
-              config: c.resolve('config'),
-              stateManager: c.resolve('stateManager'),
-              logger: c.resolve('logger').child({ service: 'XAuthManager' }),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-            });
-          });
-
-          // YouTube Auth Manager
-          container.registerSingleton('youtubeAuthManager', c => {
-            return new YouTubeAuthManager({
-              browserService: c.resolve('youtubeBrowserService'),
-              config: c.resolve('config'),
-              stateManager: c.resolve('stateManager'),
-              logger: c.resolve('logger').child({ service: 'YouTubeAuthManager' }),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-            });
-          });
-
-          // Scraper Application (X/Twitter monitoring)
-          container.registerSingleton('scraperApplication', c => {
-            return new XXXScraperApplication({
-              browserService: c.resolve('xBrowserService'),
-              contentCoordinator: c.resolve('contentCoordinator'),
-              contentClassifier: c.resolve('contentClassifier'),
-              discordService: c.resolve('discordService'),
-              config: c.resolve('config'),
-              stateManager: c.resolve('stateManager'),
-              eventBus: c.resolve('eventBus'),
-              logger: c.resolve('logger').child({ service: 'XXScraperApplication' }),
-              xAuthManager: c.resolve('xAuthManager'),
-              duplicateDetector: c.resolve('duplicateDetector'),
-              persistentStorage: c.resolve('persistentStorage'),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-            });
-          });
-
-          // Monitor Application (YouTube monitoring)
-          container.registerSingleton('monitorApplication', c => {
-            return new MonitorApplication({
-              youtubeService: c.resolve('youtubeService'),
-              httpService: c.resolve('httpService'),
-              contentClassifier: c.resolve('contentClassifier'),
-              contentAnnouncer: c.resolve('contentAnnouncer'),
-              config: c.resolve('config'),
-              stateManager: c.resolve('stateManager'),
-              eventBus: c.resolve('eventBus'),
-              logger: c.resolve('logger').child({ service: 'MonitorApplication' }),
-              contentStateManager: c.resolve('contentStateManager'),
-              livestreamStateMachine: c.resolve('livestreamStateMachine'),
-              contentCoordinator: c.resolve('contentCoordinator'),
-              duplicateDetector: c.resolve('duplicateDetector'),
-              persistentStorage: c.resolve('persistentStorage'),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-            });
-          });
-
-          // YouTube Scraper Service
-          container.registerSingleton('youtubeScraperService', c => {
-            return new YouTubeScraperService({
-              logger: c.resolve('logger').child({ service: 'YouTubeScraperService' }),
-              config: c.resolve('config'),
-              contentCoordinator: c.resolve('contentCoordinator'),
-              debugManager: c.resolve('debugFlagManager'),
-              metricsManager: c.resolve('metricsManager'),
-              browserService: c.resolve('youtubeBrowserService'),
-              youtubeAuthManager: c.resolve('youtubeAuthManager'),
-              stateManager: c.resolve('stateManager'),
-              memoryMonitor: c.resolve('memoryMonitor'),
-            });
-          });
-        });
-
-      /**
-       * Set up logging infrastructure
-       */
-      async function setupLogging(container, config) {
-        container.registerSingleton('logger', _c => {
-          const logLevel = config.get('LOG_LEVEL', 'info');
-          const logFilePath = config.get('LOG_FILE_PATH', 'bot.log');
-
-          // Create transports
-          const transports = [
-            // Systemd-safe console transport that handles EPIPE errors gracefully
-            LoggerUtils.createSystemdSafeConsoleTransport({
-              level: logLevel,
-            }),
-            // File transport with rotation
-            new winston.transports.DailyRotateFile({
-              level: logLevel,
-              filename: logFilePath.replace('.log', '-%DATE%.log'),
-              datePattern: 'YYYY-MM-DD',
-              maxSize: '20m',
-              maxFiles: '14d',
-              format: createFileLogFormat(),
-            }),
-          ];
-
-          // Note: Discord transport will be added later to avoid circular dependency
-          // between logger and discordService
-          return winston.createLogger({
-            level: logLevel,
-            format: winston.format.combine(winston.format.timestamp(), winston.format.errors({ stack: true })),
-            transports,
-          });
-        });
-
-        // Setup crash detection system immediately after logger
-        container.registerSingleton('crashDetector', c => {
-          const logger = c.resolve('logger');
-          const crashDetector = new CrashDetector(logger);
-          crashDetector.setup();
-          return crashDetector;
-        });
-      }
-
-      /**
-       * Configure Discord logging transport after both logger and discordService are created
-       */
-      async function setupDiscordLogging(container, config) {
-        const supportChannelId = config.get('DISCORD_BOT_SUPPORT_LOG_CHANNEL');
-        // Skip Discord logging setup in test environment to prevent rate limit errors
-        if (supportChannelId && process.env.NODE_ENV !== 'test') {
-          const logger = container.resolve('logger');
-          const discordService = container.resolve('discordService');
-          const debugFlagManager = container.resolve('debugFlagManager');
-          const metricsManager = container.resolve('metricsManager');
-          const logLevel = config.get('LOG_LEVEL', 'info');
-
-          // Add Discord transport to existing logger with balanced rate limiting
-          // Only log warn and above to Discord to reduce spam
-          const discordTransport = new DiscordTransport({
-            level: config.get('LOG_LEVEL', 'info'), // Only log warnings, errors, and above to Discord
-            client: discordService.client,
-            channelId: supportChannelId,
-            debugManager: debugFlagManager,
-            metricsManager,
-            flushInterval: 1000, // 1 second to match send delay
-            maxBufferSize: 20, // Match burst allowance
-            burstAllowance: 30, // Allow reasonable burst for startup logging
-            burstResetTime: 60000, // 1 minute - longer reset for better recovery
-            baseSendDelay: 1000, // 1 seconds between sends - functional
-            testMode: false, // Ensure production mode rate limiting
-          });
-
-          logger.add(discordTransport);
-        }
-      }
-
-      /**
-       * Set up webhook endpoints
-       * @param {express.Application} app - Express application
-       * @param {DependencyContainer} container - Dependency container
-       */
-      async function setupWebhookEndpoints(app, container) {
-        const monitorApplication = container.resolve('monitorApplication');
-        const logger = container.resolve('logger');
-
-        // YouTube PubSubHubbub webhook
-        app.all('/youtube-webhook', async (req, res) => {
-          const requestStart = Date.now();
-          const requestId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-
-          try {
-            // Log incoming webhook request details
-            logger.info('[WEBHOOK-ENDPOINT] Incoming request', {
-              requestId,
-              method: req.method,
-              url: req.url,
-              userAgent: req.headers['user-agent'],
-              contentType: req.headers['content-type'],
-              contentLength: req.headers['content-length'],
-              remoteAddress: req.ip || req.connection.remoteAddress,
-              forwardedFor: req.headers['x-forwarded-for'],
-              hasSignature: !!req.headers['x-hub-signature'],
-            });
-
-            const result = await monitorApplication.handleWebhook({
-              method: req.method,
-              headers: req.headers,
-              query: req.query,
-              body: req.body,
-            });
-
-            const processingTime = Date.now() - requestStart;
-
-            logger.info('[WEBHOOK-ENDPOINT] Request processed', {
-              requestId,
-              status: result.status,
-              processingTime,
-              responseMessage: result.message,
-            });
-
-            res.status(result.status);
-            if (result.body) {
-              res.send(result.body);
-            } else {
-              res.send(result.message || 'OK');
-            }
-          } catch (error) {
-            const processingTime = Date.now() - requestStart;
-
-            logger.error('[WEBHOOK-ENDPOINT] Webhook error:', {
-              requestId,
-              error: error.message,
-              stack: error.stack,
-              processingTime,
-              method: req.method,
-              url: req.url,
-            });
-
-            res.status(500).send('Internal Server Error');
-          }
-        });
-
-        // Health check endpoints
-        app.get('/health', (req, res) => {
-          const botApp = container.resolve('botApplication');
-          const status = botApp.getStatus();
-
-          res.json({
-            status: status.isRunning && status.isDiscordReady ? 'healthy' : 'unhealthy',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime(),
-          });
-        });
-
-        app.get('/health/detailed', (req, res) => {
-          const botApp = container.resolve('botApplication');
-          const scraperApp = container.resolve('scraperApplication');
-          const monitorApp = container.resolve('monitorApplication');
-
-          res.json({
-            bot: botApp.getStatus(),
-            scraper: scraperApp.getStats(),
-            monitor: monitorApp.getStats(),
-            system: {
-              uptime: process.uptime(),
-              memory: process.memoryUsage(),
-              timestamp: new Date().toISOString(),
-            },
-          });
-        });
-
-        app.get('/ready', (req, res) => {
-          const botApp = container.resolve('botApplication');
-          const status = botApp.getStatus();
-
-          if (status.isRunning && status.isDiscordReady) {
-            res.status(200).send('Ready');
-          } else {
-            res.status(503).send('Not Ready');
-          }
-        });
-
-        // Anti-botting system health endpoints
-        app.get('/health/anti-bot-status', (req, res) => {
-          try {
-            const detectionMonitor = container.resolve('detectionMonitor');
-            const performanceMonitor = container.resolve('performanceMonitor');
-            const stealthEnabled = config.get('BROWSER_STEALTH_ENABLED', 'false') === 'true';
-
-            const detectionStats = detectionMonitor.getStatistics();
-            const performanceStats = performanceMonitor.getStatistics();
-
-            res.json({
-              status: stealthEnabled ? 'enabled' : 'disabled',
-              stealth: {
-                enabled: stealthEnabled,
-                emergencyMode: detectionStats.emergencyMode?.active || false,
-                successRate: detectionStats.successRate,
-                detectionRate: detectionStats.detectionRate,
-                recentIncidents: detectionStats.recentIncidents,
-              },
-              performance: {
-                overallGrade: performanceStats.grades?.overall || 'N/A',
-                memoryGrade: performanceStats.grades?.memory || 'N/A',
-                navigationGrade: performanceStats.grades?.navigation || 'N/A',
-                reliabilityGrade: performanceStats.grades?.reliability || 'N/A',
-                memoryUsageMB: performanceStats.currentMetrics?.memoryUsageMB || 0,
-                averageNavigationMs: Math.round(performanceStats.currentMetrics?.averageNavigationTime || 0),
-              },
-              timestamp: new Date().toISOString(),
-            });
-          } catch (error) {
-            res.status(503).json({
-              status: 'unavailable',
-              error: 'Anti-botting monitoring not available',
-              message: error.message,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        });
-
-        app.get('/health/detection-metrics', (req, res) => {
-          try {
-            const detectionMonitor = container.resolve('detectionMonitor');
-            const report = detectionMonitor.getDetectionReport();
-
-            res.json({
-              summary: report.summary,
-              recentIncidents: report.incidents.slice(-10), // Last 10 incidents
-              configuration: report.configuration,
-              statistics: report.statistics,
-              timestamp: new Date().toISOString(),
-            });
-          } catch (error) {
-            res.status(503).json({
-              status: 'unavailable',
-              error: 'Detection monitoring not available',
-              message: error.message,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        });
-
-        app.get('/health/performance-impact', (req, res) => {
-          try {
-            const performanceMonitor = container.resolve('performanceMonitor');
-            const report = performanceMonitor.getPerformanceReport();
-
-            res.json({
-              grades: report.grades,
-              currentMetrics: report.currentMetrics,
-              statistics: report.statistics,
-              recentSamples: {
-                navigation: report.recentSamples.navigation?.length || 0,
-                memory: report.recentSamples.memory?.length || 0,
-                errors: report.recentSamples.errors?.length || 0,
-              },
-              recommendations: report.recommendations,
-              timestamp: new Date().toISOString(),
-            });
-          } catch (error) {
-            res.status(503).json({
-              status: 'unavailable',
-              error: 'Performance monitoring not available',
-              message: error.message,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        });
-      }
     }
-  );
+  });
+
+  // X Auth Manager
+  container.registerSingleton('xAuthManager', c => {
+    return new XAuthManager({
+      browserService: c.resolve('xBrowserService'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      logger: c.resolve('logger').child({ service: 'XAuthManager' }),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
+  });
+
+  // YouTube Auth Manager
+  container.registerSingleton('youtubeAuthManager', c => {
+    return new YouTubeAuthManager({
+      browserService: c.resolve('youtubeBrowserService'),
+      config: c.resolve('config'),
+      stateManager: c.resolve('stateManager'),
+      logger: c.resolve('logger').child({ service: 'YouTubeAuthManager' }),
+      debugManager: c.resolve('debugFlagManager'),
+      metricsManager: c.resolve('metricsManager'),
+    });
+  });
 }
 
 /**

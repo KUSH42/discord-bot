@@ -41,6 +41,11 @@ export class PlaywrightBrowserService extends BrowserService {
       this.browser = await chromium.launch(options);
       operation.progress(`Browser launched: ${!!this.browser}, Connected: ${this.browser?.isConnected()}`);
 
+      // Verify browser was created successfully
+      if (!this.browser) {
+        throw new Error('Browser launch failed');
+      }
+
       // Setup browser crash monitoring
       this.setupBrowserMonitoring();
 
@@ -471,7 +476,7 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {boolean} True if browser is running
    */
   isRunning() {
-    return this.browser !== null && this.browser.isConnected();
+    return this.browser && typeof this.browser.isConnected === 'function' && this.browser.isConnected();
   }
 
   /**
@@ -479,7 +484,7 @@ export class PlaywrightBrowserService extends BrowserService {
    * @returns {boolean} True if browser is connected
    */
   isConnected() {
-    return this.browser !== null && this.browser.isConnected();
+    return this.browser && typeof this.browser.isConnected === 'function' && this.browser.isConnected();
   }
 
   /**

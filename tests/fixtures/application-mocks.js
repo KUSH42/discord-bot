@@ -6,7 +6,7 @@
 import { jest } from '@jest/globals';
 import { createEnhancedLoggerMocks, createMockContentCoordinator } from './enhanced-logger-factory.js';
 
-export const createXXScraperApplicationMocks = () => {
+export const createXScraperApplicationMocks = () => {
   const enhancedMocks = createEnhancedLoggerMocks();
 
   return {

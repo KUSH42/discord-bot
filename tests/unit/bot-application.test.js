@@ -13,7 +13,7 @@ describe('BotApplication', () => {
   let mockConfig;
   let mockStateManager;
   let mockLogger;
-  let mockXXScraperApplication;
+  let mockXScraperApplication;
   let mockMonitorApplication;
   let mockYoutubeScraper;
   let mockExec;
@@ -106,7 +106,7 @@ describe('BotApplication', () => {
       child: jest.fn(() => mockLogger),
     };
 
-    mockXXScraperApplication = {
+    mockXScraperApplication = {
       getStats: jest.fn().mockReturnValue({
         pollingInterval: { next: timestampUTC() + 60000 },
         isRunning: true,
@@ -185,7 +185,7 @@ describe('BotApplication', () => {
       logger: mockLogger,
       debugManager: mockDebugManager,
       metricsManager: mockMetricsManager,
-      scraperApplication: mockXXScraperApplication,
+      scraperApplication: mockXScraperApplication,
       monitorApplication: mockMonitorApplication,
       youtubeScraperService: mockYoutubeScraper,
     };
@@ -645,7 +645,7 @@ describe('BotApplication', () => {
 
         await botApplication.initializeDiscordHistoryScanning();
 
-        expect(mockXXScraperApplication.duplicateDetector.scanDiscordChannelForTweets).toHaveBeenCalledTimes(4);
+        expect(mockXScraperApplication.duplicateDetector.scanDiscordChannelForTweets).toHaveBeenCalledTimes(4);
       });
 
       it('should handle missing duplicate detector', async () => {

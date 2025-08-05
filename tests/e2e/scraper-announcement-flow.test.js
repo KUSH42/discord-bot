@@ -7,7 +7,7 @@ import {
   createMockEnhancedLogger,
 } from '../utils/enhanced-logging-mocks.js';
 import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { ContentCoordinator } from '../../src/core/content-coordinator.js';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';
@@ -289,7 +289,7 @@ describe('Scraper Announcement Flow E2E', () => {
 
     // Create application instances
     monitorApp = new MonitorApplication(mockDependencies);
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   afterEach(async () => {
@@ -532,8 +532,8 @@ describe('Scraper Announcement Flow E2E', () => {
         ]);
       });
 
-      // Since XXScraperApplication uses ContentAnnouncer directly, we don't need to mock ContentCoordinator
-      // Reset the ContentAnnouncer mock to track actual calls made by XXScraperApplication
+      // Since XScraperApplication uses ContentAnnouncer directly, we don't need to mock ContentCoordinator
+      // Reset the ContentAnnouncer mock to track actual calls made by XScraperApplication
 
       // Ensure all mocks are cleared for this test suite
       jest.clearAllMocks();

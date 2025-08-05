@@ -24,6 +24,19 @@ jest.unstable_mockModule('discord.js', () => ({
     Channel: 'Channel',
     Reaction: 'Reaction',
   },
+  ChannelType: {
+    DM: 1,
+    GroupDM: 3,
+    GuildText: 0,
+    GuildVoice: 2,
+    GuildCategory: 4,
+    GuildAnnouncement: 5,
+    AnnouncementThread: 10,
+    PublicThread: 11,
+    PrivateThread: 12,
+    GuildStageVoice: 13,
+    GuildForum: 15,
+  },
 }));
 
 jest.unstable_mockModule('googleapis', () => ({
@@ -44,6 +57,7 @@ jest.unstable_mockModule('playwright', () => ({
         close: jest.fn(),
       }),
       close: jest.fn(),
+      isConnected: jest.fn().mockReturnValue(true),
     }),
   },
 }));
@@ -79,6 +93,8 @@ describe('Production Setup Validation', () => {
       X_USER_HANDLE: 'testuser',
       TWITTER_USERNAME: 'testuser',
       TWITTER_PASSWORD: 'testpass',
+      YOUTUBE_USERNAME: 'testuser',
+      YOUTUBE_PASSWORD: 'testpass',
       LOG_LEVEL: 'info',
     };
 
@@ -200,8 +216,11 @@ describe('Production Setup Validation', () => {
 
       // Verify configuration is accessible
       expect(scraperApp.xUser).toBe('testuser');
-      expect(scraperApp.twitterUsername).toBe('testuser');
-      expect(scraperApp.twitterPassword).toBe('testpass');
+
+      // Verify XAuthManager properties through its instance
+      expect(scraperApp.xAuthManager).toBeDefined();
+      expect(scraperApp.xAuthManager.twitterUsername).toBe('testuser');
+      expect(scraperApp.xAuthManager.twitterPassword).toBe('testpass');
     });
 
     it('should resolve all monitor application dependencies', async () => {
@@ -284,11 +303,11 @@ describe('Production Setup Validation', () => {
     it('should handle browser service failure gracefully', async () => {
       await setupProductionServices(container, config);
 
-      const browserService = container.resolve('browserService');
+      const xBrowserService = container.resolve('xBrowserService');
 
       // Mock browser launch failure - this should throw as expected
       const mockFailingLaunch = jest.fn().mockRejectedValue(new Error('Browser launch failed'));
-      browserService.launch = mockFailingLaunch;
+      xBrowserService.launch = mockFailingLaunch;
 
       const scraperApp = container.resolve('scraperApplication');
 

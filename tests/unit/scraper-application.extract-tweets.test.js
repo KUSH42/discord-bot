@@ -1,7 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 
-describe('XXScraperApplication Tweet Extraction', () => {
+describe('XScraperApplication Tweet Extraction', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -81,7 +81,7 @@ describe('XXScraperApplication Tweet Extraction', () => {
       persistentStorage: { get: jest.fn(), set: jest.fn() },
     };
 
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   describe('extractTweets', () => {

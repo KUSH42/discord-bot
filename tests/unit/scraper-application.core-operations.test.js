@@ -1,9 +1,9 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('XXScraperApplication Core Operations', () => {
+describe('XScraperApplication Core Operations', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -136,7 +136,7 @@ describe('XXScraperApplication Core Operations', () => {
       metricsManager: enhancedLoggingMocks.metricsManager,
     };
 
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   afterEach(() => {
@@ -166,7 +166,7 @@ describe('XXScraperApplication Core Operations', () => {
       const depsWithoutDetector = { ...mockDependencies };
       delete depsWithoutDetector.duplicateDetector;
 
-      expect(() => new XXScraperApplication(depsWithoutDetector)).toThrow(
+      expect(() => new XScraperApplication(depsWithoutDetector)).toThrow(
         'DuplicateDetector dependency is required but not provided'
       );
     });

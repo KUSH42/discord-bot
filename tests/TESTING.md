@@ -50,12 +50,12 @@ All major test utilities are fully operational in `tests/fixtures/`:
 
 ### Application Mocks
 ```javascript
-import { createXXScraperApplicationMocks } from '../fixtures/test-helpers.js';
+import { createXScraperApplicationMocks } from '../fixtures/test-helpers.js';
 
 // ✅ Before: 50+ lines of manual mock setup
 // ✅ Now: 3 lines with comprehensive mocks
-const mocks = createXXScraperApplicationMocks();
-const scraperApp = new XXScraperApplication(mocks);
+const mocks = createXScraperApplicationMocks();
+const scraperApp = new XScraperApplication(mocks);
 ```
 
 ### Timer Testing (Advanced)
@@ -818,6 +818,6 @@ const mockDep2 = { method: jest.fn() };
 // ... 50+ lines of manual setup
 
 // After
-import { createXXScraperApplicationMocks } from '../fixtures/test-helpers.js';
-const mocks = createXXScraperApplicationMocks();
+import { createXScraperApplicationMocks } from '../fixtures/test-helpers.js';
+const mocks = createXScraperApplicationMocks();
 ```

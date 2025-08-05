@@ -6,7 +6,7 @@ import { setupProductionServices } from '../../src/setup/production-setup.js';
 
 describe('Application Startup Integration Test', () => {
   let container;
-  let BotApplication, MonitorApplication, XXScraperApplication;
+  let BotApplication, MonitorApplication, XScraperApplication;
   let originalEnv;
 
   beforeEach(async () => {
@@ -45,9 +45,9 @@ describe('Application Startup Integration Test', () => {
     jest.spyOn(MonitorApplication.prototype, 'stop').mockResolvedValue();
 
     const scraperAppModule = await import('../../src/application/x-scraper-application.js');
-    XXScraperApplication = scraperAppModule.XXScraperApplication;
-    jest.spyOn(XXScraperApplication.prototype, 'start').mockResolvedValue();
-    jest.spyOn(XXScraperApplication.prototype, 'stop').mockResolvedValue();
+    XScraperApplication = scraperAppModule.XScraperApplication;
+    jest.spyOn(XScraperApplication.prototype, 'start').mockResolvedValue();
+    jest.spyOn(XScraperApplication.prototype, 'stop').mockResolvedValue();
   });
 
   afterEach(async () => {
@@ -83,11 +83,11 @@ describe('Application Startup Integration Test', () => {
     // Verify that start methods are properly mocked and available
     expect(BotApplication.prototype.start).toBeDefined();
     expect(MonitorApplication.prototype.start).toBeDefined();
-    expect(XXScraperApplication.prototype.start).toBeDefined();
+    expect(XScraperApplication.prototype.start).toBeDefined();
 
     // Verify they're mocked functions
     expect(jest.isMockFunction(BotApplication.prototype.start)).toBe(true);
     expect(jest.isMockFunction(MonitorApplication.prototype.start)).toBe(true);
-    expect(jest.isMockFunction(XXScraperApplication.prototype.start)).toBe(true);
+    expect(jest.isMockFunction(XScraperApplication.prototype.start)).toBe(true);
   });
 });

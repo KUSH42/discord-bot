@@ -421,14 +421,14 @@ describe('XAuthManager', () => {
           .mockResolvedValueOnce('input[name="password"]');
         jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
 
-        // Start the login process and expect it to reject
-        const loginPromise = await expect(xAuthManager.loginToX()).rejects.toThrow('Authentication failed');
+        // Start the login process
+        const loginPromise = xAuthManager.loginToX();
 
         // Fast-forward all timers to allow the authentication attempts to complete
         await jest.runAllTimersAsync();
 
-        // Wait for the promise to be handled
-        await loginPromise;
+        // Now expect it to reject
+        await expect(loginPromise).rejects.toThrow('Authentication failed');
       } finally {
         jest.useRealTimers();
       }
@@ -608,12 +608,12 @@ describe('XAuthManager', () => {
         jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
         mockBrowserService.waitForNavigation.mockRejectedValue(new Error('Network error'));
 
-        const loginPromise = await expect(xAuthManager.loginToX()).rejects.toThrow('Network error');
+        const loginPromise = xAuthManager.loginToX();
 
         // Fast-forward timers to allow the operation to complete
         await jest.runAllTimersAsync();
 
-        await loginPromise;
+        await expect(loginPromise).rejects.toThrow('Network error');
       } finally {
         jest.useRealTimers();
       }

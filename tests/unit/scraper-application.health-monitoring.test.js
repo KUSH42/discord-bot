@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('XXScraperApplication Health Monitoring', () => {
+describe('XScraperApplication Health Monitoring', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -156,7 +156,7 @@ describe('XXScraperApplication Health Monitoring', () => {
       },
     };
 
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   afterEach(() => {

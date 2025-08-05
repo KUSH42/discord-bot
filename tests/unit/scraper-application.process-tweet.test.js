@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { XXScraperApplication } from '../../src/application/x-scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('XXScraperApplication Process Tweet', () => {
+describe('XScraperApplication Process Tweet', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -106,7 +106,7 @@ describe('XXScraperApplication Process Tweet', () => {
       metricsManager: enhancedLoggingMocks.metricsManager,
     };
 
-    scraperApp = new XXScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   describe('processNewTweet', () => {
