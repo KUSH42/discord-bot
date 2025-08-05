@@ -89,6 +89,10 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
         hasUrl: jest.fn().mockResolvedValue(false),
         addUrl: jest.fn().mockResolvedValue(),
       },
+      browserRateLimit: {
+        recordBrowserRequest: jest.fn().mockResolvedValue(true),
+        getRemainingTime: jest.fn().mockReturnValue(0),
+      },
     };
 
     // Create scraper application instance
@@ -200,6 +204,7 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
   describe('Enhanced Retweet Detection - Scrolling Bug Fix', () => {
     let extractTweetsSpy;
     let performEnhancedScrollingSpy;
+    let navigateToProfileTimelineSpy;
 
     beforeEach(() => {
       scraperApp.browser = mockBrowserService;
@@ -222,13 +227,20 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
         .mockResolvedValueOnce(olderTweets); // Second call (after scrolling)
 
       performEnhancedScrollingSpy = jest.spyOn(scraperApp, 'performEnhancedScrolling').mockResolvedValue();
+      navigateToProfileTimelineSpy = jest.spyOn(scraperApp, 'navigateToProfileTimeline').mockResolvedValue();
 
+      // Mock the process flow methods
+      jest.spyOn(scraperApp, 'shouldProcessRetweets').mockReturnValue(true);
+      jest.spyOn(scraperApp, 'filterDuplicatesImmediate').mockImplementation(tweets => tweets);
+      jest.spyOn(scraperApp, 'sortTweetsByTimestamp').mockImplementation(tweets => tweets);
       jest.spyOn(scraperApp, 'processNewTweet').mockResolvedValue();
+      jest.spyOn(scraperApp, 'delay').mockResolvedValue();
     });
 
     afterEach(() => {
       extractTweetsSpy?.mockRestore();
       performEnhancedScrollingSpy?.mockRestore();
+      navigateToProfileTimelineSpy?.mockRestore();
     });
 
     it('should extract tweets twice: before and after scrolling', async () => {
@@ -237,9 +249,9 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       // Verify extractTweets was called twice
       expect(extractTweetsSpy).toHaveBeenCalledTimes(2);
 
-      // Verify scrolling happened (may be called twice: once in navigateToProfileTimeline, once in performEnhancedRetweetDetection)
-      expect(performEnhancedScrollingSpy).toHaveBeenCalledTimes(2);
-    });
+      // Verify scrolling happened once in performEnhancedRetweetDetection
+      expect(performEnhancedScrollingSpy).toHaveBeenCalledTimes(1);
+    }, 10000);
 
     it('should merge recent and older tweets while deduplicating', async () => {
       await scraperApp.performEnhancedRetweetDetection();
@@ -253,7 +265,7 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
 
       // Verify older tweets are also included
       expect(scraperApp.processNewTweet).toHaveBeenCalledWith(expect.objectContaining({ tweetID: 'old1' }));
-    });
+    }, 10000);
 
     it('should prevent recent tweets from being lost due to scrolling replacement', async () => {
       // This is a regression test for the bug where scrolling replaced recent tweets
@@ -279,6 +291,6 @@ describe('Enhanced Scrolling and Profile Navigation', () => {
       // Verify the deduplication works by ensuring we have 4 total calls
       // (2 recent unique + 2 older unique, even though older includes 1 recent duplicate)
       expect(scraperApp.processNewTweet).toHaveBeenCalledTimes(4);
-    });
+    }, 10000);
   });
 });

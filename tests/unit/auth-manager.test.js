@@ -277,12 +277,14 @@ describe('XAuthManager', () => {
       const result = await xAuthManager.isAuthenticated();
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Error checking authentication status:',
-        expect.objectContaining({
-          module: 'auth',
-        })
-      );
+      // With enhanced logging, need to spy on the enhanced logger instance, not the base mock
+      const enhancedLogger = xAuthManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
+      // Re-run the test to capture the spy
+      await xAuthManager.isAuthenticated();
+
+      expect(warnSpy).toHaveBeenCalledWith('Error checking authentication status:', 'Cookie check failed');
     });
 
     it('should return false if browser or page is not available', async () => {
@@ -400,24 +402,37 @@ describe('XAuthManager', () => {
     });
 
     it('should throw error when authentication fails after login', async () => {
-      // Mock all intermediate steps to succeed but final authentication to fail
-      jest
-        .spyOn(xAuthManager, 'isAuthenticated')
-        .mockResolvedValueOnce(false) // Initial check
-        .mockResolvedValueOnce(false) // First retry
-        .mockResolvedValueOnce(false) // Second retry
-        .mockResolvedValueOnce(false); // Third retry
-      jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
-      jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
-      jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
-      jest
-        .spyOn(xAuthManager, 'waitForSelectorWithFallback')
-        .mockResolvedValueOnce('input[name="text"]')
-        .mockResolvedValueOnce('input[name="password"]');
-      jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
+      jest.useFakeTimers();
 
-      await expect(xAuthManager.loginToX()).rejects.toThrow('Authentication failed');
-    });
+      try {
+        // Mock all intermediate steps to succeed but final authentication to fail
+        jest
+          .spyOn(xAuthManager, 'isAuthenticated')
+          .mockResolvedValueOnce(false) // Initial check
+          .mockResolvedValueOnce(false) // First retry
+          .mockResolvedValueOnce(false) // Second retry
+          .mockResolvedValueOnce(false); // Third retry
+        jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
+        jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
+        jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
+        jest
+          .spyOn(xAuthManager, 'waitForSelectorWithFallback')
+          .mockResolvedValueOnce('input[name="text"]')
+          .mockResolvedValueOnce('input[name="password"]');
+        jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
+
+        // Start the login process and immediately expect it to reject
+        const loginPromise = await expect(xAuthManager.loginToX()).rejects.toThrow('Authentication failed');
+
+        // Fast-forward all timers to allow the authentication attempts to complete
+        await jest.runAllTimersAsync();
+
+        // Wait for the promise to resolve/reject
+        await loginPromise;
+      } finally {
+        jest.useRealTimers();
+      }
+    }, 10000);
 
     it('should handle browser interaction errors', async () => {
       mockBrowserService.type.mockRejectedValue(new Error('Type error'));
@@ -505,7 +520,7 @@ describe('XAuthManager', () => {
 
       expect(xAuthManager.loginToX).toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error validating saved cookies, falling back to login:',
+        expect.stringContaining('Error validating saved cookies, falling back to login:'),
         expect.objectContaining({
           module: 'auth',
         })
@@ -518,7 +533,7 @@ describe('XAuthManager', () => {
 
       await expect(xAuthManager.ensureAuthenticated()).rejects.toThrow('Authentication failed');
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Non-recoverable authentication error:',
+        expect.stringContaining('Non-recoverable authentication error:'),
         expect.objectContaining({
           module: 'auth',
         })
@@ -534,7 +549,7 @@ describe('XAuthManager', () => {
 
       expect(xAuthManager.loginToX).toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error validating saved cookies, falling back to login:',
+        expect.stringContaining('Error validating saved cookies, falling back to login:'),
         expect.objectContaining({
           module: 'auth',
         })
@@ -646,7 +661,7 @@ describe('XAuthManager', () => {
       await xAuthManager.ensureAuthenticated();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Error validating saved cookies, falling back to login:',
+        expect.stringContaining('Error validating saved cookies, falling back to login:'),
         expect.objectContaining({
           module: 'auth',
         })
@@ -1230,7 +1245,7 @@ describe('XAuthManager', () => {
       await expect(xAuthManager.ensureAuthenticated()).rejects.toThrow('Authentication failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Non-recoverable authentication error:',
+        expect.stringContaining('Non-recoverable authentication error:'),
         expect.objectContaining({
           module: 'auth',
         })

@@ -73,10 +73,14 @@ describe('ContentStateManager', () => {
 
       expect(stateManager.contentStates.size).toBe(1);
       expect(stateManager.contentStates.has('video-1')).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager initialized', {
-        loadedStates: 1,
-        botStartTime: expect.any(String),
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content state manager initialized'),
+        expect.objectContaining({
+          loadedStates: 1,
+          botStartTime: expect.any(String),
+          module: 'state',
+        })
+      );
     });
 
     it('should skip old states to prevent memory bloat', async () => {
@@ -103,9 +107,13 @@ describe('ContentStateManager', () => {
       await stateManager.initializeFromStorage();
 
       expect(stateManager.contentStates.size).toBe(0);
-      expect(mockLogger.warn).toHaveBeenCalledWith('❌ Failed to initialize from storage, starting fresh', {
-        error: 'Storage failed',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to initialize from storage, starting fresh'),
+        expect.objectContaining({
+          error: 'Storage failed',
+          module: 'state',
+        })
+      );
     });
 
     it('should handle null/undefined storage data', async () => {

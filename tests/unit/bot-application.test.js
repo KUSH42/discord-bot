@@ -653,8 +653,16 @@ describe('BotApplication', () => {
 
         await botApplication.initializeDiscordHistoryScanning();
 
-        // Enhanced Logger produces structured debug messages, check if debug was called
-        expect(mockLogger.debug).toHaveBeenCalled();
+        // With enhanced logging, we should check the actual logger instance warn calls
+        // since missing duplicate detector triggers warning messages
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          '⚠️ YouTube Monitor duplicate detector not available - YouTube duplicate detection disabled!',
+          expect.objectContaining({ module: 'api' })
+        );
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          'This means old YouTube videos may be re-announced as new content',
+          expect.objectContaining({ module: 'api' })
+        );
       });
 
       it('should handle channel fetch errors', async () => {

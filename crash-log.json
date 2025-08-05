@@ -1,0 +1,588 @@
+[
+  {
+    "type": "unhandledRejection",
+    "details": {
+      "reason": "Test rejection",
+      "stack": "Error: Test rejection\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:130:25)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "promise": "[object Promise]",
+      "timestamp": "2025-08-05T09:20:55.373Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.373Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "unhandledRejection",
+    "details": {
+      "reason": "Simple string rejection",
+      "promise": "[object Promise]",
+      "timestamp": "2025-08-05T09:20:55.389Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.389Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Test exception",
+      "stack": "Error: Test exception\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:158:25)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.391Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.391Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "processWarning",
+    "details": {
+      "name": "DeprecationWarning",
+      "message": "Test warning message",
+      "stack": "Warning stack trace",
+      "timestamp": "2025-08-05T09:20:55.393Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.393Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "lowMemory",
+    "details": {
+      "memoryUsage": {
+        "rss": 104857600,
+        "heapTotal": 83886080,
+        "heapUsed": 73400320,
+        "external": 10485760
+      },
+      "timestamp": "2025-08-05T09:20:55.395Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.395Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 104857600,
+      "heapTotal": 83886080,
+      "heapUsed": 73400320,
+      "external": 10485760
+    }
+  },
+  {
+    "type": "processExit",
+    "details": {
+      "exitCode": 0,
+      "timestamp": "2025-08-05T09:20:55.399Z",
+      "lastHeartbeat": "2025-08-05T09:20:55.399Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.399Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "SIGTERM",
+    "details": {
+      "timestamp": "2025-08-05T09:20:55.407Z",
+      "memoryUsage": {
+        "rss": 52428800,
+        "heapUsed": 31457280
+      }
+    },
+    "timestamp": "2025-08-05T09:20:55.407Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapUsed": 31457280
+    }
+  },
+  {
+    "type": "SIGINT",
+    "details": {
+      "timestamp": "2025-08-05T09:20:55.409Z",
+      "memoryUsage": {
+        "rss": 52428800,
+        "heapUsed": 31457280
+      }
+    },
+    "timestamp": "2025-08-05T09:20:55.409Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapUsed": 31457280
+    }
+  },
+  {
+    "type": "highMemoryUsage",
+    "details": {
+      "heapUsedMB": 2200,
+      "memoryUsage": {
+        "rss": 3145728000,
+        "heapTotal": 2621440000,
+        "heapUsed": 2306867200,
+        "external": 104857600
+      },
+      "timestamp": "2025-08-05T09:21:25.413Z"
+    },
+    "timestamp": "2025-08-05T09:21:25.413Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 3145728000,
+      "heapTotal": 2621440000,
+      "heapUsed": 2306867200,
+      "external": 104857600
+    }
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.416Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.417Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "newCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.419Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "newCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.420Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.422Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "error": "Test error message"
+    },
+    "timestamp": "2025-08-05T09:20:55.425Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "test": "data"
+    },
+    "timestamp": "2025-08-05T09:20:55.443Z",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  {
+    "type": "testCrash",
+    "details": {
+      "test": "data"
+    },
+    "timestamp": "2025-08-05T09:20:55.446Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 0",
+      "stack": "Error: Error 0\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 1",
+      "stack": "Error: Error 1\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 2",
+      "stack": "Error: Error 2\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 3",
+      "stack": "Error: Error 3\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 4",
+      "stack": "Error: Error 4\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 5",
+      "stack": "Error: Error 5\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 6",
+      "stack": "Error: Error 6\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 7",
+      "stack": "Error: Error 7\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 8",
+      "stack": "Error: Error 8\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "uncaughtException",
+    "details": {
+      "error": "Error 9",
+      "stack": "Error: Error 9\n    at Object.<anonymous> (/home/xush/Documents/prog/discord-bot/tests/unit/utilities/crash-detector.test.js:585:48)\n    at Promise.finally.completed (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1559:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1499:10)\n    at _callCircusTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1009:40)\n    at _runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:949:3)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:839:13)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at _runTestsForDescribeBlock (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:829:11)\n    at run (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:757:3)\n    at runAndTransformResultsToJestFormat (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/jestAdapterInit.js:1920:21)\n    at jestAdapter (/home/xush/Documents/prog/discord-bot/node_modules/jest-circus/build/runner.js:101:19)\n    at runTestInternal (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:275:16)\n    at runTest (/home/xush/Documents/prog/discord-bot/node_modules/jest-runner/build/index.js:343:7)",
+      "timestamp": "2025-08-05T09:20:55.507Z"
+    },
+    "timestamp": "2025-08-05T09:20:55.507Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "crash1",
+    "details": {
+      "data": "test1"
+    },
+    "timestamp": "2025-08-05T09:20:55.511Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  },
+  {
+    "type": "crash2",
+    "details": {
+      "data": "test2"
+    },
+    "timestamp": "2025-08-05T09:20:55.511Z",
+    "pid": 12345,
+    "nodeVersion": "v18.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "uptime": 3600,
+    "memoryUsage": {
+      "rss": 52428800,
+      "heapTotal": 41943040,
+      "heapUsed": 31457280,
+      "external": 5242880,
+      "arrayBuffers": 2097152
+    }
+  }
+]
