@@ -587,6 +587,11 @@ export class YouTubeAuthManager {
         return false;
       }
 
+      // Check if page is closed
+      if (this.browserService.page.isClosed()) {
+        return false;
+      }
+
       // Quick cookie-based check first (fastest method)
       const hasAuthCookies = await this.browserService.evaluate(() => {
         return document.cookie.includes('SAPISID') || document.cookie.includes('LOGIN_INFO');
@@ -607,6 +612,7 @@ export class YouTubeAuthManager {
     const operation = this.logger.startOperation('isAuthenticated', {
       hasBrowser: !!this.browserService,
       hasPage: !!(this.browserService && this.browserService.page),
+      pageIsClosed: !!(this.browserService && this.browserService.page && this.browserService.page.isClosed()),
     });
 
     try {
@@ -614,6 +620,15 @@ export class YouTubeAuthManager {
         operation.success('Browser service not available', {
           authenticated: false,
           reason: 'no_browser_service',
+        });
+        return false;
+      }
+
+      // Check if page is closed
+      if (this.browserService.page.isClosed()) {
+        operation.success('Browser page is closed', {
+          authenticated: false,
+          reason: 'page_closed',
         });
         return false;
       }
