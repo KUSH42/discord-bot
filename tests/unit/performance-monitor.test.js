@@ -74,16 +74,20 @@ describe('PerformanceMonitor', () => {
       expect(operation.end).toBeInstanceOf(Function);
     });
 
-    it('should record successful operations', () => {
+    it('should record successful operations', async () => {
       const operation = performanceMonitor.startOperation('navigation', { url: 'https://example.com' });
 
       // Simulate some time passing
-      setTimeout(() => {
-        operation.end(true, { statusCode: 200 });
-      }, 100);
+      await new Promise(resolve => {
+        setTimeout(() => {
+          operation.end(true, { statusCode: 200 });
 
-      expect(performanceMonitor.stats.totalOperations).toBe(1);
-      expect(performanceMonitor.stats.successfulOperations).toBe(1);
+          // Verify after the operation ends
+          expect(performanceMonitor.stats.totalOperations).toBe(1);
+          expect(performanceMonitor.stats.successfulOperations).toBe(1);
+          resolve();
+        }, 100);
+      });
     });
 
     it('should record failed operations', () => {
@@ -292,10 +296,13 @@ describe('PerformanceMonitor', () => {
 
   describe('metric recording', () => {
     it('should record manual metrics', () => {
+      // Spy on the enhanced logger instance
+      const debugSpy = jest.spyOn(performanceMonitor.logger, 'debug');
+
       performanceMonitor.recordMetric('custom_metric', 42, { source: 'test' });
 
       // Should not throw and should log the metric
-      expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect(debugSpy).toHaveBeenCalledWith(
         'Manual metric recorded',
         expect.objectContaining({
           type: 'manual',
@@ -332,8 +339,10 @@ describe('PerformanceMonitor', () => {
     it('should update configuration correctly', () => {
       const newConfig = {
         sampleRetention: 500,
-        memoryAlertMB: 2000,
-        errorRateAlert: 0.1,
+        alertThresholds: {
+          memory: 2000,
+          errorRate: 0.1,
+        },
       };
 
       performanceMonitor.updateConfiguration(newConfig);
@@ -360,15 +369,23 @@ describe('PerformanceMonitor', () => {
 
   describe('edge cases', () => {
     it('should handle operation tracking errors gracefully', () => {
-      // Mock process.hrtime.bigint to throw an error
+      // Mock process.hrtime.bigint to throw an error only on startOperation
       const originalHrtime = process.hrtime.bigint;
+
+      // Create a performanceMonitor that will fail on startOperation
+      const faultyMonitor = new PerformanceMonitor({ enabled: true }, mockLogger, mockDebugManager, mockMetricsManager);
+
+      // Mock hrtime to fail
       process.hrtime.bigint = jest.fn(() => {
         throw new Error('Hrtime error');
       });
 
-      const operation = performanceMonitor.startOperation('test');
-
-      expect(() => operation.end(true)).not.toThrow();
+      // This should not throw and should return a no-op operation
+      expect(() => {
+        const operation = faultyMonitor.startOperation('test');
+        expect(operation.end).toBeInstanceOf(Function);
+        expect(() => operation.end(true)).not.toThrow();
+      }).not.toThrow();
 
       // Restore original function
       process.hrtime.bigint = originalHrtime;

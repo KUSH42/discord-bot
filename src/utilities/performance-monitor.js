@@ -109,18 +109,31 @@ export class PerformanceMonitor {
       return { end: () => {} };
     }
 
-    const startData = {
-      type: operationType,
-      startTime: process.hrtime.bigint(),
-      startMemory: process.memoryUsage(),
-      metadata,
-      id: `op-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    };
+    try {
+      const startData = {
+        type: operationType,
+        startTime: process.hrtime.bigint(),
+        startMemory: process.memoryUsage(),
+        metadata,
+        id: `op-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
 
-    return {
-      id: startData.id,
-      end: (success = true, result = {}) => this.endOperation(startData, success, result),
-    };
+      return {
+        id: startData.id,
+        end: (success = true, result = {}) => this.endOperation(startData, success, result),
+      };
+    } catch (error) {
+      this.logger.error('Failed to start operation tracking', {
+        operationType,
+        error: error.message,
+      });
+
+      // Return a no-op tracker
+      return {
+        id: 'error-op',
+        end: () => {},
+      };
+    }
   }
 
   /**
@@ -571,7 +584,20 @@ export class PerformanceMonitor {
    * @param {Object} newConfig - New configuration options
    */
   updateConfiguration(newConfig) {
-    this.config = { ...this.config, ...newConfig };
+    // Deep merge for nested objects like alertThresholds
+    if (newConfig.alertThresholds) {
+      this.config.alertThresholds = { ...this.config.alertThresholds, ...newConfig.alertThresholds };
+    }
+
+    // Merge other top-level properties
+    const { alertThresholds, ...otherConfig } = newConfig;
+    this.config = { ...this.config, ...otherConfig };
+
+    // Re-apply alertThresholds if it was provided
+    if (alertThresholds) {
+      this.config.alertThresholds = { ...this.config.alertThresholds, ...alertThresholds };
+    }
+
     this.logger.infoWithObject('PerformanceMonitor configuration updated', { newConfig });
   }
 

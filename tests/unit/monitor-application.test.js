@@ -232,15 +232,13 @@ describe('MonitorApplication', () => {
       monitorApp.fallbackEnabled = true;
       monitorApp.fallbackTimerId = 'existing-timer';
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = monitorApp.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       monitorApp.scheduleApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'API fallback already scheduled, skipping',
-        expect.objectContaining({
-          module: 'youtube',
-          timestamp: expect.any(Number),
-        })
-      );
+      expect(debugSpy).toHaveBeenCalledWith('API fallback already scheduled, skipping');
     });
 
     it('should clear timer ID after fallback execution', async () => {
@@ -329,15 +327,13 @@ describe('MonitorApplication', () => {
       mockYoutubeService.getChannelVideos.mockResolvedValue([]);
       jest.spyOn(monitorApp, 'processVideo');
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = monitorApp.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       await monitorApp.performApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'No videos found in API fallback check',
-        expect.objectContaining({
-          module: 'youtube',
-          timestamp: expect.any(Number),
-        })
-      );
+      expect(debugSpy).toHaveBeenCalledWith('No videos found in API fallback check');
       expect(monitorApp.processVideo).not.toHaveBeenCalled();
       expect(monitorApp.stats.fallbackPolls).toBe(1);
     });
@@ -346,15 +342,13 @@ describe('MonitorApplication', () => {
       mockYoutubeService.getChannelVideos.mockResolvedValue(null);
       jest.spyOn(monitorApp, 'processVideo');
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = monitorApp.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       await monitorApp.performApiFallback();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'No videos found in API fallback check',
-        expect.objectContaining({
-          module: 'youtube',
-          timestamp: expect.any(Number),
-        })
-      );
+      expect(debugSpy).toHaveBeenCalledWith('No videos found in API fallback check');
       expect(monitorApp.processVideo).not.toHaveBeenCalled();
     });
 

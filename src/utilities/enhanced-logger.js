@@ -287,7 +287,12 @@ export class EnhancedLogger {
    * @param {Object} context - Additional context
    */
   error(message, context = {}) {
-    this.log('error', 1, message, context);
+    // Handle case where context is not an object (e.g., a string)
+    let normalizedContext = context;
+    if (typeof context !== 'object' || context === null) {
+      normalizedContext = { additionalInfo: context };
+    }
+    this.log('error', 1, message, normalizedContext);
   }
 
   /**
@@ -296,7 +301,12 @@ export class EnhancedLogger {
    * @param {Object} context - Additional context
    */
   warn(message, context = {}) {
-    this.log('warn', 2, message, context);
+    // Handle case where context is not an object (e.g., a string)
+    let normalizedContext = context;
+    if (typeof context !== 'object' || context === null) {
+      normalizedContext = { additionalInfo: context };
+    }
+    this.log('warn', 2, message, normalizedContext);
   }
 
   /**
@@ -305,7 +315,12 @@ export class EnhancedLogger {
    * @param {Object} context - Additional context
    */
   info(message, context = {}) {
-    this.log('info', 3, message, context);
+    // Handle case where context is not an object (e.g., a string)
+    let normalizedContext = context;
+    if (typeof context !== 'object' || context === null) {
+      normalizedContext = { additionalInfo: context };
+    }
+    this.log('info', 3, message, normalizedContext);
   }
 
   /**
@@ -314,7 +329,12 @@ export class EnhancedLogger {
    * @param {Object} context - Additional context
    */
   debug(message, context = {}) {
-    this.log('debug', 4, message, context);
+    // Handle case where context is not an object (e.g., a string)
+    let normalizedContext = context;
+    if (typeof context !== 'object' || context === null) {
+      normalizedContext = { additionalInfo: context };
+    }
+    this.log('debug', 4, message, normalizedContext);
   }
 
   /**
@@ -323,7 +343,12 @@ export class EnhancedLogger {
    * @param {Object} context - Additional context
    */
   verbose(message, context = {}) {
-    this.log('verbose', 5, message, context);
+    // Handle case where context is not an object (e.g., a string)
+    let normalizedContext = context;
+    if (typeof context !== 'object' || context === null) {
+      normalizedContext = { additionalInfo: context };
+    }
+    this.log('verbose', 5, message, normalizedContext);
   }
 
   /**

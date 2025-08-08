@@ -402,37 +402,27 @@ describe('XAuthManager', () => {
     });
 
     it('should throw error when authentication fails after login', async () => {
-      jest.useFakeTimers();
+      // Mock all intermediate steps to succeed but final authentication to fail
+      jest.spyOn(xAuthManager, 'isAuthenticated').mockResolvedValue(false); // All authentication checks fail
+      jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
+      jest
+        .spyOn(xAuthManager, 'waitForSelectorWithFallback')
+        .mockResolvedValueOnce('input[name="text"]')
+        .mockResolvedValueOnce('input[name="password"]');
+      jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
+
+      // Mock setTimeout to resolve immediately to avoid delays
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = jest.fn((callback, delay) => originalSetTimeout(callback, 0));
 
       try {
-        // Mock all intermediate steps to succeed but final authentication to fail
-        jest
-          .spyOn(xAuthManager, 'isAuthenticated')
-          .mockResolvedValueOnce(false) // Initial check
-          .mockResolvedValueOnce(false) // First retry
-          .mockResolvedValueOnce(false) // Second retry
-          .mockResolvedValueOnce(false); // Third retry
-        jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
-        jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
-        jest.spyOn(xAuthManager, 'saveAuthenticationState').mockResolvedValue();
-        jest
-          .spyOn(xAuthManager, 'waitForSelectorWithFallback')
-          .mockResolvedValueOnce('input[name="text"]')
-          .mockResolvedValueOnce('input[name="password"]');
-        jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
-
-        // Start the login process
-        const loginPromise = xAuthManager.loginToX();
-
-        // Fast-forward all timers to allow the authentication attempts to complete
-        await jest.runAllTimersAsync();
-
-        // Now expect it to reject
-        await expect(loginPromise).rejects.toThrow('Authentication failed');
+        await expect(xAuthManager.loginToX()).rejects.toThrow(/Authentication failed/);
       } finally {
-        jest.useRealTimers();
+        global.setTimeout = originalSetTimeout;
       }
-    }, 15000);
+    });
 
     it('should handle browser interaction errors', async () => {
       mockBrowserService.type.mockRejectedValue(new Error('Type error'));
@@ -596,28 +586,21 @@ describe('XAuthManager', () => {
     });
 
     it('should handle network errors during navigation', async () => {
-      jest.useFakeTimers();
+      // Set up mocks to succeed until navigation fails
+      jest
+        .spyOn(xAuthManager, 'waitForSelectorWithFallback')
+        .mockResolvedValueOnce('input[name="text"]')
+        .mockResolvedValueOnce('input[name="password"]');
+      jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
+      jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
+      jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
 
-      try {
-        jest
-          .spyOn(xAuthManager, 'waitForSelectorWithFallback')
-          .mockResolvedValueOnce('input[name="text"]')
-          .mockResolvedValueOnce('input[name="password"]');
-        jest.spyOn(xAuthManager, 'handleUnusualLoginChallenge').mockResolvedValue(false);
-        jest.spyOn(xAuthManager, 'clickNextButton').mockResolvedValue();
-        jest.spyOn(xAuthManager, 'clickLoginButton').mockResolvedValue();
-        mockBrowserService.waitForNavigation.mockRejectedValue(new Error('Network error'));
+      // Mock navigation failure
+      const networkError = new Error('Network error');
+      mockBrowserService.waitForNavigation.mockRejectedValue(networkError);
 
-        const loginPromise = xAuthManager.loginToX();
-
-        // Fast-forward timers to allow the operation to complete
-        await jest.runAllTimersAsync();
-
-        await expect(loginPromise).rejects.toThrow('Network error');
-      } finally {
-        jest.useRealTimers();
-      }
-    }, 10000);
+      await expect(xAuthManager.loginToX()).rejects.toThrow('Network error');
+    });
 
     it('should handle malformed cookies in state gracefully', async () => {
       mockStateManager.get.mockReturnValue('not-an-array');

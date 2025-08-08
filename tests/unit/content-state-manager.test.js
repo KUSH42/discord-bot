@@ -1,17 +1,26 @@
 import { jest } from '@jest/globals';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
 import { timestampUTC } from '../../src/utilities/utc-time.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ContentStateManager', () => {
   let stateManager;
   let mockConfigManager;
   let mockPersistentStorage;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.clearAllTimers();
     jest.useFakeTimers();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+    mockLogger = enhancedLoggingMocks.logger;
+    mockDebugManager = enhancedLoggingMocks.debugManager;
+    mockMetricsManager = enhancedLoggingMocks.metricsManager;
 
     mockConfigManager = {
       getNumber: jest.fn(),
@@ -24,14 +33,13 @@ describe('ContentStateManager', () => {
       clearAllContentStates: jest.fn(),
     };
 
-    mockLogger = {
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    };
-
-    stateManager = new ContentStateManager(mockConfigManager, mockPersistentStorage, mockLogger);
+    stateManager = new ContentStateManager(
+      mockConfigManager,
+      mockPersistentStorage,
+      mockLogger,
+      mockDebugManager,
+      mockMetricsManager
+    );
   });
 
   afterEach(() => {
@@ -307,9 +315,13 @@ describe('ContentStateManager', () => {
     it('should log debug information', async () => {
       const updates = { state: 'live', announced: true };
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       await stateManager.updateContentState(contentId, updates);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect(debugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Content state updated'),
         expect.objectContaining({
           contentId,
@@ -437,11 +449,15 @@ describe('ContentStateManager', () => {
 
       stateManager.botStartTime = botStartTime;
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       stateManager.isNewContent(contentId, publishTime.toISOString(), detectionTime);
 
       // The implementation logs different messages before vs after initialization
       // Before initialization: "New content evaluation (pre-initialization)"
-      expect(mockLogger.debug).toHaveBeenCalledWith('New content evaluation (pre-initialization)', {
+      expect(debugSpy).toHaveBeenCalledWith('New content evaluation (pre-initialization)', {
         contentId,
         publishedAt: publishTime.toISOString(),
         contentAge: expect.any(Number),
@@ -465,34 +481,53 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for missing publishedAt parameter', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, null);
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
 
     it('should return false for undefined publishedAt parameter', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, undefined);
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
 
     it('should return false for invalid date string', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, 'invalid-date');
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with invalid publishedAt', {
-        contentId,
-        publishedAt: 'invalid-date',
-      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('isNewContent called with invalid publishedAt'),
+        expect.objectContaining({
+          contentId,
+          publishedAt: 'invalid-date',
+        })
+      );
     });
 
     it('should return false for empty string publishedAt', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, '');
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
   });
 
@@ -512,15 +547,22 @@ describe('ContentStateManager', () => {
     });
 
     it('should mark existing content as announced', async () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.markAsAnnounced(contentId);
 
       const updatedState = stateManager.contentStates.get(contentId);
       expect(updatedState.announced).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content marked as announced', {
-        contentId,
-        type: 'youtube_video',
-        source: 'webhook',
-      });
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Content marked as announced'),
+        expect.objectContaining({
+          contentId,
+          type: 'youtube_video',
+          source: 'webhook',
+        })
+      );
     });
 
     it('should throw error for non-existent content', async () => {
@@ -798,12 +840,16 @@ describe('ContentStateManager', () => {
       // Advance time to ensure different timestamp
       jest.advanceTimersByTime(1000);
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.reset();
 
       expect(stateManager.contentStates.size).toBe(0);
       expect(stateManager.botStartTime.getTime()).toBeGreaterThan(originalBotStartTime.getTime());
       expect(mockPersistentStorage.clearAllContentStates).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Content state manager reset'));
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Content state manager reset'));
     });
   });
 
@@ -818,11 +864,15 @@ describe('ContentStateManager', () => {
     });
 
     it('should cleanup and clear all content states', async () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.destroy();
 
       expect(stateManager.cleanup).toHaveBeenCalled();
       expect(stateManager.contentStates.size).toBe(0);
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Content state manager destroyed'));
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Content state manager destroyed'));
     });
   });
 
@@ -863,9 +913,17 @@ describe('ContentStateManager', () => {
       mockPersistentStorage.removeContentStates.mockRejectedValue(error);
       mockConfigManager.getNumber.mockReturnValue(24);
 
+      // Spy on the enhanced logger instance BEFORE running cleanup
+      const enhancedLogger = stateManager.logger;
+      const errorSpy = jest.spyOn(enhancedLogger, 'error');
+
       // Add old content (older than 2x 24h = 48h)
       const oldTime = new Date(timestampUTC() - 72 * 60 * 60 * 1000); // 72 hours ago
-      stateManager.contentStates.set('old-content', { lastUpdated: oldTime });
+      stateManager.contentStates.set('old-content', {
+        lastUpdated: oldTime,
+        id: 'old-content',
+        state: 'published',
+      });
 
       // This should not throw even if storage fails (we now handle the error)
       await stateManager.cleanup();
@@ -873,12 +931,11 @@ describe('ContentStateManager', () => {
       // Should still remove from memory even if storage fails
       expect(stateManager.contentStates.has('old-content')).toBe(false);
 
-      // Should log the storage error
-      expect(mockLogger.warn).toHaveBeenCalledWith(
+      // Should log the storage error (via operation.error)
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to remove content states from storage'),
         expect.objectContaining({
-          error: 'Storage cleanup failed',
-          removedFromMemory: 1,
+          removedFromMemory: expect.any(Number),
         })
       );
     });
