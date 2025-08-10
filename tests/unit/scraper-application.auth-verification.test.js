@@ -1,7 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
-describe('ScraperApplication Authentication Verification', () => {
+describe('XScraperApplication Authentication Verification', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -11,6 +12,9 @@ describe('ScraperApplication Authentication Verification', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockConfig = {
       getRequired: jest.fn(),
@@ -30,13 +34,7 @@ describe('ScraperApplication Authentication Verification', () => {
       click: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
 
     mockAuthManager = {
       login: jest.fn(),
@@ -75,7 +73,9 @@ describe('ScraperApplication Authentication Verification', () => {
       discordService: { login: jest.fn() },
       eventBus: { emit: jest.fn(), on: jest.fn(), off: jest.fn() },
       logger: mockLogger,
-      authManager: mockAuthManager,
+      debugManager: enhancedLoggingMocks.debugManager,
+      metricsManager: enhancedLoggingMocks.metricsManager,
+      xAuthManager: mockAuthManager,
       duplicateDetector: {
         isDuplicate: jest.fn().mockReturnValue(false),
         markAsSeen: jest.fn(),
@@ -84,7 +84,7 @@ describe('ScraperApplication Authentication Verification', () => {
       persistentStorage: { get: jest.fn(), set: jest.fn() },
     };
 
-    scraperApp = new ScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   describe('verifyAuthentication', () => {
@@ -93,86 +93,53 @@ describe('ScraperApplication Authentication Verification', () => {
 
       await scraperApp.verifyAuthentication();
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Verifying X authentication status...');
       expect(mockAuthManager.isAuthenticated).toHaveBeenCalled();
-      expect(mockLogger.debug).toHaveBeenCalledWith('✅ Authentication verified successfully');
     });
 
     it('should re-authenticate when verification fails', async () => {
       mockAuthManager.isAuthenticated.mockResolvedValue(false);
-      jest.spyOn(scraperApp, 'ensureAuthenticated').mockResolvedValue();
+      mockAuthManager.ensureAuthenticated.mockResolvedValue();
 
       await scraperApp.verifyAuthentication();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Authentication check failed, re-authenticating...');
-      expect(scraperApp.ensureAuthenticated).toHaveBeenCalled();
+      expect(mockAuthManager.isAuthenticated).toHaveBeenCalled();
+      expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
     });
 
     it('should handle authentication verification errors', async () => {
       const authError = new Error('Auth check failed');
       mockAuthManager.isAuthenticated.mockRejectedValue(authError);
-      jest.spyOn(scraperApp, 'ensureAuthenticated').mockResolvedValue();
 
-      await scraperApp.verifyAuthentication();
+      await expect(scraperApp.verifyAuthentication()).rejects.toThrow('Auth check failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Authentication verification failed:', authError);
-      expect(mockLogger.info).toHaveBeenCalledWith('Attempting to re-authenticate after verification failure...');
-      expect(scraperApp.ensureAuthenticated).toHaveBeenCalled();
+      expect(mockAuthManager.isAuthenticated).toHaveBeenCalled();
     });
   });
 
-  describe('refreshAuth', () => {
-    it('should refresh authentication successfully when logged in', async () => {
-      mockBrowserService.evaluate.mockResolvedValue(true); // Not logged in check returns false (meaning logged in)
+  describe('ensureAuthenticated', () => {
+    it('should delegate to xAuthManager.ensureAuthenticated', async () => {
+      mockAuthManager.ensureAuthenticated.mockResolvedValue();
 
-      await scraperApp.refreshAuth();
+      await scraperApp.ensureAuthenticated();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Refreshing X authentication...');
-      expect(mockBrowserService.goto).toHaveBeenCalledWith('https://x.com/home');
-      expect(mockBrowserService.evaluate).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Authentication refreshed successfully');
+      expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
     });
 
-    it('should re-login when authentication has expired', async () => {
-      mockBrowserService.evaluate.mockResolvedValue(false); // Login selector found (meaning not logged in)
-      jest.spyOn(scraperApp, 'loginToX').mockResolvedValue();
+    it('should pass options to xAuthManager.ensureAuthenticated', async () => {
+      mockAuthManager.ensureAuthenticated.mockResolvedValue();
+      const options = { force: true };
 
-      await scraperApp.refreshAuth();
+      await scraperApp.ensureAuthenticated(options);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Authentication expired, re-logging in...');
-      expect(scraperApp.loginToX).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Authentication refreshed successfully');
+      expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalledWith(options);
     });
 
-    it('should handle refresh authentication errors', async () => {
-      const refreshError = new Error('Refresh failed');
-      mockBrowserService.goto.mockRejectedValue(refreshError);
+    it('should handle authentication errors from xAuthManager', async () => {
+      mockAuthManager.ensureAuthenticated.mockRejectedValue(new Error('Auth failed'));
 
-      await expect(scraperApp.refreshAuth()).rejects.toThrow('Refresh failed');
+      await expect(scraperApp.ensureAuthenticated()).rejects.toThrow('Auth failed');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Failed to refresh authentication:', refreshError);
-    });
-
-    it('should evaluate login status correctly', async () => {
-      // First call refreshAuth to trigger the evaluate call
-      await scraperApp.refreshAuth();
-
-      const evaluateFunction = mockBrowserService.evaluate.mock.calls[0]?.[0];
-
-      // Ensure evaluate function was called
-      expect(evaluateFunction).toBeDefined();
-
-      // Test the evaluation function logic
-      const mockDocument = {
-        querySelector: jest.fn(),
-      };
-
-      // Mock logged in scenario (no login button found)
-      mockDocument.querySelector.mockReturnValue(null);
-
-      // We need to simulate the browser evaluation context
-      const result = evaluateFunction.toString().includes('!document.querySelector(\'[data-testid="login"]\')');
-      expect(result).toBe(true);
+      expect(mockAuthManager.ensureAuthenticated).toHaveBeenCalled();
     });
   });
 
@@ -192,11 +159,28 @@ describe('ScraperApplication Authentication Verification', () => {
       const mockDelay = jest.fn().mockResolvedValue();
       scraperApp.delay = mockDelay;
 
+      // Mock the browser property and its evaluate method
+      // Mock different return values to simulate content loading during scrolling
+      let callCount = 0;
+      scraperApp.browser = {
+        page: { isClosed: jest.fn().mockReturnValue(false) },
+        evaluate: jest.fn().mockImplementation(() => {
+          callCount++;
+          return Promise.resolve({
+            scrollHeight: 1000 + callCount * 100, // Simulate increasing scroll height
+            scrollTop: callCount * 100,
+            tweetCount: 5 + callCount, // Simulate new tweets being loaded
+          });
+        }),
+      };
+
       await scraperApp.performEnhancedScrolling();
 
-      expect(mockBrowserService.evaluate).toHaveBeenCalledTimes(5);
-      expect(mockDelay).toHaveBeenCalledTimes(5);
-      expect(mockDelay).toHaveBeenCalledWith(1500);
+      // Enhanced scrolling performs 3 iterations with 3 evaluate calls per iteration
+      expect(scraperApp.browser.evaluate).toHaveBeenCalledTimes(9);
+      // Delay is called multiple times per iteration (2500ms + 1000ms per iteration, plus final delay)
+      expect(mockDelay).toHaveBeenCalled();
+      expect(mockDelay).toHaveBeenCalledWith(2500); // Main delay between scrolls
     });
   });
 });

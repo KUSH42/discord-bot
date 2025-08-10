@@ -4,7 +4,7 @@
  */
 export const CONTENT_DETECTION_CONFIG = {
   // Unified content age threshold across all platforms
-  MAX_CONTENT_AGE_HOURS: 2,
+  MAX_CONTENT_AGE_HOURS: 24,
 
   // Duplicate detection settings
   DUPLICATE_DETECTION: {

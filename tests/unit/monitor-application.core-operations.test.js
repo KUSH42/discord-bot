@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { MonitorApplication } from '../../src/application/monitor-application.js';
+import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('MonitorApplication - Core Operations', () => {
   let monitorApp;
@@ -11,6 +12,8 @@ describe('MonitorApplication - Core Operations', () => {
   let mockStateManager;
   let mockEventBus;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
   let mockContentStateManager;
   let mockLivestreamStateMachine;
   let mockContentCoordinator;
@@ -18,6 +21,9 @@ describe('MonitorApplication - Core Operations', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
 
     mockYoutubeService = {
       getChannelDetails: jest.fn(),
@@ -69,19 +75,17 @@ describe('MonitorApplication - Core Operations', () => {
 
     mockStateManager = {
       get: jest.fn(),
+      set: jest.fn(),
+      delete: jest.fn(),
     };
 
     mockEventBus = {
       emit: jest.fn(),
     };
 
-    mockLogger = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    };
+    mockLogger = enhancedLoggingMocks.logger;
+    mockDebugManager = enhancedLoggingMocks.debugManager;
+    mockMetricsManager = enhancedLoggingMocks.metricsManager;
 
     mockContentStateManager = {
       hasContent: jest.fn(),
@@ -117,6 +121,8 @@ describe('MonitorApplication - Core Operations', () => {
       livestreamStateMachine: mockLivestreamStateMachine,
       contentCoordinator: mockContentCoordinator,
       persistentStorage: mockPersistentStorage,
+      debugManager: mockDebugManager,
+      metricsManager: mockMetricsManager,
     };
 
     monitorApp = new MonitorApplication(dependencies);
@@ -199,8 +205,32 @@ describe('MonitorApplication - Core Operations', () => {
       await monitorApp.start();
 
       expect(mockYoutubeService.getChannelDetails).toHaveBeenCalledWith('UCTestChannel');
-      expect(mockLogger.info).toHaveBeenCalledWith('Validating YouTube API access...');
-      expect(mockLogger.info).toHaveBeenCalledWith('YouTube API validated. Monitoring channel: Test Channel');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube API validation successful',
+        expect.objectContaining({
+          channelTitle: 'Test Channel',
+          channelId: 'UCTestChannel',
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          module: 'youtube',
+          outcome: 'success',
+          timestamp: expect.any(Number),
+        })
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube monitor application started successfully',
+        expect.objectContaining({
+          callbackUrl: 'https://example.com/webhook',
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          module: 'youtube',
+          outcome: 'success',
+          scheduledPollInterval: 600000,
+          subscriptionActive: false,
+          timestamp: expect.any(Number),
+          youtubeChannelId: 'UCTestChannel',
+        })
+      );
     });
 
     it('should subscribe to PubSubHubbub', async () => {
@@ -304,12 +334,27 @@ describe('MonitorApplication - Core Operations', () => {
     });
 
     it('should handle unsubscription errors gracefully', async () => {
-      jest.spyOn(monitorApp, 'unsubscribeFromPubSubHubbub').mockRejectedValue(new Error('Unsubscribe failed'));
+      // Remove the mock from beforeEach and let the real method run
+      monitorApp.unsubscribeFromPubSubHubbub.mockRestore();
+
+      // Mock the HTTP service to fail, which will be caught and logged by unsubscribeFromPubSubHubbub
+      mockHttpService.post.mockRejectedValue(new Error('Unsubscribe failed'));
+      monitorApp.subscriptionActive = true; // Ensure unsubscription will be attempted
 
       await monitorApp.stop();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error stopping monitor application:', expect.any(Error));
-      // isRunning should still be set to false despite the error
+      // The error should be logged by unsubscribeFromPubSubHubbub, not by stop
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'PubSubHubbub unsubscription failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
+      // isRunning should be set to false despite the internal unsubscription error
+      expect(monitorApp.isRunning).toBe(false);
+      // Subscription should remain true after error (unsubscription failed)
+      expect(monitorApp.subscriptionActive).toBe(true);
     });
   });
 
@@ -323,15 +368,37 @@ describe('MonitorApplication - Core Operations', () => {
       await monitorApp.validateYouTubeAccess();
 
       expect(mockYoutubeService.getChannelDetails).toHaveBeenCalledWith('UCTestChannel');
-      expect(mockLogger.info).toHaveBeenCalledWith('Validating YouTube API access...');
-      expect(mockLogger.info).toHaveBeenCalledWith('YouTube API validated. Monitoring channel: Test Channel');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube API validation successful',
+        expect.objectContaining({
+          channelTitle: 'Test Channel',
+          channelId: 'UCTestChannel',
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          module: 'youtube',
+          outcome: 'success',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should handle null channel details', async () => {
       mockYoutubeService.getChannelDetails.mockResolvedValue(null);
 
       await expect(monitorApp.validateYouTubeAccess()).rejects.toThrow('Failed to fetch YouTube channel details');
-      expect(mockLogger.error).toHaveBeenCalledWith('YouTube API validation failed:', expect.any(Error));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'YouTube API validation failed',
+        expect.objectContaining({
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          error: 'Failed to fetch YouTube channel details',
+          module: 'youtube',
+          outcome: 'error',
+          stack: expect.any(String),
+          timestamp: expect.any(Number),
+          youtubeChannelId: 'UCTestChannel',
+        })
+      );
     });
 
     it('should handle API errors', async () => {
@@ -341,7 +408,19 @@ describe('MonitorApplication - Core Operations', () => {
       await expect(monitorApp.validateYouTubeAccess()).rejects.toThrow(
         'YouTube API validation failed: API quota exceeded'
       );
-      expect(mockLogger.error).toHaveBeenCalledWith('YouTube API validation failed:', error);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'YouTube API validation failed',
+        expect.objectContaining({
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          error: 'API quota exceeded',
+          module: 'youtube',
+          outcome: 'error',
+          stack: expect.any(String),
+          timestamp: expect.any(Number),
+          youtubeChannelId: expect.any(String),
+        })
+      );
     });
 
     it('should handle channel details without title', async () => {
@@ -352,7 +431,18 @@ describe('MonitorApplication - Core Operations', () => {
 
       await monitorApp.validateYouTubeAccess();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('YouTube API validated. Monitoring channel: Unknown');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'YouTube API validation successful',
+        expect.objectContaining({
+          channelTitle: 'Unknown',
+          channelId: 'UCTestChannel',
+          correlationId: expect.any(String),
+          duration: expect.any(Number),
+          module: 'youtube',
+          outcome: 'success',
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { MonitorApplication } from '../../src/application/monitor-application.js';
+import { MonitorApplication } from '../../src/application/yt-monitor-application.js';
 
 describe('MonitorApplication - Fallback Integration Tests', () => {
   let monitorApp;
@@ -71,11 +71,23 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      // Add enhanced logger methods
+      startOperation: jest.fn().mockReturnValue({
+        progress: jest.fn(),
+        success: jest.fn(),
+        error: jest.fn(),
+      }),
       child: jest.fn().mockReturnValue({
         info: jest.fn(),
         warn: jest.fn(),
         error: jest.fn(),
         debug: jest.fn(),
+        // Add enhanced logger methods to child logger too
+        startOperation: jest.fn().mockReturnValue({
+          progress: jest.fn(),
+          success: jest.fn(),
+          error: jest.fn(),
+        }),
         child: jest.fn().mockReturnThis(),
       }),
     };
@@ -100,7 +112,26 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
     };
 
     const mockContentCoordinator = {
-      processContent: jest.fn().mockResolvedValue({ processed: true }),
+      processContent: jest.fn().mockResolvedValue({
+        action: 'announced',
+        announcementResult: { success: true, channelId: 'test-channel', messageId: 'test-message' },
+      }),
+    };
+
+    const mockDebugManager = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      shouldLog: jest.fn().mockReturnValue(true),
+      getLevel: jest.fn().mockReturnValue(5),
+      toggleFlag: jest.fn(),
+      setLevel: jest.fn(),
+    };
+
+    const mockMetricsManager = {
+      recordMetric: jest.fn(),
+      recordTiming: jest.fn(),
+      startTimer: jest.fn().mockReturnValue({ end: jest.fn() }),
+      incrementCounter: jest.fn(),
+      setGauge: jest.fn(),
     };
 
     const dependencies = {
@@ -112,6 +143,8 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
+      debugManager: mockDebugManager,
+      metricsManager: mockMetricsManager,
       persistentStorage: mockPersistentStorage,
       contentStateManager: mockContentStateManager,
       livestreamStateMachine: mockLivestreamStateMachine,
@@ -166,6 +199,10 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
         .mockReturnValue({ isValid: true, details: { method: 'sha1' } });
       jest.spyOn(monitorApp, 'parseNotificationXML').mockReturnValue({ videoId: 'test123' });
       jest.spyOn(monitorApp, 'performApiFallback').mockResolvedValue();
+
+      // Add spy on scheduleApiFallback to verify it's called
+      const scheduleApiFallbackSpy = jest.spyOn(monitorApp, 'scheduleApiFallback');
+
       mockYoutubeService.getVideoDetails.mockRejectedValue(new Error('API Error'));
 
       const request = {
@@ -179,7 +216,17 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
 
       // Verify fallback was scheduled
       expect(monitorApp.fallbackTimerId).toBeTruthy();
-      expect(mockLogger.warn).toHaveBeenCalledWith('Scheduling API fallback due to notification processing failure');
+      expect(scheduleApiFallbackSpy).toHaveBeenCalled();
+
+      // Enhanced logger uses child logger, so check the child logger's warn method
+      const childLogger = mockLogger.child();
+      expect(childLogger.warn).toHaveBeenCalledWith(
+        'Scheduling API fallback due to notification processing failure',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
 
       // Fast forward timer to trigger fallback
       jest.advanceTimersByTime(30000);
@@ -267,7 +314,14 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
 
       // Verify only one fallback was scheduled
       expect(monitorApp.fallbackTimerId).toBeTruthy();
-      expect(mockLogger.debug).toHaveBeenCalledWith('API fallback already scheduled, skipping');
+      const childLogger = mockLogger.child();
+      expect(childLogger.debug).toHaveBeenCalledWith(
+        'API fallback already scheduled, skipping',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
 
       // Fast forward timer to trigger fallback
       jest.advanceTimersByTime(30000);
@@ -307,7 +361,14 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       expect(monitorApp.processVideo).toHaveBeenCalledWith(mockVideos[0], 'api-fallback');
       expect(monitorApp.processVideo).toHaveBeenCalledWith(mockVideos[1], 'api-fallback');
       expect(monitorApp.stats.fallbackPolls).toBe(1);
-      expect(mockLogger.info).toHaveBeenCalledWith('API fallback check completed successfully');
+      const childLogger = mockLogger.child();
+      expect(childLogger.info).toHaveBeenCalledWith(
+        'API fallback check completed successfully',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
 
     it('should handle fallback API errors gracefully', async () => {
@@ -318,7 +379,14 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       await expect(monitorApp.performApiFallback()).rejects.toThrow('Fallback API Error');
 
       // Verify fallback error was logged
-      expect(mockLogger.error).toHaveBeenCalledWith('API fallback check failed:', expect.any(Error));
+      const childLogger = mockLogger.child();
+      expect(childLogger.error).toHaveBeenCalledWith(
+        'API fallback check failed:',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
       expect(monitorApp.stats.fallbackPolls).toBe(1);
     });
 
@@ -362,7 +430,14 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
 
       // Verify fallback timer was cleared
       expect(monitorApp.fallbackTimerId).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith('Scheduled API fallback cleared');
+      const childLogger = mockLogger.child();
+      expect(childLogger.info).toHaveBeenCalledWith(
+        'Scheduled API fallback cleared',
+        expect.objectContaining({
+          module: 'youtube',
+          timestamp: expect.any(Number),
+        })
+      );
     });
   });
 
@@ -385,7 +460,9 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       jest.spyOn(monitorApp, 'processVideo').mockImplementation(async (video, source) => {
         // Simulate the real processVideo logic for duplicates
         if (monitorApp.duplicateDetector.isDuplicate(`https://www.youtube.com/watch?v=${video.id}`)) {
-          mockLogger.debug(`Duplicate video detected: ${video.snippet.title} (${video.id})`);
+          // Use the child logger to match enhanced logger behavior
+          const childLogger = mockLogger.child();
+          childLogger.debug(`Duplicate video detected: ${video.snippet.title} (${video.id})`);
           return;
         }
         // Normal processing...
@@ -398,7 +475,8 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
       expect(monitorApp.duplicateDetector.isDuplicate).toHaveBeenCalledWith(
         'https://www.youtube.com/watch?v=duplicate-video'
       );
-      expect(mockLogger.debug).toHaveBeenCalledWith('Duplicate video detected: Duplicate Video (duplicate-video)');
+      const childLogger = mockLogger.child();
+      expect(childLogger.debug).toHaveBeenCalledWith('Duplicate video detected: Duplicate Video (duplicate-video)');
       expect(mockContentAnnouncer.announceContent).not.toHaveBeenCalled();
     });
 
@@ -419,12 +497,19 @@ describe('MonitorApplication - Fallback Integration Tests', () => {
         details: { isLive: true },
       });
 
+      // Get the mockContentCoordinator from dependencies to update its mock
+      const mockContentCoordinator = monitorApp.contentCoordinator;
+
       // Execute fallback
       await monitorApp.performApiFallback();
 
       // Verify content was classified
       expect(mockContentClassifier.classifyYouTubeContent).toHaveBeenCalledWith(mockVideo);
-      expect(mockContentAnnouncer.announceContent).toHaveBeenCalledWith(
+
+      // Since contentCoordinator is present, verify it was called instead of direct announcer
+      expect(mockContentCoordinator.processContent).toHaveBeenCalledWith(
+        'classified-video',
+        'api-fallback',
         expect.objectContaining({
           platform: 'youtube',
           type: 'livestream',

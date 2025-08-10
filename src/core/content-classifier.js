@@ -1,9 +1,13 @@
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+
 /**
  * Pure business logic for classifying content from different platforms
  * No side effects - only analyzes input and returns classification results
  */
 export class ContentClassifier {
-  constructor() {
+  constructor(baseLogger, debugFlagManager, metricsManager) {
+    // Create enhanced logger for this module
+    this.logger = createEnhancedLogger('api', baseLogger, debugFlagManager, metricsManager);
     // URL patterns for content classification
     this.patterns = {
       youtube: {
@@ -26,42 +30,65 @@ export class ContentClassifier {
    * @returns {Object} Classification result
    */
   classifyXContent(url, text = '', metadata = {}) {
-    const result = {
-      platform: 'x',
-      type: 'unknown',
-      confidence: 0,
-      details: {},
-    };
+    // Use sampled operation tracking for high-volume content classification (10% sampling)
+    const operation = this.logger.startSampledOperation(
+      'classifyXContent',
+      {
+        url,
+        hasText: !!text,
+        hasMetadata: !!metadata,
+      },
+      0.1
+    );
 
-    // Validate inputs
-    if (!url || typeof url !== 'string') {
-      result.error = 'Invalid URL provided';
+    try {
+      const result = {
+        platform: 'x',
+        type: 'unknown',
+        confidence: 0,
+        details: {},
+      };
+
+      // Validate inputs
+      if (!url || typeof url !== 'string') {
+        result.error = 'Invalid URL provided';
+        operation.error(new Error('Invalid URL provided'), 'Input validation failed', { url });
+        return result;
+      }
+
+      // Check if it's a valid X/Twitter URL
+      if (!this.isXUrl(url)) {
+        result.error = 'URL is not from X (Twitter)';
+        operation.error(new Error('Invalid X URL'), 'URL validation failed', { url });
+        return result;
+      }
+
+      operation.progress('URL validation passed, extracting status ID');
+
+      // Extract status ID
+      const statusMatch = url.match(this.patterns.x.status);
+      if (!statusMatch) {
+        result.type = 'profile';
+        result.confidence = 0.9;
+        operation.success('Classified as profile content', { type: result.type, confidence: result.confidence });
+        return result;
+      }
+
+      result.details.statusId = statusMatch[1];
+      operation.progress('Status ID extracted, analyzing content type');
+
+      // Analyze content to determine type
+      const classification = this.analyzeXContentType(text, metadata);
+      result.type = classification.type;
+      result.confidence = classification.confidence;
+      result.details = { ...result.details, ...classification.details };
+
+      operation.success('X content classification completed', { type: result.type, confidence: result.confidence });
       return result;
+    } catch (error) {
+      operation.error(error, 'X content classification failed');
+      throw error;
     }
-
-    // Check if it's a valid X/Twitter URL
-    if (!this.isXUrl(url)) {
-      result.error = 'URL is not from X (Twitter)';
-      return result;
-    }
-
-    // Extract status ID
-    const statusMatch = url.match(this.patterns.x.status);
-    if (!statusMatch) {
-      result.type = 'profile';
-      result.confidence = 0.9;
-      return result;
-    }
-
-    result.details.statusId = statusMatch[1];
-
-    // Analyze content to determine type
-    const classification = this.analyzeXContentType(text, metadata);
-    result.type = classification.type;
-    result.confidence = classification.confidence;
-    result.details = { ...result.details, ...classification.details };
-
-    return result;
   }
 
   /**
@@ -117,6 +144,22 @@ export class ContentClassifier {
       return true;
     }
 
+    // Check social context for reply indicators (most reliable for modern X/Twitter)
+    if (metadata && metadata.socialContext) {
+      const socialContext = metadata.socialContext.toLowerCase();
+      if (socialContext.includes('replying to') || socialContext.includes('reply to')) {
+        return true;
+      }
+    }
+
+    // Check all text content for reply indicators
+    if (metadata && metadata.allText) {
+      const fullText = metadata.allText.toLowerCase();
+      if (fullText.includes('replying to') || fullText.includes('reply to')) {
+        return true;
+      }
+    }
+
     // Check text patterns
     if (typeof text === 'string') {
       // Starts with @username pattern
@@ -141,12 +184,19 @@ export class ContentClassifier {
    */
   isRetweet(text, metadata) {
     // Primary check: Author-based detection (most reliable)
-    if (metadata && metadata.author && metadata.monitoredUser) {
+    if (metadata && metadata.author && metadata.xUser) {
       const { author } = metadata;
-      const { monitoredUser } = metadata;
+      const { xUser } = metadata;
 
       // If author differs from monitored user, it's a retweet
-      if (author !== monitoredUser && author !== `@${monitoredUser}` && author !== 'Unknown') {
+      if (author !== xUser && author !== `@${xUser}` && author !== 'Unknown') {
+        return true;
+      }
+    }
+
+    // Check retweetedBy field as backup detection method
+    if (metadata && metadata.retweetedBy && metadata.xUser) {
+      if (metadata.retweetedBy === metadata.xUser) {
         return true;
       }
     }
@@ -192,7 +242,20 @@ export class ContentClassifier {
       return true;
     }
 
-    // Check for embedded tweet URL pattern
+    // Check for quote tweet block from DOM analysis (most reliable for modern X/Twitter)
+    if (metadata && metadata.quoteTweetBlock === true) {
+      return true;
+    }
+
+    // Check for embedded tweet URL pattern in all text content
+    if (metadata && metadata.allText) {
+      const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
+      if (quoteTweetPattern.test(metadata.allText)) {
+        return true;
+      }
+    }
+
+    // Check for embedded tweet URL pattern in main text
     if (typeof text === 'string') {
       const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
       if (quoteTweetPattern.test(text)) {
@@ -212,8 +275,24 @@ export class ContentClassifier {
   getReplyIndicators(text, metadata) {
     const indicators = [];
 
-    if (metadata.inReplyTo) {
+    if (metadata && metadata.inReplyTo) {
       indicators.push(`Reply to ${metadata.inReplyTo}`);
+    }
+
+    // Check social context for reply indicators
+    if (metadata && metadata.socialContext) {
+      const socialContext = metadata.socialContext.toLowerCase();
+      if (socialContext.includes('replying to') || socialContext.includes('reply to')) {
+        indicators.push(`Social context: ${metadata.socialContext}`);
+      }
+    }
+
+    // Check all text content for reply indicators
+    if (metadata && metadata.allText) {
+      const fullText = metadata.allText.toLowerCase();
+      if (fullText.includes('replying to') || fullText.includes('reply to')) {
+        indicators.push('Contains reply text in full content');
+      }
     }
 
     if (typeof text === 'string') {
@@ -408,8 +487,22 @@ export class ContentClassifier {
   getQuoteIndicators(text, metadata) {
     const indicators = [];
 
-    if (metadata.quotedStatus) {
+    if (metadata && metadata.quotedStatus) {
       indicators.push('Has quoted status metadata');
+    }
+
+    // Check for quote tweet block from DOM analysis
+    if (metadata && metadata.quoteTweetBlock === true) {
+      indicators.push('Quote tweet block detected in DOM');
+    }
+
+    // Check for embedded tweet URL in all text content
+    if (metadata && metadata.allText) {
+      const quoteTweetPattern = /https?:\/\/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/;
+      const match = metadata.allText.match(quoteTweetPattern);
+      if (match) {
+        indicators.push(`Contains embedded tweet URL in full content: ${match[0]}`);
+      }
     }
 
     if (typeof text === 'string') {
@@ -429,52 +522,80 @@ export class ContentClassifier {
    * @returns {Object} Classification result
    */
   classifyYouTubeContent(video) {
-    const result = {
-      platform: 'youtube',
-      type: 'video',
-      confidence: 0.9,
-      details: {},
-    };
+    // Use sampled operation tracking for YouTube content classification (20% sampling)
+    const operation = this.logger.startSampledOperation(
+      'classifyYouTubeContent',
+      {
+        videoId: video?.id,
+        hasSnippet: !!video?.snippet,
+        hasLiveStreamingDetails: !!video?.liveStreamingDetails,
+      },
+      0.2
+    );
 
-    // Validate input
-    if (!video || typeof video !== 'object') {
-      result.error = 'Invalid video object provided';
-      result.confidence = 0;
+    try {
+      const result = {
+        platform: 'youtube',
+        type: 'video',
+        confidence: 0.9,
+        details: {},
+      };
+
+      // Validate input
+      if (!video || typeof video !== 'object') {
+        result.error = 'Invalid video object provided';
+        result.confidence = 0;
+        operation.error(new Error('Invalid video object'), 'Input validation failed', { video });
+        return result;
+      }
+
+      operation.progress('Video object validated, determining content type');
+
+      // Check for upcoming/scheduled content first
+      if (this.isYouTubeUpcoming(video)) {
+        result.type = 'upcoming';
+        result.confidence = 0.9;
+        result.details.scheduledTime = this.getYouTubeScheduledTime(video);
+        operation.progress('Identified as upcoming content');
+      }
+
+      // Check for livestream indicators
+      else if (this.isYouTubeLivestream(video)) {
+        result.type = 'livestream';
+        result.confidence = 0.95;
+        result.details.liveStreamDetails = this.getYouTubeLiveDetails(video);
+        operation.progress('Identified as livestream content');
+      }
+
+      // Check for shorts
+      else if (this.isYouTubeShort(video)) {
+        result.type = 'short';
+        result.confidence = 0.85;
+        operation.progress('Identified as YouTube Short');
+      }
+
+      // Default to regular video
+      else {
+        result.details.duration = this.getYouTubeDuration(video);
+        operation.progress('Identified as regular video content');
+      }
+
+      // Add common details
+      result.details.videoId = video.id;
+      result.details.title = video.snippet?.title;
+      result.details.channelId = video.snippet?.channelId;
+      result.details.publishedAt = video.snippet?.publishedAt;
+
+      operation.success('YouTube content classification completed', {
+        type: result.type,
+        confidence: result.confidence,
+        videoId: result.details.videoId,
+      });
       return result;
+    } catch (error) {
+      operation.error(error, 'YouTube content classification failed');
+      throw error;
     }
-
-    // Check for upcoming/scheduled content first
-    if (this.isYouTubeUpcoming(video)) {
-      result.type = 'upcoming';
-      result.confidence = 0.9;
-      result.details.scheduledTime = this.getYouTubeScheduledTime(video);
-    }
-
-    // Check for livestream indicators
-    else if (this.isYouTubeLivestream(video)) {
-      result.type = 'livestream';
-      result.confidence = 0.95;
-      result.details.liveStreamDetails = this.getYouTubeLiveDetails(video);
-    }
-
-    // Check for shorts
-    else if (this.isYouTubeShort(video)) {
-      result.type = 'short';
-      result.confidence = 0.85;
-    }
-
-    // Default to regular video
-    else {
-      result.details.duration = this.getYouTubeDuration(video);
-    }
-
-    // Add common details
-    result.details.videoId = video.id;
-    result.details.title = video.snippet?.title;
-    result.details.channelId = video.snippet?.channelId;
-    result.details.publishedAt = video.snippet?.publishedAt;
-
-    return result;
   }
 
   /**

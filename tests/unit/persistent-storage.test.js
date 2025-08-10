@@ -352,7 +352,7 @@ describe('PersistentStorage', () => {
 
         mockFs.readFile.mockResolvedValue(JSON.stringify(existingFingerprints));
 
-        // Mock Date.now() to get predictable timestamp
+        // Mock timestampUTC() to get predictable timestamp
         const mockDate = '2023-01-01T12:00:00.000Z';
         jest.spyOn(global, 'Date').mockImplementation(() => ({
           toISOString: () => mockDate,

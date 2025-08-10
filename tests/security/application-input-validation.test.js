@@ -2,7 +2,7 @@ import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals
 import { CommandProcessor } from '../../src/core/command-processor.js';
 import { ContentClassifier } from '../../src/core/content-classifier.js';
 import { ContentAnnouncer } from '../../src/core/content-announcer.js';
-import { Configuration } from '../../src/infrastructure/configuration.js';
+import { Configuration } from '../../src/config/configurations.js';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
 
 describe('Application Input Validation Security Tests', () => {
@@ -74,7 +74,16 @@ describe('Application Input Validation Security Tests', () => {
     };
 
     mockStateManager = {
-      get: jest.fn().mockReturnValue(true),
+      get: jest.fn().mockImplementation(key => {
+        const stateValues = {
+          postingEnabled: true,
+          announcementEnabled: true,
+          vxTwitterConversionEnabled: true,
+          logLevel: 'info',
+          botStartTime: new Date('2024-01-01T00:00:00Z'),
+        };
+        return stateValues[key] !== undefined ? stateValues[key] : true;
+      }),
       set: jest.fn(),
       subscribe: jest.fn(),
       setValidator: jest.fn(),
@@ -304,7 +313,7 @@ describe('Application Input Validation Security Tests', () => {
           let contentStr;
           try {
             contentStr = JSON.stringify(currentContent);
-          } catch (e) {
+          } catch (_e) {
             contentStr = '[Circular Content]';
           }
           classifier.classifyXContent('https://x.com/test/status/123', contentStr);

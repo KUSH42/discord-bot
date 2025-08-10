@@ -1,7 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 
-describe('ScraperApplication Tweet Extraction', () => {
+describe('XScraperApplication Tweet Extraction', () => {
   let scraperApp;
   let mockDependencies;
   let mockConfig;
@@ -66,7 +66,7 @@ describe('ScraperApplication Tweet Extraction', () => {
       discordService: { login: jest.fn() },
       eventBus: { emit: jest.fn(), on: jest.fn(), off: jest.fn() },
       logger: mockLogger,
-      authManager: {
+      xAuthManager: {
         login: jest.fn(),
         clickNextButton: jest.fn(),
         clickLoginButton: jest.fn(),
@@ -81,7 +81,7 @@ describe('ScraperApplication Tweet Extraction', () => {
       persistentStorage: { get: jest.fn(), set: jest.fn() },
     };
 
-    scraperApp = new ScraperApplication(mockDependencies);
+    scraperApp = new XScraperApplication(mockDependencies);
   });
 
   describe('extractTweets', () => {

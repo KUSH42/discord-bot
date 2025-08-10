@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { ScraperApplication } from '../../src/application/scraper-application.js';
+import { XScraperApplication } from '../../src/application/x-scraper-application.js';
 import { DuplicateDetector } from '../../src/duplicate-detector.js';
 
 describe('Polling Logic', () => {
@@ -97,7 +97,7 @@ describe('Polling Logic', () => {
     };
 
     // Create scraper application instance
-    scraperApp = new ScraperApplication({
+    scraperApp = new XScraperApplication({
       browserService: mockBrowserService,
       contentClassifier: mockContentClassifier,
       contentAnnouncer: mockContentAnnouncer,
@@ -105,12 +105,17 @@ describe('Polling Logic', () => {
       stateManager: mockStateManager,
       eventBus: mockEventBus,
       logger: mockLogger,
-      authManager: mockAuthManager,
+      xAuthManager: mockAuthManager,
       persistentStorage: {
         hasFingerprint: jest.fn().mockResolvedValue(false),
         storeFingerprint: jest.fn().mockResolvedValue(),
         hasUrl: jest.fn().mockResolvedValue(false),
         addUrl: jest.fn().mockResolvedValue(),
+      },
+      duplicateDetector: {
+        isDuplicate: jest.fn().mockReturnValue(false),
+        addContent: jest.fn(),
+        clear: jest.fn(),
       },
     });
   });

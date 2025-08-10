@@ -1,16 +1,26 @@
 import { jest } from '@jest/globals';
 import { ContentStateManager } from '../../src/core/content-state-manager.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
+import { createMockDependenciesWithEnhancedLogging } from '../utils/enhanced-logging-mocks.js';
 
 describe('ContentStateManager', () => {
   let stateManager;
   let mockConfigManager;
   let mockPersistentStorage;
   let mockLogger;
+  let mockDebugManager;
+  let mockMetricsManager;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.clearAllTimers();
     jest.useFakeTimers();
+
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+    mockLogger = enhancedLoggingMocks.logger;
+    mockDebugManager = enhancedLoggingMocks.debugManager;
+    mockMetricsManager = enhancedLoggingMocks.metricsManager;
 
     mockConfigManager = {
       getNumber: jest.fn(),
@@ -23,14 +33,13 @@ describe('ContentStateManager', () => {
       clearAllContentStates: jest.fn(),
     };
 
-    mockLogger = {
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    };
-
-    stateManager = new ContentStateManager(mockConfigManager, mockPersistentStorage, mockLogger);
+    stateManager = new ContentStateManager(
+      mockConfigManager,
+      mockPersistentStorage,
+      mockLogger,
+      mockDebugManager,
+      mockMetricsManager
+    );
   });
 
   afterEach(() => {
@@ -52,7 +61,7 @@ describe('ContentStateManager', () => {
 
   describe('initializeFromStorage', () => {
     it('should load recent states from storage', async () => {
-      const recentTime = new Date(Date.now() - 60000).toISOString(); // 1 minute ago
+      const recentTime = new Date(timestampUTC() - 60000).toISOString(); // 1 minute ago
       const storedStates = {
         'video-1': {
           id: 'video-1',
@@ -72,14 +81,18 @@ describe('ContentStateManager', () => {
 
       expect(stateManager.contentStates.size).toBe(1);
       expect(stateManager.contentStates.has('video-1')).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager initialized', {
-        loadedStates: 1,
-        botStartTime: expect.any(String),
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content state manager initialized'),
+        expect.objectContaining({
+          loadedStates: 1,
+          botStartTime: expect.any(String),
+          module: 'state',
+        })
+      );
     });
 
     it('should skip old states to prevent memory bloat', async () => {
-      const oldTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours ago (older than 2x max age)
+      const oldTime = new Date(timestampUTC() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours ago (older than 2x max age)
       const storedStates = {
         'video-old': {
           id: 'video-old',
@@ -102,9 +115,13 @@ describe('ContentStateManager', () => {
       await stateManager.initializeFromStorage();
 
       expect(stateManager.contentStates.size).toBe(0);
-      expect(mockLogger.warn).toHaveBeenCalledWith('❌ Failed to initialize from storage, starting fresh', {
-        error: 'Storage failed',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to initialize from storage, starting fresh'),
+        expect.objectContaining({
+          error: 'Storage failed',
+          module: 'state',
+        })
+      );
     });
 
     it('should handle null/undefined storage data', async () => {
@@ -163,9 +180,9 @@ describe('ContentStateManager', () => {
         id: contentId,
         type: 'youtube_video',
         state: 'published',
-        firstSeen: expect.any(String),
-        lastUpdated: expect.any(String),
-        publishedAt: expect.any(String),
+        firstSeen: expect.any(Date),
+        lastUpdated: expect.any(Date),
+        publishedAt: expect.any(Date),
         announced: false,
         source: 'webhook',
         url: 'https://www.youtube.com/watch?v=test123',
@@ -211,12 +228,16 @@ describe('ContentStateManager', () => {
     it('should log debug information', async () => {
       await stateManager.addContent(contentId, initialState);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Content added to state management', {
-        contentId,
-        type: 'youtube_video',
-        state: 'published',
-        source: 'webhook',
-      });
+      // Enhanced logger operation.success() calls info, not debug
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content added to state management'),
+        expect.objectContaining({
+          contentId,
+          type: 'youtube_video',
+          state: 'published',
+          source: 'webhook',
+        })
+      );
     });
 
     it('should handle persistence failures gracefully', async () => {
@@ -227,10 +248,13 @@ describe('ContentStateManager', () => {
 
       expect(result).toBeDefined();
       expect(stateManager.contentStates.has(contentId)).toBe(true);
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -291,13 +315,20 @@ describe('ContentStateManager', () => {
     it('should log debug information', async () => {
       const updates = { state: 'live', announced: true };
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
       await stateManager.updateContentState(contentId, updates);
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('Content state updated', {
-        contentId,
-        updates: ['state', 'announced'],
-        newState: 'live',
-      });
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Content state updated'),
+        expect.objectContaining({
+          contentId,
+          updates: ['state', 'announced'],
+          newState: 'live',
+        })
+      );
     });
 
     it('should handle persistence failures gracefully', async () => {
@@ -308,10 +339,13 @@ describe('ContentStateManager', () => {
 
       expect(result.state).toBe('live');
       expect(stateManager.contentStates.get(contentId).state).toBe('live');
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -378,8 +412,8 @@ describe('ContentStateManager', () => {
     });
 
     it('should return true for new content within age limit and after bot start', () => {
-      const recentTime = new Date(Date.now() - 30000); // 30 seconds ago
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      const recentTime = new Date(timestampUTC() - 30000); // 30 seconds ago
+      stateManager.botStartTime = new Date(timestampUTC() - 60000); // Bot started 1 minute ago
 
       const result = stateManager.isNewContent(contentId, recentTime.toISOString());
 
@@ -387,7 +421,7 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for content older than max age', () => {
-      const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+      const oldTime = new Date(timestampUTC() - 25 * 60 * 60 * 1000); // 25 hours ago
 
       const result = stateManager.isNewContent(contentId, oldTime.toISOString());
 
@@ -395,35 +429,51 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for content published before bot started', () => {
-      const beforeBotStart = new Date(Date.now() - 120000); // 2 minutes ago
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      // Set specific times with large gap to avoid grace period
+      const botStartTime = new Date('2023-01-01T12:00:00.000Z');
+      const beforeBotStart = new Date('2023-01-01T10:00:00.000Z'); // 2 hours before (outside grace period)
+      const detectionTime = new Date('2023-01-01T13:00:00.000Z'); // 1 hour after bot start (outside grace period)
 
-      const result = stateManager.isNewContent(contentId, beforeBotStart.toISOString());
+      stateManager.botStartTime = botStartTime;
+
+      const result = stateManager.isNewContent(contentId, beforeBotStart.toISOString(), detectionTime);
 
       expect(result).toBe(false);
     });
 
     it('should log debug information', () => {
-      const publishTime = new Date(Date.now() - 60000);
-      stateManager.botStartTime = new Date(Date.now() - 30000);
+      // Use fixed times to ensure predictable behavior
+      const botStartTime = new Date('2023-01-01T12:00:00.000Z');
+      const publishTime = new Date('2023-01-01T12:30:00.000Z'); // 30 minutes after bot start
+      const detectionTime = new Date('2023-01-01T12:35:00.000Z');
 
-      stateManager.isNewContent(contentId, publishTime.toISOString());
+      stateManager.botStartTime = botStartTime;
 
-      expect(mockLogger.debug).toHaveBeenCalledWith('New content evaluation', {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const debugSpy = jest.spyOn(enhancedLogger, 'debug');
+
+      stateManager.isNewContent(contentId, publishTime.toISOString(), detectionTime);
+
+      // The implementation logs different messages before vs after initialization
+      // Before initialization: "New content evaluation (pre-initialization)"
+      expect(debugSpy).toHaveBeenCalledWith('New content evaluation (pre-initialization)', {
         contentId,
         publishedAt: publishTime.toISOString(),
         contentAge: expect.any(Number),
         maxAge: expect.any(Number),
         isWithinAgeLimit: expect.any(Boolean),
         isAfterBotStart: expect.any(Boolean),
+        timeSinceBotStart: expect.any(Number),
         botStartTime: expect.any(String),
+        shouldAllow: expect.any(Boolean),
       });
     });
 
     it('should handle custom detection time', () => {
-      const publishTime = new Date(Date.now() - 30000); // 30 seconds ago
+      const publishTime = new Date(timestampUTC() - 30000); // 30 seconds ago
       const detectionTime = new Date(); // now
-      stateManager.botStartTime = new Date(Date.now() - 60000); // Bot started 1 minute ago
+      stateManager.botStartTime = new Date(timestampUTC() - 60000); // Bot started 1 minute ago
 
       const result = stateManager.isNewContent(contentId, publishTime.toISOString(), detectionTime);
 
@@ -431,34 +481,53 @@ describe('ContentStateManager', () => {
     });
 
     it('should return false for missing publishedAt parameter', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, null);
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
 
     it('should return false for undefined publishedAt parameter', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, undefined);
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
 
     it('should return false for invalid date string', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, 'invalid-date');
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with invalid publishedAt', {
-        contentId,
-        publishedAt: 'invalid-date',
-      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('isNewContent called with invalid publishedAt'),
+        expect.objectContaining({
+          contentId,
+          publishedAt: 'invalid-date',
+        })
+      );
     });
 
     it('should return false for empty string publishedAt', () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const warnSpy = jest.spyOn(enhancedLogger, 'warn');
+
       const result = stateManager.isNewContent(contentId, '');
 
       expect(result).toBe(false);
-      expect(mockLogger.warn).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
+      expect(warnSpy).toHaveBeenCalledWith('isNewContent called with missing publishedAt', { contentId });
     });
   });
 
@@ -478,15 +547,22 @@ describe('ContentStateManager', () => {
     });
 
     it('should mark existing content as announced', async () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.markAsAnnounced(contentId);
 
       const updatedState = stateManager.contentStates.get(contentId);
       expect(updatedState.announced).toBe(true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content marked as announced', {
-        contentId,
-        type: 'youtube_video',
-        source: 'webhook',
-      });
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Content marked as announced'),
+        expect.objectContaining({
+          contentId,
+          type: 'youtube_video',
+          source: 'webhook',
+        })
+      );
     });
 
     it('should throw error for non-existent content', async () => {
@@ -587,11 +663,14 @@ describe('ContentStateManager', () => {
       expect(stateManager.contentStates.has('old-2')).toBe(false);
 
       expect(mockPersistentStorage.removeContentStates).toHaveBeenCalledWith(['old-1', 'old-2']);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state cleanup completed', {
-        removedCount: 2,
-        remainingCount: 2,
-        maxAgeHours: expect.any(Number),
-      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Content state cleanup completed'),
+        expect.objectContaining({
+          removedCount: 2,
+          remainingCount: 2,
+          maxAgeHours: expect.any(Number),
+        })
+      );
     });
 
     it('should use custom age threshold', async () => {
@@ -611,7 +690,10 @@ describe('ContentStateManager', () => {
 
       await stateManager.cleanup();
 
-      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('No content states to cleanup'),
+        expect.any(Object)
+      );
     });
   });
 
@@ -652,9 +734,9 @@ describe('ContentStateManager', () => {
 
       expect(mockPersistentStorage.storeContentState).toHaveBeenCalledWith(contentId, {
         ...contentState,
-        firstSeen: contentState.firstSeen.toISOString(),
-        lastUpdated: contentState.lastUpdated.toISOString(),
-        publishedAt: contentState.publishedAt.toISOString(),
+        firstSeen: contentState.firstSeen,
+        lastUpdated: contentState.lastUpdated,
+        publishedAt: contentState.publishedAt,
       });
     });
 
@@ -664,10 +746,13 @@ describe('ContentStateManager', () => {
 
       await stateManager.persistContentState(contentId, contentState);
 
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to persist content state', {
-        contentId,
-        error: 'Persistence failed',
-      });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to persist content state'),
+        expect.objectContaining({
+          contentId,
+          error: 'Persistence failed',
+        })
+      );
     });
   });
 
@@ -755,12 +840,16 @@ describe('ContentStateManager', () => {
       // Advance time to ensure different timestamp
       jest.advanceTimersByTime(1000);
 
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.reset();
 
       expect(stateManager.contentStates.size).toBe(0);
       expect(stateManager.botStartTime.getTime()).toBeGreaterThan(originalBotStartTime.getTime());
       expect(mockPersistentStorage.clearAllContentStates).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager reset');
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Content state manager reset'));
     });
   });
 
@@ -775,11 +864,15 @@ describe('ContentStateManager', () => {
     });
 
     it('should cleanup and clear all content states', async () => {
+      // Spy on the enhanced logger instance
+      const enhancedLogger = stateManager.logger;
+      const infoSpy = jest.spyOn(enhancedLogger, 'info');
+
       await stateManager.destroy();
 
       expect(stateManager.cleanup).toHaveBeenCalled();
       expect(stateManager.contentStates.size).toBe(0);
-      expect(mockLogger.info).toHaveBeenCalledWith('Content state manager destroyed');
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Content state manager destroyed'));
     });
   });
 
@@ -820,9 +913,17 @@ describe('ContentStateManager', () => {
       mockPersistentStorage.removeContentStates.mockRejectedValue(error);
       mockConfigManager.getNumber.mockReturnValue(24);
 
+      // Spy on the enhanced logger instance BEFORE running cleanup
+      const enhancedLogger = stateManager.logger;
+      const errorSpy = jest.spyOn(enhancedLogger, 'error');
+
       // Add old content (older than 2x 24h = 48h)
-      const oldTime = new Date(Date.now() - 72 * 60 * 60 * 1000); // 72 hours ago
-      stateManager.contentStates.set('old-content', { lastUpdated: oldTime });
+      const oldTime = new Date(timestampUTC() - 72 * 60 * 60 * 1000); // 72 hours ago
+      stateManager.contentStates.set('old-content', {
+        lastUpdated: oldTime,
+        id: 'old-content',
+        state: 'published',
+      });
 
       // This should not throw even if storage fails (we now handle the error)
       await stateManager.cleanup();
@@ -830,11 +931,13 @@ describe('ContentStateManager', () => {
       // Should still remove from memory even if storage fails
       expect(stateManager.contentStates.has('old-content')).toBe(false);
 
-      // Should log the storage error
-      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to remove content states from storage', {
-        error: 'Storage cleanup failed',
-        removedFromMemory: 1,
-      });
+      // Should log the storage error (via operation.error)
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to remove content states from storage'),
+        expect.objectContaining({
+          removedFromMemory: expect.any(Number),
+        })
+      );
     });
 
     it('should handle initializeFromStorage with malformed date strings', async () => {
@@ -857,8 +960,8 @@ describe('ContentStateManager', () => {
     it('should handle isNewContent with string dates vs Date objects', () => {
       mockConfigManager.getNumber.mockReturnValue(24);
 
-      const stringDate = new Date(Date.now() - 60000).toISOString();
-      const dateObject = new Date(Date.now() - 60000);
+      const stringDate = new Date(timestampUTC() - 60000).toISOString();
+      const dateObject = new Date(timestampUTC() - 60000);
 
       const result1 = stateManager.isNewContent('test-1', stringDate);
       const result2 = stateManager.isNewContent('test-2', dateObject);

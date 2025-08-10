@@ -24,6 +24,7 @@ import {
   createMockRequest,
   createMockResponse,
 } from '../mocks/express.mock.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 describe('External API Integration Tests', () => {
   beforeEach(() => {
@@ -377,7 +378,7 @@ describe('External API Integration Tests', () => {
         }
 
         // Check if cookies are expired
-        const now = Date.now();
+        const now = timestampUTC();
         if (authCookie.expires && authCookie.expires < now) {
           throw new Error('Authentication cookies expired');
         }

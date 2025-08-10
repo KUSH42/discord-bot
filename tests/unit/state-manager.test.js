@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { StateManager } from '../../src/infrastructure/state-manager.js';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
 
 const flushPromises = async () => {
   await Promise.resolve();
@@ -284,8 +285,9 @@ describe('StateManager', () => {
     });
 
     it('should handle unsubscribing non-existent key gracefully', () => {
-      stateManager.unsubscribe('nonExistent', mockCallback1);
-      // Should not throw
+      expect(() => {
+        stateManager.unsubscribe('nonExistent', mockCallback1);
+      }).not.toThrow();
     });
 
     it('should handle unsubscribing non-existent callback gracefully', () => {
@@ -446,7 +448,7 @@ describe('StateManager', () => {
     it('should restore state from snapshot', () => {
       const snapshot = {
         state: { restoredKey: 'restoredValue' },
-        timestamp: Date.now(),
+        timestamp: timestampUTC(),
         subscriberCount: 0,
         validatorCount: 0,
       };

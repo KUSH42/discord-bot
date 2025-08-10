@@ -1,14 +1,24 @@
+import { createEnhancedLogger } from '../../../utilities/enhanced-logger.js';
+
 /**
  * Processing Scheduler for Discord Message Sender
  * Manages timing and scheduling of message processing in a testable way
  */
 export class ProcessingScheduler {
-  constructor(options = {}) {
+  constructor(dependencies = {}) {
+    const { logger, debugManager, metricsManager, ...options } = dependencies;
+
+    // Create enhanced logger for performance monitoring
+    if (logger && debugManager && metricsManager) {
+      this.logger = createEnhancedLogger('performance', logger, debugManager, metricsManager);
+    } else {
+      this.logger = logger || { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+    }
     // Configuration
     this.testMode = options.testMode || false;
-    this.baseCheckInterval = options.baseCheckInterval || 100; // ms between checks
-    this.idleCheckInterval = options.idleCheckInterval || 1000; // ms when queue is empty
-    this.maxJitter = options.maxJitter || 0.1; // 10% jitter by default
+    this.baseCheckInterval = options.baseCheckInterval !== undefined ? options.baseCheckInterval : 100; // ms between checks
+    this.idleCheckInterval = options.idleCheckInterval !== undefined ? options.idleCheckInterval : 1000; // ms when queue is empty
+    this.maxJitter = options.maxJitter !== undefined ? options.maxJitter : 0.1; // 10% jitter by default
     this.enableJitter = options.enableJitter !== false;
 
     // State
@@ -49,15 +59,27 @@ export class ProcessingScheduler {
     if (!callback || typeof callback !== 'function') {
       throw new Error('Callback must be a function');
     }
-
+    /*
+    const operation = this.logger.startOperation('scheduleCallback', {
+      testMode: this.testMode,
+      requestedDelay: delay,
+    });
+    */
     this.metrics.totalSchedules++;
     const actualDelay = delay !== null ? delay : this.calculateDelay();
 
+    // operation.progress(`Calculated delay: ${actualDelay}ms`);
+
+    let result;
     if (this.testMode) {
-      return this.scheduleTestMode(callback, actualDelay);
+      result = this.scheduleTestMode(callback, actualDelay);
+      // operation.success('Scheduled in test mode', { actualDelay, mode: 'immediate' });
     } else {
-      return this.scheduleProduction(callback, actualDelay);
+      result = this.scheduleProduction(callback, actualDelay);
+      // operation.success('Scheduled in production mode', { actualDelay, mode: 'timeout' });
     }
+
+    return result;
   }
 
   /**

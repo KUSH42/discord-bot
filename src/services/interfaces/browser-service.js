@@ -154,6 +154,16 @@ export class BrowserService {
   }
 
   /**
+   * Wait for a function to return truthy value
+   * @param {Function} fn - Function to evaluate in page context
+   * @param {Object} options - Wait options
+   * @returns {Promise<*>} Function result
+   */
+  async waitForFunction(_fn, _options = {}) {
+    throw new Error('Abstract method: waitForFunction must be implemented');
+  }
+
+  /**
    * Get page content/HTML
    * @returns {Promise<string>} Page HTML content
    */
@@ -209,6 +219,22 @@ export class BrowserService {
    */
   isRunning() {
     throw new Error('Abstract method: isRunning must be implemented');
+  }
+
+  /**
+   * Check if browser is connected
+   * @returns {boolean} True if browser is connected
+   */
+  isConnected() {
+    throw new Error('Abstract method: isConnected must be implemented');
+  }
+
+  /**
+   * Check if browser is closed
+   * @returns {boolean} True if browser is closed
+   */
+  isClosed() {
+    throw new Error('Abstract method: isClosed must be implemented');
   }
 
   /**

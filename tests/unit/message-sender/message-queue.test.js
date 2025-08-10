@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { MessageQueue } from '../../../src/services/implementations/message-sender/message-queue.js';
+import { timestampUTC } from '../../../src/utilities/utc-time.js';
 
 describe('MessageQueue', () => {
   let queue;
@@ -16,7 +17,7 @@ describe('MessageQueue', () => {
     });
 
     it('should enqueue and dequeue messages', () => {
-      const message = { id: '1', content: 'test', priority: 0, createdAt: Date.now() };
+      const message = { id: '1', content: 'test', priority: 0, createdAt: timestampUTC() };
 
       queue.enqueue(message);
       expect(queue.size()).toBe(1);

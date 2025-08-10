@@ -3,6 +3,7 @@ import pluginJs from '@eslint/js';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import jest from 'eslint-plugin-jest';
+import timezoneSafety from './eslint-plugins/timezone-safety.js';
 
 export default [
   {
@@ -32,6 +33,7 @@ export default [
     plugins: {
       prettier,
       jest,
+      'timezone-safety': timezoneSafety,
     },
     rules: {
       ...pluginJs.configs.recommended.rules,
@@ -85,6 +87,10 @@ export default [
       // Security rules
       'no-script-url': 'error',
       'no-octal-escape': 'error',
+
+      // Timezone safety rules
+      'timezone-safety/enforce-utc-timestamps': 'error',
+      'timezone-safety/require-utc-imports': 'warn',
     },
   },
 

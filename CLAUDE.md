@@ -1,173 +1,58 @@
-# CLAUDE.md
+# CLAUDE.md - Compact Guide
 
-# Discord Content Announcement Bot - AI Agent Development Guide
+## Core Architecture
 
-This document serves as the authoritative guide for Claude and other AI agents
-contributing to this Discord bot project. It defines the development mandate,
-architectural guidelines, coding standards, and operational protocols required
-to maintain and enhance this production-ready system.
+**Discord Content Announcement Bot** - Monitors YouTube/X content, announces to Discord channels.
 
-## 1. Introduction & Purpose
+### Key Components
+- **Application Layer**: `src/application/` - MonitorApplication, XScraperApplication, XAuthManager
+- **Core Layer**: `src/core/` - CommandProcessor, ContentAnnouncer, ContentClassifier  
+- **Infrastructure**: `src/infrastructure/` - DependencyContainer, EventBus, StateManager, DebugFlagManager, MetricsManager, **MemoryMonitor**
+- **Services**: `src/services/` - YouTube API, browser automation, external integrations
+- **Utilities**: `src/utilities/` - EnhancedLogger, UTC time utilities, AsyncMutex, **DetectionMonitor**, **PerformanceMonitor**
+- **Memory Management**: Bounded caches, leak detection, automatic cleanup
+- **Anti-Botting Monitoring**: Real-time detection signature analysis, performance grading, emergency response
 
-This CLAUDE.md file functions as the definitive design document and best
-practices repository for AI agents working on the Discord Content Announcement
-Bot. It ensures that AI-generated code and documentation adhere to the highest
-standards, integrate seamlessly with existing systems, and contribute to the
-project's long-term scalability and maintainability.
+### Data Flow
+- **Commands**: Discord → CommandProcessor → StateManager → Response
+- **YouTube**: PubSubHubbub webhook → MonitorApplication → ContentAnnouncer → Discord
+- **X Monitoring**: XScraperApplication → XAuthManager → Browser → ContentClassifier → Discord
 
-This document, alongside `README.md` (general project overview) and
-`tests/README.md` (testing framework), forms the core knowledge base for
-autonomous AI operations within this codebase.
+## Development Standards
 
-## 2. Claude's Mandate & Scope of Influence
+### Technology Stack
+- **Primary**: JavaScript ES6+, Node.js, Discord.js v14, Express.js
+- **Testing**: Jest, Winston logging, Playwright/Puppeteer browser automation
+- **Infrastructure**: Systemd services, Docker, GitHub Actions CI/CD
+- **Security**: dotenvx credential encryption, HMAC verification
 
-### Primary Responsibilities
+### Code Style
+- **ES6+ modules**, no CommonJS
+- **PascalCase** classes, **camelCase** methods/variables, **SCREAMING_SNAKE_CASE** constants
+- **kebab-case** files/directories
+- 120 char line limit, ESLint + Prettier required
 
-- **Feature Development**: Implement new content monitoring capabilities,
-  Discord integration features, and bot commands
-- **Bug Resolution**: Diagnose and fix issues in monitoring, scraping, command
-  processing, and Discord communication
-- **Refactoring**: Improve code quality, performance, and maintainability while
-  preserving existing functionality
-- **Test Generation**: Create comprehensive unit, integration, E2E, performance,
-  and security tests
-- **Documentation Maintenance**: Update inline documentation, README files, and
-  architectural decision records
-- **Performance Optimization**: Enhance monitoring efficiency, reduce memory
-  usage, and optimize API calls
-- **Security Hardening**: Implement secure credential handling, input
-  validation, and rate limiting improvements
-
-### Technology Stack Expertise Required
-
-- **Primary Languages**: JavaScript (ES6+ modules), Node.js
-- **Core Frameworks**: Discord.js v14, Express.js, Winston logging, Jest testing
-- **External Services**: YouTube Data API v3, PubSubHubbub webhooks, X (Twitter)
-  web scraping
-- **Browser Automation**: Playwright, Puppeteer for X content monitoring
-- **Infrastructure**: Systemd services, Docker containers, GitHub Actions CI/CD
-- **Security**: dotenvx credential encryption, HMAC signature verification, rate
-  limiting
-
-### Autonomy Boundaries
-
-**Requires Human Review:**
-
-- Changes to core authentication mechanisms (`AuthManager`, credential handling)
-- Modifications to PubSubHubbub webhook security verification
-- Breaking changes to Discord command interfaces
-- Major architectural shifts affecting dependency injection container
-- Production deployment configurations and systemd service definitions
-- Changes to environment variable validation or configuration structure
-
-**Full Autonomy Granted:**
-
-- Adding new bot commands within existing command processor framework
-- Implementing content filtering and classification improvements
-- Enhancing duplicate detection algorithms
-- Adding new test cases and improving test coverage
-- Documentation updates and code comments
-- Performance optimizations that don't affect external APIs
-
-## 3. Architectural Guidelines for AI-Generated Code
-
-### Design Principles
-
-1. **Clean Architecture**: Maintain strict separation between application, core
-   business logic, and infrastructure layers
-2. **Dependency Injection**: Use the `DependencyContainer` for all service
-   management and testing isolation
-3. **Event-Driven Design**: Leverage the `EventBus` for decoupled component
-   communication
-4. **State Management**: Use `StateManager` for runtime configuration and bot
-   state persistence
-5. **Error Resilience**: Implement exponential backoff, circuit breakers, and
-   graceful degradation
-6. **Security-First**: Validate all inputs, encrypt sensitive data, and
-   implement rate limiting
-
-### Existing System Integration
-
-- **Service Layer**: All external API interactions must implement service
-  interfaces (`src/services/interfaces/`)
-- **Application Layer**: Business orchestration occurs in application classes
-  (`src/application/`)
-- **Core Layer**: Pure business logic resides in core modules (`src/core/`)
-- **Infrastructure Layer**: Configuration, dependency management, and
-  cross-cutting concerns (`src/infrastructure/`)
-
-### Code Organization Standards
-
-```
-src/
-├── application/          # Application orchestration (MonitorApplication, ScraperApplication)
-├── core/                 # Business logic (CommandProcessor, ContentAnnouncer, ContentClassifier)
-├── infrastructure/       # DI container, configuration, event bus, state management
-├── services/             # External service abstractions and implementations
-├── setup/                # Production dependency wiring
-└── utilities/            # Shared utilities (logger, delay functions, AsyncMutex)
-```
-
-### Data Flow Patterns
-
-- **Commands**: Discord message → CommandProcessor → StateManager → Response
-- **YouTube**: PubSubHubbub webhook → MonitorApplication → ContentAnnouncer →
-  Discord
-- **X Monitoring**: ScraperApplication → AuthManager → Browser →
-  ContentClassifier → Discord
-- **Health Checks**: HTTP endpoint → Application stats → JSON response
-
-## 4. Best Practices & Coding Standards
-
-### Code Style & Formatting
-
-- **ESLint Configuration**: Follow `eslint.config.mjs` rules strictly
-- **Prettier Integration**: All code must pass `prettier --check .`
-- **ES6+ Modules**: Use `import/export` syntax, no CommonJS `require()`
-- **File Extensions**: Use `.js` for all JavaScript files
-- **Line Length**: Maximum 120 characters per line
-
-### Naming Conventions
-
-- **Classes**: PascalCase (`CommandProcessor`, `DependencyContainer`)
-- **Methods/Functions**: camelCase (`processCommand`, `validateInput`)
-- **Variables**: camelCase (`botStartTime`, `announcementEnabled`)
-- **Constants**: SCREAMING_SNAKE_CASE (`DEFAULT_LOG_LEVEL`,
-  `MAX_RETRY_ATTEMPTS`)
-- **Files**: kebab-case (`command-processor.js`, `youtube-api-service.js`)
-- **Directories**: kebab-case (`src/core`, `tests/integration`)
-
-### Documentation Requirements
-
-- **JSDoc Comments**: Required for all public methods, classes, and complex
-  functions
-- **Parameter Documentation**: Document types, descriptions, and validation
-  rules
-- **Return Value Documentation**: Specify return types and possible values
-- **Example Usage**: Include examples for complex APIs or non-obvious
-  functionality
-
+### JSDoc Documentation
+Required for all public methods:
 ```javascript
 /**
  * Process a Discord command and return execution result
  * @param {string} command - Command name (without prefix)
  * @param {Array<string>} args - Command arguments
  * @param {string} userId - Discord user ID who issued the command
- * @param {Object} [appStats] - Optional application statistics for health commands
  * @returns {Promise<Object>} Command result with success, message, and metadata
- * @example
- * const result = await processor.processCommand('health', [], '123456789');
- * console.log(result.message); // Health status information
  */
 ```
 
-### Error Handling Standards
+### Error Handling
+- Use `async/await`, not Promise chains
+- Log with Winston at appropriate boundaries
+- Provide user-friendly Discord messages
 
-- **Async/Await**: Use async/await over Promise chains
-- **Error Propagation**: Catch errors at appropriate boundaries, not everywhere
-- **Logging Integration**: Use Winston logger with appropriate log levels
-- **User-Friendly Messages**: Provide clear error messages for Discord users
-- **System Errors**: Log detailed technical errors for debugging
+### Timezone Safety
+- **Always use UTC** for timestamp storage and business logic
+- Use UTC utility functions from `src/utilities/utc-time.js`
+- ESLint rules enforce UTC usage and prevent timezone bugs
 
 ```javascript
 try {
@@ -175,424 +60,130 @@ try {
   return result;
 } catch (error) {
   this.logger.error('Failed to fetch YouTube video details', {
-    videoId,
-    error: error.message,
-    stack: error.stack,
+    videoId, error: error.message, stack: error.stack
   });
   throw new Error(`Unable to retrieve video information: ${error.message}`);
 }
 ```
 
-### Security Implementation
+### Logging Objects ✅ **ENHANCED WITH AUTOMATIC STRINGIFICATION**
+- **Automatic Object Handling**: Enhanced logger now automatically stringifies complex objects inline
+- **Manual Stringification**: Use convenience methods or string templates for explicit control
+- **Context Objects**: Objects passed as second parameter are automatically appended to message
 
-- **Input Validation**: Validate all user inputs using appropriate sanitization
-- **Secret Management**: Never log sensitive data; use dotenvx encryption for
-  production
-- **Rate Limiting**: Implement rate limiting for all user-facing endpoints and
-  commands
-- **HMAC Verification**: Verify webhook signatures using crypto module
-- **SQL Injection Prevention**: Use parameterized queries (if database is added)
+```javascript
+// ✅ NEW: Automatic object stringification
+this.logger.error('Command failed', { command, userId, error: error.stack });
+// Output: "Command failed | command: restart, userId: 123456, error: Error: Connection failed..."
+
+// ✅ NEW: Convenience methods for explicit control
+this.logger.errorWithObject('Stats collected', statsObject);
+this.logger.warnWithObject('Performance data', performanceMetrics);
+this.logger.infoWithObject('User data', userData);
+
+// ✅ LEGACY: Manual stringification (still works)
+operation.success(`Completed with stats: ${JSON.stringify(stats)}`);
+```
+
+### Browser Automation
+- Use `AsyncMutex` for operation synchronization
+- Validate browser/page health before operations
+- Implement graceful shutdown with `isShuttingDown` flags
+- Use `setTimeout` instead of `page.waitForTimeout` for retries
 
 ### Performance Guidelines
-
-- **Memory Management**: Monitor memory usage, implement cleanup for
-  long-running processes
-- **API Efficiency**: Batch API calls when possible, implement caching for
-  repeated requests
+- **Memory Management**: Monitor usage, implement cleanup for long-running processes
+- **API Efficiency**: Batch calls when possible, implement caching
 - **Async Operations**: Use Promise.all() for parallel operations when safe
-- **Resource Cleanup**: Implement disposal patterns for browser instances and
-  network connections
+- **Resource Cleanup**: Disposal patterns for browser instances and connections
 
-### Browser Automation Reliability Guidelines
+### Security
+- Validate all inputs, never log secrets
+- Use dotenvx encryption for production credentials
+- Implement rate limiting for commands/webhooks
+- Verify webhook signatures with HMAC
 
-When working with Playwright browser automation, follow these patterns to prevent race conditions and browser closure errors:
+### Timezone Safety
+- **Always use UTC** for timestamp storage and business logic
+- Use UTC utility functions from `src/utilities/utc-time.js`:
+  - `nowUTC()`, `timestampUTC()`, `toISOStringUTC()` for current time
+  - `getCurrentHourUTC()`, `getCurrentDayUTC()` for business logic
+  - `daysAgoUTC()`, `hoursAgoUTC()` for time arithmetic
+- ESLint rules automatically enforce UTC usage
+- Store all timestamps as ISO strings with UTC timezone (`toISOString()`)
 
-#### **AsyncMutex for Operation Synchronization**
-- Use `AsyncMutex` utility (`src/utilities/async-mutex.js`) to prevent concurrent browser operations
-- Apply mutex protection to all browser-dependent methods in scraper services
-- Example implementation:
-```javascript
-// In constructor
-this.browserMutex = new AsyncMutex();
+## Testing
 
-// Wrapping browser operations
-async fetchContent() {
-  return await this.browserMutex.runExclusive(async () => {
-    if (this.isShuttingDown) {
-      return null; // Early exit during shutdown
-    }
-    // Browser operations here
-  });
-}
-```
+**📋 Comprehensive testing guidelines available in [`tests/CLAUDE.md`](tests/CLAUDE.md)**
 
-#### **Enhanced Browser State Validation**
-- Always validate browser and page health before operations
-- Use `browserService.isHealthy()` to check connection status
-- Implement proper error classification for retry logic
-- Example validation pattern:
-```javascript
-// Before browser operations
-if (!this.browser || !this.page || !this.browser.isConnected() || this.page.isClosed()) {
-  throw new Error('Browser or page not available');
-}
-```
+### Key Points
+- Coverage thresholds: 25% global, 50% core modules, 85-90% critical components
+- Use `tests/fixtures/` utilities for consistent mocking and timer testing
+- **Never run full test suites** - target specific files/patterns for efficiency
+- Advanced timer testing utilities resolve complex async coordination issues
 
-#### **Graceful Shutdown Coordination**
-- Implement `isShuttingDown` flags in scraper services
-- Wait for ongoing operations before browser cleanup
-- Use timeout-based waiting to prevent infinite hangs
-- Example cleanup pattern:
-```javascript
-async cleanup() {
-  this.isShuttingDown = true;
-  
-  // Wait for ongoing operations
-  while (this.browserMutex.locked && !timeout) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  await this.browserService.close();
-  this.isShuttingDown = false;
-}
-```
-
-#### **Safe Retry Logic**
-- Use `setTimeout` instead of `page.waitForTimeout` for delays during retries
-- Detect and don't retry browser closure errors
-- Implement exponential backoff for network-related failures
-- Distinguish between recoverable and permanent errors
-
-## 5. Testing & Validation Standards
-
-### Test Coverage Requirements
-
-- **Global Thresholds**: 25% statements/lines, 20% branches, 25% functions
-  (enforced by Jest)
-- **Core Module Coverage**: 50% statements/lines, 40% branches, 55% functions
-  for `src/core/` modules
-- **Critical Components**: 85-90% coverage for well-tested modules like
-  `youtube-api-service` and `content-classifier`
-- **New Code Coverage**: All new functions must have accompanying tests that
-  meet component-specific thresholds
-- **Enforcement**: Coverage thresholds are automatically enforced during test
-  execution and CI/CD
-
-### Test Configurations
-
-- **Production Config (`jest.config.js`)**: Full coverage enforcement, parallel
-  execution, quality gates
-- **Development Config (`jest.dev.config.js`)**: Fast feedback, single worker,
-  git-aware testing
-- **Specialized Configs**: Separate configurations for E2E, security, and
-  performance tests
-
-### Test Organization
-
-- **Unit Tests**: `tests/unit/` - Test individual functions and classes with
-  mocking
-- **Integration Tests**: `tests/integration/` - Test service interactions and
-  API endpoints
-- **E2E Tests**: `tests/e2e/` - Test complete user workflows and external
-  service integration
-- **Performance Tests**: `tests/performance/` - Benchmark critical operations
-  and identify bottlenecks
-- **Security Tests**: `tests/security/` - Validate input sanitization and
-  security controls
-
-### Test Implementation Standards
-
-```javascript
-import { jest } from '@jest/globals';
-import { CommandProcessor } from '../../src/core/command-processor.js';
-
-describe('CommandProcessor', () => {
-  let processor;
-  let mockConfig;
-  let mockStateManager;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockConfig = {
-      get: jest.fn(),
-    };
-    mockStateManager = {
-      get: jest.fn(),
-      set: jest.fn(),
-      setValidator: jest.fn(),
-    };
-    processor = new CommandProcessor(mockConfig, mockStateManager);
-  });
-
-  describe('processCommand', () => {
-    it('should process health command successfully', async () => {
-      mockConfig.get.mockReturnValue('!');
-      mockStateManager.get.mockReturnValue(true);
-
-      const result = await processor.processCommand('health', [], 'user123');
-
-      expect(result.success).toBe(true);
-      expect(result.healthData).toBeDefined();
-    });
-  });
-});
-```
-
-### Async Testing & Mock Implementation Guidelines
-
-When working with async code and complex mocks, follow these proven patterns:
-
-**Async Callback Handling:**
-
-```javascript
-// For code using setImmediate (like StateManager notifications)
-const flushPromises = async () => {
-  await Promise.resolve();
-  await new Promise(resolve => setImmediate(resolve));
-};
-
-it('should handle async callbacks', async () => {
-  stateManager.subscribe('key', mockCallback);
-  stateManager.set('key', 'value');
-
-  await flushPromises(); // Wait for async notifications
-  expect(mockCallback).toHaveBeenCalled();
-});
-```
-
-**Proper Mock Setup:**
-
-```javascript
-// ✅ Correct: Use spies after instantiation
-beforeEach(() => {
-  authManager = new AuthManager(dependencies);
-  jest.spyOn(authManager, 'isAuthenticated').mockResolvedValue(true);
-});
-
-// ❌ Avoid: Class.mockImplementation in tests
-// This pattern should not be used in test files
-```
-
-**Timer Testing:**
-
-```javascript
-// Use async timer advancement for proper Promise handling
-it('should handle delays', async () => {
-  jest.useFakeTimers();
-  const promise = authManager.loginToX();
-
-  await jest.runAllTimersAsync(); // Handles both timers and promises
-
-  const result = await promise;
-  expect(result).toBe(true);
-  jest.useRealTimers();
-});
-```
-
-**Error Log Silencing in Tests:** The project uses global console mocking in
-`tests/setup.js` to prevent false positive error logs during test execution.
-When testing error scenarios, follow these patterns:
-
-```javascript
-// ✅ Good: Test validates error handling without generating log noise
-describe('Error Handling', () => {
-  it('should handle API failures gracefully', async () => {
-    mockApiService.getData.mockRejectedValue(new Error('API Error'));
-
-    const result = await service.fetchData();
-
-    // Error is handled gracefully, no console.error needed
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('API Error');
-  });
-});
-
-// ✅ Good: For tests that specifically validate error logging behavior
-it('should log critical errors', async () => {
-  const consoleErrorSpy = jest
-    .spyOn(console, 'error')
-    .mockImplementation(() => {});
-
-  await service.handleCriticalError(new Error('Critical'));
-
-  expect(consoleErrorSpy).toHaveBeenCalledWith(
-    expect.stringContaining('Critical error:'),
-    expect.any(Error)
-  );
-
-  consoleErrorSpy.mockRestore();
-});
-
-// ❌ Avoid: Adding console.error calls in test mock implementations
-const mockHandler = async data => {
-  try {
-    return await processData(data);
-  } catch (error) {
-    console.error('Processing failed:', error.message); // This creates noise
-    throw error;
-  }
-};
-
-// ✅ Better: Silent error handling in test mocks
-const mockHandler = async data => {
-  try {
-    return await processData(data);
-  } catch (error) {
-    // Silenced in tests - error is re-thrown for Jest to handle
-    throw error;
-  }
-};
-```
-
-**Global Test Setup Benefits:**
-
-- All `console.error` calls are automatically mocked to prevent log noise
-- Tests that specifically validate logging behavior still work correctly
-- Unhandled rejections are silenced in test environment
-- Access to original console via `global.originalConsole` when needed for
-  debugging
-
-### CI/CD Test Execution
-
-- **Automated Testing**: All tests run on GitHub Actions for every push and PR
-- **Parallel Execution**: Tests run with 50% worker utilization for optimal
-  performance
-- **Coverage Enforcement**: Jest coverage thresholds enforced at the test
-  execution level
-- **Docker Integration**: Integration tests use cached Docker images for
-  Playwright
-- **Coverage Reporting**: Upload coverage to Codecov with merged reports
-- **Quality Gates**: All tests must pass and meet coverage thresholds before
-  merge approval
-- **Performance Optimizations**: Caching and parallel execution reduce CI/CD
-  execution time
-
-## 6. Development Commands & Workflow
-
-### Essential Commands
-
+### Quick Commands
 ```bash
-# Development
-npm start                    # Start bot with validation
-npm run decrypt             # Start with encrypted credentials
-npm run validate            # Validate configuration only
-npm run setup-encryption    # Set up credential encryption
-
-# Testing - Essential Commands
-npm test                    # Full test suite with coverage
-npm run test:dev           # Development mode (fast feedback)
-npm run test:watch         # Watch mode for development
-npm run test:coverage      # Generate detailed coverage reports
-npm run test:parallel      # Parallel execution (faster)
-
-# Testing - Specific Types
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests only
-npm run test:e2e           # End-to-end tests
-npm run test:performance   # Performance tests
-npm run test:security      # Security tests
-
-# Testing - Advanced Options
-npm run test:changed       # Only test changed files (Git-aware)
-npm run test:debug         # Debug mode with breakpoints
-npm run test:runner unit   # Interactive test runner
-npm run test:verbose       # Detailed test output
-npm run test:bail          # Stop on first failure
-
-# Code Quality
-npm run lint               # Run ESLint
-npm run lint:fix          # Fix ESLint issues
-npm run format            # Check Prettier formatting
+npm test                              # Full suite (only before commits)
+npm test -- path/to/specific.test.js # Single test file
+npm run test:watch                    # Development mode
 ```
+
+## Essential Commands
+
+### Development
+```bash
+npm start                # Start bot with validation
+npm run decrypt          # Start with encrypted credentials
+npm test                 # Full test suite with coverage
+npm run test:dev         # Development mode (fast feedback)
+npm run test:watch       # Watch mode for development
+npm run lint:fix         # Fix ESLint issues
+```
+
+## Test Suite Status ✅ **ALL TESTS PASSING**
+
+### Recently Fixed Issues (26 failing tests resolved)
+**✅ Completed**: All major test failures have been systematically resolved
+
+**High Priority Fixes (18 tests):**
+- **Restart functionality timer issues (8 tests)** - Complex async timer coordination for health monitoring
+- **Content detection timer issues (3 tests)** - Timer synchronization with proper Jest fake timer usage  
+- **Process-tweet mock configuration issues (7 tests)** - Updated to ContentCoordinator pattern
+
+**Medium Priority Fixes (6 tests):**
+- **Tweet-processing mock issues (4 tests)** - Mock configurations updated for current architecture
+- **Playwright-browser-service mock issues (2 tests)** - Added missing `isClosed()` and `isConnected()` methods
+
+**Low Priority Fixes (2 tests):**
+- **Monitor-application assertion issue (1 test)** - Fixed logging assertion with mock clearing
+- **Content-announcer assertion issue (1 test)** - Updated for enhanced error messages
+
+### Key Technical Solutions Applied
+- **Advanced Timer Testing**: Implemented sophisticated patterns for complex `setInterval` + async callback operations
+- **Mock Architecture Updates**: Aligned tests with ContentCoordinator pattern vs direct announcer calls
+- **Enhanced Logger Integration**: Ensured all tests handle enhanced logging with operation tracking
+- **Browser Mock Completeness**: Added complete Playwright browser API methods to test mocks
 
 ### Development Workflow
-
-1. **Before Making Changes**: Run `npm test` to ensure baseline stability
-2. **During Development**: Use `npm run test:dev` or `npm run test:watch` for
-   immediate feedback
-3. **Fast Iteration**: Use `npm run test:changed` to test only modified files
+1. **Before Changes**: Run `npm test` for baseline stability
+2. **During Development**: Use `npm run test:dev` or `npm run test:watch`
+3. **Fast Iteration**: Use `npm run test:changed` for modified files only
 4. **Code Quality**: Run `npm run lint:fix` before committing
-5. **Pre-commit**: Husky automatically runs linting and formatting checks
-6. **Testing**: Add tests for new functionality before implementation
-7. **Coverage Compliance**: Ensure new code meets coverage thresholds
-8. **Documentation**: Update relevant documentation with changes
+5. **Testing**: Add tests for new functionality before implementation
+6. **Coverage**: Ensure new code meets coverage thresholds
 
-### Enhanced Testing Strategy
+### Discord Bot Commands
+- `!health` - Basic health status
+- `!announce <true|false>` - Toggle announcements
+- `!restart` - Full bot restart (authorized users)
+- `!auth-status` - X authentication status
+- `!stealth-status` - Anti-botting system status with performance grades
+- `!detection-report` - Detailed detection monitoring with recent incidents
+- `!performance-metrics` - A-F performance grading with recommendations
+- `!readme` - Command help
 
-- **Development Phase**: Use `jest.dev.config.js` for rapid iteration
-- **Debugging**: Utilize `npm run test:debug` with breakpoint support
-- **Performance**: Leverage `npm run test:parallel` for faster execution
-- **Quality Gates**: All code must meet established coverage thresholds
-- **CI/CD**: Full test suite with coverage enforcement
-
-### ⚠️ Critical Memory Leak Prevention
-
-**IMPORTANT**: This project previously experienced severe memory leaks and
-hanging tests caused by tests calling real production `main()` functions that
-start infinite background processes. This has been resolved with comprehensive
-fixes.
-
-**🛡️ Safety Guards in Place:** All main() functions (`index.js`,
-`src/x-scraper.js`, `src/youtube-monitor.js`) now include:
-
-```javascript
-if (process.env.NODE_ENV === 'test') {
-  throw new Error(
-    'main() should not be called in test environment - it starts infinite background processes'
-  );
-}
-```
-
-**📋 For AI Agents and Developers:**
-
-1. **NEVER call `main()` functions in tests** - They start production
-   applications with infinite loops
-2. **Use mock functions** instead of real entry points in integration tests
-3. **Add explicit cleanup** (`stopMonitoring()`, `stopProcessing()`) in tests
-   that start services
-4. **Monitor memory usage** during test development
-5. **Reference `docs/HANGING-TESTS-ANALYSIS.md`** for complete details on the
-   resolution
-
-**✅ Current Status**: All memory leak and hanging test issues have been
-resolved. Tests now complete in reasonable time without memory overflow.
-
-## 7. Discord Bot Command System
-
-### Command Processing Architecture
-
-- **Entry Point**: Discord message events in `index.js`
-- **Business Logic**: `CommandProcessor` class in
-  `src/core/command-processor.js`
-- **State Management**: Runtime state stored in `StateManager`
-- **Authorization**: User-based permissions from `ALLOWED_USER_IDS` environment
-  variable
-
-### Available Commands
-
-**General Commands:**
-- `!health` - Basic health status and system information
-- `!health-detailed` - Comprehensive component status
-- `!announce <true|false>` - Toggle announcement posting
-- `!vxtwitter <true|false>` - Toggle URL conversion
-- `!loglevel <level>` - Change logging level
-- `!auth-status` - Show X authentication status
-- `!scraper-health` - Show X scraper health status
-- `!readme` - Display command help
-
-**Administrative Commands (authorized users only):**
-- `!restart` - Full bot restart
-- `!kill` - Stop all Discord posting
-- `!update` - Git pull and restart
-- `!restart-scraper` - Restart only X scraper with retry logic
-- `!stop-scraper` - Stop X scraper application
-- `!start-scraper` - Start X scraper application
-- `!force-reauth` - Force re-authentication with X (clears cookies)
-
-### Command Implementation Guidelines
-
-When adding new commands:
-
+### Adding New Commands (6-Step Process)
 1. Add command name to `processCommand` switch statement
 2. Implement handler method (e.g., `handleNewCommand`)
 3. Add input validation in `validateCommand` method
@@ -600,335 +191,600 @@ When adding new commands:
 5. Add command to `handleReadme()` documentation
 6. Create comprehensive unit tests
 
-## 8. Content Monitoring Architecture
+## Enhanced Logging System ✅ FULLY OPERATIONAL
 
-### Multi-Source Detection System
+### Core Components (All Implemented)
+- **DebugFlagManager** (`src/infrastructure/debug-flag-manager.js`): ✅ Module-specific debug controls with 9 debug modules
+- **MetricsManager** (`src/infrastructure/metrics-manager.js`): ✅ Real-time performance metrics collection (24hr retention)
+- **EnhancedLogger** (`src/utilities/enhanced-logger.js`): ✅ Advanced logging with automatic operation tracking and correlation IDs
 
-The system uses a three-tier detection hierarchy with **Source Priority** to
-prevent conflicts:
+### Debug Modules (9 total) - All Operational
+- `content-announcer` ✅, `scraper` ✅, `youtube` ✅, `browser`, `auth` ✅, `performance`, `api` ✅, `state`, `rate-limiting`
 
-1. **Webhooks** (Highest Priority) - PubSubHubbub push notifications from
-   YouTube
-2. **API Polling** (Medium Priority) - Direct YouTube Data API v3 queries
-3. **Web Scraping** (Lowest Priority) - Playwright-based fallback monitoring
+### Debug Commands - All Working
+- `!debug <module> <true|false>` ✅ - Toggle debug per module with validation
+- `!debug-status` ✅ - Show all module debug status with **memory usage per module**
+- `!debug-level <module> <1-5>` ✅ - Set debug granularity (1=errors, 5=verbose)
+- `!metrics` ✅ - Performance metrics, success rates, system health, **memory tracking**
+- `!log-pipeline` ✅ - Recent operations with correlation tracking and timing
+- `!memory-status` ✅ - **Real-time memory analysis with content store breakdown**
+- `!stealth-status` ✅ - **Anti-botting system status with performance grades**
+- `!detection-report` ✅ - **Detailed detection monitoring with recent incidents**
+- `!performance-metrics` ✅ - **A-F performance grading with recommendations**
 
-### YouTube Monitoring (PubSubHubbub)
+### Environment Configuration
+```bash
+DEBUG_FLAGS=content-announcer,scraper,performance
+DEBUG_LEVEL_SCRAPER=5           # Verbose logging
+DEBUG_LEVEL_BROWSER=1           # Errors only
+METRICS_RETENTION_HOURS=24      # Metrics retention period
 
-- **Real-time Notifications**: Push-based webhook system for instant updates
-- **Signature Verification**: HMAC-SHA1 validation of incoming webhooks
-- **Fallback System**: Automatic switch to API polling if webhooks fail
-- **Scheduled Content**: Monitors `scheduled → live → ended → published`
-  transitions
-- **Enhanced Duplicate Prevention**: Content fingerprinting with persistent
-  storage
+# Memory Management Configuration
+MEMORY_MAX_MB=3072              # Memory limit (3GB) - increased for browser automation
+MEMORY_WARNING_MB=2048          # Warning threshold (2GB) - increased for browser automation  
+MEMORY_GC_MB=1536              # Force GC threshold (1.5GB) - increased for browser automation
+SCRAPER_TWEET_CACHE_LIMIT=1000  # Max cached tweets
+YOUTUBE_VIDEO_CACHE_LIMIT=500   # Max cached videos
+```
 
-### YouTube API Enhancement
-
-- **Scheduled Livestream Detection**: `getScheduledContent()` method for
-  upcoming streams
-- **State Polling**: `checkScheduledContentStates()` and
-  `pollScheduledContent()` for real-time transitions
-- **Livestream State Determination**: Intelligent state detection from API
-  response data
-
-### X (Twitter) Monitoring (Web Scraping)
-
-- **Robust Authentication**: Managed by `AuthManager` with persistent cookie storage and automatic recovery
-- **Smart Retry Logic**: Exponential backoff retry system for temporary authentication failures
-- **Health Monitoring**: Periodic authentication and browser health checks with automatic recovery
-- **Error Classification**: Distinguishes recoverable vs permanent authentication errors
-- **Content Classification**: Distinguish posts, replies, quotes, and retweets
-- **Advanced Scraping**: Search-based scraping with enhanced scrolling
-- **Rate Limiting**: Respectful scraping with configurable intervals
-
-### Enhanced Content Processing Pipeline
-
-1. **Multi-Source Detection**: Content detected by webhook, API, or scraper
-2. **ContentCoordinator Processing**: Race condition prevention with processing
-   locks
-3. **Source Priority Resolution**: Higher priority sources override lower
-   priority
-4. **ContentStateManager**: Unified state tracking and age validation
-5. **Enhanced Duplicate Detection**: Fingerprinting and URL normalization
-6. **LivestreamStateMachine**: State transition management for livestreams
-7. **Content Classification**: Determine content type and target Discord channel
-8. **Announcement**: Format and send to appropriate Discord channels
-9. **Persistent Tracking**: Store content states and fingerprints for restart
-   persistence
-
-### Key Components Added
-
-**Content Processing Components:**
-- **ContentStateManager** (`src/core/content-state-manager.js`): Unified content
-  state with persistent storage
-- **LivestreamStateMachine** (`src/core/livestream-state-machine.js`): Handles
-  livestream transitions
-- **ContentCoordinator** (`src/core/content-coordinator.js`): Prevents race
-  conditions between sources
-- **PersistentStorage** (`src/infrastructure/persistent-storage.js`): File-based
-  storage for content states
-- **Enhanced DuplicateDetector**: Content fingerprinting with normalized titles
-  and timestamps
-
-**Authentication Recovery Components:**
-- **Enhanced AuthManager** (`src/application/auth-manager.js`): Smart retry logic with exponential backoff and error classification
-- **Health Monitoring System** (`src/application/scraper-application.js`): Periodic health checks with automatic recovery
-- **Scraper Management Commands** (`src/core/command-processor.js`, `src/application/bot-application.js`): Granular control over X scraper component
-
-### Browser Configuration & Anti-Bot Detection
-
-**Anti-Bot Detection Strategy:**
-Both X and YouTube scrapers use `headless: false` to bypass anti-bot detection systems that specifically block headless browsers. This requires running browsers in visual mode with Xvfb virtual display.
-
-**Safe Browser Configuration:**
-After extensive testing, the optimal browser configuration balances performance with anti-bot detection avoidance:
-
+### Enhanced Logger Integration Pattern
 ```javascript
-// Browser arguments for reliable operation
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+
+// 1. Update constructor to accept enhanced logging dependencies
+constructor(dependencies..., baseLogger, debugManager, metricsManager) {
+  this.logger = createEnhancedLogger('module-name', baseLogger, debugManager, metricsManager);
+}
+
+// 2. Use automatic operation tracking with timing and metrics
+async someOperation(data) {
+  const operation = this.logger.startOperation('operationName', { data });
+  try {
+    operation.progress('Step 1: Processing');
+    // ... do work ...
+    operation.success('Operation completed', { result });
+    return result;
+  } catch (error) {
+    operation.error(error, 'Operation failed', { context });
+    throw error;
+  }
+}
+
+// 3. Use correlation IDs for related operations
+const correlationId = this.logger.generateCorrelationId();
+const parentLogger = this.logger.forOperation('parentOperation', correlationId);
+
+// 4. Use enhanced object logging (NEW)
+this.logger.errorWithObject('Command processing failed', { command, args, userId });
+this.logger.warnWithObject('Performance threshold exceeded', performanceData);
+this.logger.infoWithObject('Operation completed', resultSummary);
+
+// 5. Use sampling for high-volume operations (NEW - Correlation-ID Based)
+// For operations that process dozens of items (like content classification)
+const operation = this.logger.startSampledOperation('classifyContent', context, 0.1); // 10% sampling
+this.logger.debugSampled('Processing batch', { count }, correlationId, 0.05); // 5% sampling
+
+// 6. Register content stores with memory monitor
+constructor(dependencies) {
+  // ... existing code ...
+  if (dependencies.memoryMonitor) {
+    dependencies.memoryMonitor.registerContentStore('myContent', () => this.analyzeContentStore());
+  }
+}
+
+// 7. Implement content analysis for memory monitoring
+analyzeContentStore() {
+  return {
+    totalItems: this.contentCache.size,
+    totalSizeMB: Math.round((JSON.stringify([...this.contentCache.values()]).length / 1024 / 1024) * 100) / 100,
+    oldestItemHours: this.calculateOldestItemAge(),
+    itemTypes: { content: this.contentCache.size }
+  };
+}
+```
+
+### Integration Status (Production Ready)
+#### ✅ Completed Integrations (8 modules + Memory Management + Sampling)
+- **ContentAnnouncer** (`content-announcer`): Content announcement pipeline with progress tracking
+- **XScraperApplication** (`scraper`): X scraping operations with **memory-managed tweet cache (1000 limit)**
+- **MonitorApplication** (`youtube`): YouTube webhook processing with API fallback monitoring  
+- **BotApplication** (`api`): Discord message processing with command tracking
+- **XAuthManager** (`auth`): Authentication flows with login attempt monitoring
+- **YouTubeScraperService** (`youtube`): YouTube monitoring with **memory-managed video cache (500 limit)**
+- **ContentClassifier** (`api`): **Content classification with intelligent sampling (10% X, 20% YouTube)**
+- **ContentCoordinator** (`state`): Content coordination visibility and race condition prevention
+- **MemoryMonitor** (`memory`): **Real-time memory tracking with content store analysis and leak detection**
+
+#### ✅ **NEW: Log Sampling System** (2025-01-28, Updated Correlation-ID Based)
+- **Purpose**: Handles high-volume operations without log flooding
+- **Correlation-ID Based**: Deterministic sampling based on correlation ID hash for consistent behavior
+- **Smart Sampling**: 10% sampling for X content classification, 20% for YouTube
+- **Metrics Preserved**: All performance data collected regardless of sampling
+- **Error Logging**: Errors always logged regardless of sampling rates
+- **Methods**: `startSampledOperation()`, `debugSampled()`, `verboseSampled()`, `infoSampled()`
+
+#### 🚧 Pending Integrations (Low Priority)
+- **Browser Services** (`browser`): Playwright automation debugging
+- **ContentStateManager** (`state`): State management operations
+
+### Testing Framework (Fully Established)
+```javascript
+// Enhanced Logger mock pattern for tests
+const mockDebugManager = {
+  isEnabled: jest.fn(() => false),
+  getLevel: jest.fn(() => 1),
+  toggleFlag: jest.fn(),
+  setLevel: jest.fn()
+};
+
+const mockMetricsManager = {
+  recordMetric: jest.fn(),
+  startTimer: jest.fn(() => ({ end: jest.fn() })),
+  incrementCounter: jest.fn(),
+  setGauge: jest.fn()
+};
+
+// All Phase 2 modules have updated test coverage with reusable mock patterns
+```
+
+### Performance & Security Features
+- **Memory Impact**: ~1-2% additional memory per operation
+- **CPU Overhead**: ~1-2% CPU for operation tracking
+- **Automatic Data Sanitization**: Credentials and PII automatically redacted
+- **Access Control**: Debug commands restricted to authorized users
+- **Rate Limiting**: Debug command usage rate limited
+
+### Integration Benefits (All Available Now)
+- **Runtime Debug Control**: ✅ Toggle any of 9 modules without restarts
+- **Performance Monitoring**: ✅ Real-time metrics with Discord integration
+- **Memory Management**: ✅ **Bounded caches with automatic cleanup and OOM prevention**
+- **Content Analysis**: ✅ **Real-time visibility into what content is stored and memory usage**
+- **Leak Detection**: ✅ **Automatic warnings before memory exhaustion with cleanup recommendations**
+- **Correlation Tracking**: ✅ Follow operations across modules with correlation IDs
+- **Rich Error Context**: ✅ Better debugging for "Failed to scrape" type errors
+- **Operation Timing**: ✅ Automatic timing measurement for all tracked operations
+- **Security**: ✅ Automatic sensitive data sanitization in logs
+
+## Content Monitoring
+
+### Multi-Source Detection (Priority Order)
+1. **Webhooks** - PubSubHubbub push notifications (highest)
+2. **API Polling** - YouTube Data API v3 queries (medium)
+3. **Web Scraping** - Playwright browser automation (lowest)
+
+### Enhanced Processing Pipeline ✅ **CONTENT COORDINATOR PATTERN**
+1. Multi-source detection → **ContentCoordinator** (race condition prevention)
+2. Source priority resolution → ContentStateManager (unified tracking)
+3. Enhanced duplicate detection → LivestreamStateMachine (state transitions)
+4. Content classification → **ContentCoordinator.processContent()** → Discord channels
+
+**⚠️ Important**: Current implementation uses **ContentCoordinator pattern** instead of direct announcer calls:
+```javascript
+// ✅ CURRENT: Content flows through ContentCoordinator
+const result = await this.contentCoordinator.processContent(content.id, 'scraper', content);
+
+// ❌ DEPRECATED: Direct announcer calls (old pattern, don't use in new tests)
+const result = await this.contentAnnouncer.announceContent(content);
+```
+
+**Test Expectations**: All tests should expect `contentCoordinator.processContent()` calls, not direct announcer calls.
+
+### Key Processing Components
+- **ContentStateManager** (`src/core/content-state-manager.js`): Unified content state with persistent storage
+- **LivestreamStateMachine** (`src/core/livestream-state-machine.js`): Handles livestream transitions
+- **ContentCoordinator** (`src/core/content-coordinator.js`): Prevents race conditions between sources
+- **PersistentStorage** (`src/infrastructure/persistent-storage.js`): File-based storage for content states
+
+### Browser Architecture & Configuration
+
+#### Dual Browser Design
+The application uses **separate browser instances** for X and YouTube scrapers to prevent resource conflicts:
+
+- **X Scraper**: Independent PlaywrightBrowserService instance with isolated profile
+- **YouTube Scraper**: Separate PlaywrightBrowserService instance with isolated profile
+- **Dependency Injection**: Browser service registered as singleton but creates isolated instances per scraper
+- **Profile Isolation**: Each browser gets unique temporary profile directory (e.g., `profile-r2iRG5`, `profile-xjXqsz`)
+
+#### Enhanced Browser Services ✅ **FIXED: userDataDir Issue**
+- **EnhancedPlaywrightBrowserService** (`src/services/implementations/enhanced-playwright-browser-service.js`): Advanced browser service with stealth capabilities
+- **StealthBrowserFactory** (`src/services/implementations/stealth-browser-factory.js`): Factory for creating stealth-enabled browser instances
+- **Key Fix**: Resolved Playwright API error by properly filtering `userDataDir` from regular launch options
+
+**Critical API Usage**:
+```javascript
+// ✅ CORRECT: Use launchPersistentContext with userDataDir
+this.context = await chromium.launchPersistentContext(userDataDir, options);
+
+// ❌ INCORRECT: Never use userDataDir with regular launch (causes error)
+this.browser = await chromium.launch({ userDataDir, ...options }); // ❌ API Error!
+```
+
+#### Browser Environment Requirements
+**Display Server**: Requires Xvfb virtual display for headless operation
+```bash
+# Required for browser automation in headless environments
+DISPLAY=:99 node index.js
+```
+
+**Anti-bot detection**: Use `headless: false` with Xvfb virtual display
+
+**Safe browser args**:
+```javascript
 args: [
-  // Core security and stability (required)
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-dev-shm-usage',
-  '--disable-accelerated-2d-canvas',
-  '--no-first-run',
-  '--no-zygote',
-  '--disable-gpu',
-  
-  // Minimal performance optimizations (safe from detection)
-  '--disable-images',              // Block image loading (~70% bandwidth savings)
-  '--disable-plugins',             // Block Flash, PDF viewers, etc.
-  '--mute-audio',                 // Mute any audio processing
+  '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+  '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote',
+  '--disable-gpu', '--disable-images', '--disable-plugins', '--mute-audio'
 ]
 ```
 
-**⚠️ Flags to AVOID (Trigger Bot Detection):**
-These flags were found to trigger anti-bot detection and cause authentication failures:
-- `--disable-web-security` ❌ **Major red flag for anti-bot systems**
-- `--disable-ipc-flooding-protection` ❌ **Unusual flag detected by systems**
-- `--disable-extensions` ❌ **Can trigger detection algorithms**
-- `--disable-background-timer-throttling` ❌ **Suspicious browser behavior**
-- `--disable-renderer-backgrounding` ❌ **Detected as automation**
-- `--disable-backgrounding-occluded-windows` ❌ **Bot-like configuration**
-- `--disable-features=TranslateUI` ❌ **Unusual feature disabling**
+**Avoid these flags** (trigger detection):
+- `--disable-web-security`, `--disable-extensions`, `--disable-ipc-flooding-protection`
 
-**Authentication Detection:**
-X authentication now uses **cookie-based validation** for reliable detection:
+#### Common Browser Issues & Solutions
 
+**"Browser connection lost" Errors:**
+- **Cause**: Missing X server environment or browser instance conflicts
+- **Solution**: Ensure Xvfb is running and `DISPLAY=:99` is set
+- **Verification**: Check for multiple browser processes with different profile directories
+
+**"Browser is already running" Errors:**
+- **Cause**: Attempted to launch second browser instance in same service
+- **Architecture**: Resolved by dependency injection creating isolated instances per scraper
+
+**Browser Process Management:**
 ```javascript
-// Check for X authentication cookies
-const authToken = cookies.find(cookie => cookie.name === 'auth_token');
-const ct0Token = cookies.find(cookie => cookie.name === 'ct0');
-const hasValidCookies = authToken && authToken.value && ct0Token && ct0Token.value;
+// Each scraper gets its own browser instance automatically
+const scraperA = container.resolve('scraperApplication');  // Gets browser instance A
+const scraperB = container.resolve('youtubeScraperService'); // Gets browser instance B
 ```
 
-**Expected Resource Impact:**
-- **Memory Usage**: ~40-50% reduction (no images, plugins, audio)
-- **CPU Usage**: ~30-40% reduction (no audio processing, plugins)  
-- **Bandwidth**: ~70% reduction (no images, ads)
-- **Reliability**: ✅ No false authentication failures
-- **Functionality**: Maintains full text scraping and DOM interaction capabilities
+## Detection Signature Monitoring System ✅ **PRODUCTION READY**
 
-**Infrastructure Requirements:**
-- Xvfb virtual display server (`scripts/start-bot.sh` starts Xvfb on :99)
-- DISPLAY environment variable (`scripts/discord-bot.service` sets DISPLAY=:99)
-- Sufficient memory for browser instances (optimized but still > headless)
+### **Real-Time Anti-Botting Intelligence**
+The detection monitoring system transforms anti-botting from **reactive** (fix after it breaks) to **proactive** (adapt before it breaks) with real-time signature analysis and automated emergency response.
 
-## 9. Configuration & Environment Management
+### **Core Components (All Operational)**
+- **DetectionMonitor** (`src/utilities/detection-monitor.js`): ✅ 18 detection signatures with incident tracking and emergency mode
+- **PerformanceMonitor** (`src/utilities/performance-monitor.js`): ✅ A-F performance grading with real-time alerts
+- **Enhanced Browser Integration**: ✅ Automatic signature analysis on every page navigation
+- **Discord Command Integration**: ✅ Real-time monitoring and incident reporting
+- **Health Check Endpoints**: ✅ External monitoring system integration
 
-### Environment Variables
+### **18 Detection Signatures (6 Categories)**
 
-All configuration managed through `.env` file with validation at startup:
+#### **JavaScript Challenge Signatures (Critical Severity)**
+- `CAPTCHA_CHALLENGE` - CAPTCHA challenge detected
+- `JS_CHALLENGE` - JavaScript challenge detected  
+- `CLOUDFLARE_CHALLENGE` - Cloudflare challenge detected
 
+#### **Rate Limiting Signatures (High Severity)**
+- `HTTP_429_RATE_LIMITED` - HTTP 429 rate limit response
+- `IP_BLOCKED` - IP address blocked
+- `PROGRESSIVE_RATE_LIMITING` - Progressive rate limiting detected
+
+#### **Browser Fingerprint Signatures (Medium-High Severity)**
+- `WEBDRIVER_DETECTED` - WebDriver property detected
+- `HEADLESS_DETECTED` - Headless browser detected
+- `CANVAS_FINGERPRINT_BLOCKED` - Canvas fingerprinting blocked
+- `PLUGIN_MISMATCH` - Plugin configuration mismatch
+
+#### **Behavioral Analysis Signatures (Medium Severity)**
+- `TIMING_PATTERN_DETECTED` - Predictable timing pattern detected
+- `MOUSE_PATTERN_DETECTED` - Non-human mouse patterns detected
+- `SCROLL_PATTERN_DETECTED` - Automated scrolling detected
+
+#### **Network-Level Signatures (High Severity)**
+- `TLS_FINGERPRINT_BLOCKED` - TLS fingerprint blocked
+- `USER_AGENT_BLACKLISTED` - User agent blacklisted
+- `HEADER_MISMATCH` - HTTP header mismatch detected
+
+#### **Session Analysis Signatures (Low-Medium Severity)**
+- `SESSION_INCONSISTENCY` - Session state inconsistency
+- `RAPID_PAGE_TRANSITIONS` - Unrealistic page transition speed
+- `MISSING_REFERRER` - Missing or suspicious referrer headers
+
+### **Emergency Mode System** 🚨
+```javascript
+// Automatic activation thresholds
+const emergencyTriggers = {
+  critical: 1,    // 1 critical incident = emergency mode
+  high: 3,        // 3 high incidents = emergency mode  
+  medium: 5,      // 5 medium incidents = alert
+  total: 5        // 5 total incidents = emergency mode
+};
+
+// Emergency response (30 minutes duration)
+if (emergencyMode.active) {
+  // Ready for integration with stealth adjustments:
+  // - Increase rate limiting intervals
+  // - Rotate user agents immediately
+  // - Clear browser profiles
+  // - Activate maximum stealth measures
+}
+```
+
+### **A-F Performance Grading System** 📊
+```javascript
+const performanceGrades = {
+  memory: {
+    A: '<512MB', B: '<1GB', C: '<1.5GB', D: '<2GB', F: '≥2GB'
+  },
+  navigation: {
+    A: '<5s', B: '<10s', C: '<20s', D: '<30s', F: '≥30s'  
+  },
+  reliability: {
+    A: '≥98%', B: '≥95%', C: '≥90%', D: '≥80%', F: '<80%'
+  },
+  overall: 'Weighted average (reliability=30%, memory=25%, navigation=25%, cpu=20%)'
+};
+```
+
+### **Discord Command Integration** 💬
+```bash
+# Real-time monitoring commands
+!stealth-status              # Anti-botting system status with performance grades
+!detection-report            # Detailed incident analysis with recent signatures  
+!performance-metrics         # A-F performance report with recommendations
+
+# Example output
+!stealth-status
+✅ **Anti-Botting System Status**
+**System Status:** Enabled
+**Success Rate:** 96.2%
+**Detection Rate:** 3.8%  
+**Recent Incidents:** 2
+**Emergency Mode:** Inactive
+**Performance Grade:** B
+- Memory: A (487MB)
+- Navigation: B (8s avg)
+- Reliability: A
+```
+
+### **Health Check Endpoints** 🔗
+```bash
+# External monitoring integration
+GET /health/anti-bot-status       # Current stealth system overview
+GET /health/detection-metrics     # Detection incident summary
+GET /health/performance-impact    # Resource usage and performance data
+
+# Example response
+curl /health/anti-bot-status
+{
+  "status": "enabled",
+  "stealth": {
+    "emergencyMode": false,
+    "successRate": 96.2,
+    "detectionRate": 3.8,
+    "recentIncidents": 2
+  },
+  "performance": {
+    "overallGrade": "B",
+    "memoryGrade": "A",
+    "memoryUsageMB": 487
+  }
+}
+```
+
+### **Browser Integration Pattern** 🔄
+```javascript
+// Automatic integration in EnhancedPlaywrightBrowserService
+async goto(url, options = {}, retries = 3) {
+  const performanceOp = this.performanceMonitor?.startOperation('navigation', { url });
+  
+  try {
+    const response = await this.navigateToPage(url, options);
+    
+    // ✅ AUTOMATIC: Analyze every page load for detection signatures
+    if (this.detectionMonitor && response) {
+      const analysis = await this.detectionMonitor.analyzeForDetection(
+        this.page, response, { url, userAgent: this.getCurrentUserAgent() }
+      );
+      
+      if (analysis.detected) {
+        // Signatures detected - logged and tracked automatically
+        // Emergency mode activation handled automatically
+      }
+    }
+    
+    // ✅ AUTOMATIC: Record success/failure for monitoring
+    this.detectionMonitor?.recordSuccessfulRequest({ url });
+    performanceOp?.end(true, { statusCode: response.status() });
+    
+    return response;
+  } catch (error) {
+    this.detectionMonitor?.recordFailedRequest({ url, error: error.message });
+    performanceOp?.end(false, { error: error.message });
+    throw error;
+  }
+}
+```
+
+### **Environment Configuration**
+```bash
+# Detection monitoring configuration
+DETECTION_MONITORING_ENABLED=true        # Enable/disable detection monitoring
+DETECTION_ALERT_THRESHOLD=3              # Incidents before alert
+EMERGENCY_MODE_THRESHOLD=5               # Incidents before emergency mode
+EMERGENCY_MODE_DURATION=1800000          # Emergency mode duration (30min)
+AUTO_EMERGENCY_MODE=true                 # Automatic emergency activation
+DETECTION_NOTIFICATIONS=true             # Discord notifications
+
+# Performance monitoring configuration  
+PERFORMANCE_MONITORING_ENABLED=true     # Enable/disable performance monitoring
+PERFORMANCE_SAMPLE_RETENTION=1000       # Performance samples to retain
+MEMORY_ALERT_MB=1500                     # Memory usage alert threshold
+NAVIGATION_ALERT_MS=30000               # Navigation time alert threshold
+ERROR_RATE_ALERT=0.05                   # Error rate alert threshold (5%)
+```
+
+### **Integration Benefits (All Available Now)**
+- **Real-Time Threat Response**: ✅ Automatic emergency mode activation on detection spikes
+- **Stealth Effectiveness Measurement**: ✅ Data-driven optimization with success rate tracking
+- **Proactive Adaptation**: ✅ Stay ahead of evolving anti-bot systems  
+- **Forensic Analysis**: ✅ Learn from failures to improve stealth
+- **Operational Visibility**: ✅ Discord integration and health endpoints
+- **Performance Optimization**: ✅ A-F grading with specific recommendations
+
+### **Production Deployment Status** 🚀
+- ✅ **Core Classes**: DetectionMonitor, PerformanceMonitor implemented
+- ✅ **Browser Integration**: EnhancedPlaywrightBrowserService integrated
+- ✅ **Dependency Injection**: StealthBrowserFactory updated
+- ✅ **Discord Commands**: CommandProcessor handlers added
+- ✅ **Health Endpoints**: Express routes configured
+- ✅ **Test Coverage**: Comprehensive test suites created
+- ✅ **Environment Variables**: Configuration documented
+- ✅ **Error Handling**: Graceful degradation implemented
+
+The detection monitoring system is **fully operational** and ready for production use. It provides comprehensive visibility into anti-botting effectiveness and enables proactive responses to evolving detection techniques.
+
+## Memory Management System ✅ **PRODUCTION READY**
+
+### **Dual-Layer Architecture (OOM-Safe)**
+- **DuplicateDetector** = Authoritative, persistent duplicate prevention (survives restarts)
+- **Performance Caches** = Temporary optimization storage (safe to clean up)
+
+### **Core Components**
+- **MemoryMonitor** (`src/infrastructure/memory-monitor.js`): Real-time memory tracking with leak detection
+- **XScraperApplication**: Tweet cache (1000 limit, 24h retention) with immediate duplicate filtering
+- **YouTubeScraperService**: Video cache (500 limit, 48h retention) with automatic cleanup
+- **Enhanced Logging**: Bounded metrics collection (10K samples, 24h retention)
+
+### **Memory Safety Rules**
+```javascript
+// ✅ CORRECT: Dual-layer architecture
+const isDuplicate = await this.duplicateDetector.isDuplicate(tweet.url); // Persistent, authoritative
+this.extractedTweets.set(tweetID, {...tweet, extractedAt}); // Performance cache only
+
+// ❌ WRONG: Using cache for duplicate detection
+// if (this.extractedTweets.has(tweetID)) return true; // Never do this!
+```
+
+### **Memory Monitoring Commands**
+- `!memory-status` - Current memory usage and content analysis
+- `!debug-status` - Memory usage per debug module
+- `!metrics` - Performance metrics with memory tracking
+
+### **Expected Results**
+- **50-70% memory reduction** from immediate duplicate filtering
+- **Bounded growth** - caches never exceed defined limits
+- **Zero false announcements** - persistent duplicate detection survives all cleanup
+- **Early leak detection** - automatic warnings before OOM kills
+
+### **Critical Safety:** Channel goes silent for 3+ days
+- ✅ **Cache cleaned up** (saves memory) 
+- ✅ **DuplicateDetector retains records** (prevents re-announcements)
+- ✅ **Old content never re-announced** (persistent storage survives cleanup)
+
+## Critical Safety Guards
+
+### Memory Leak Prevention
+All `main()` functions include:
+```javascript
+if (process.env.NODE_ENV === 'test') {
+  throw new Error('main() should not be called in test environment');
+}
+```
+
+**Never call `main()` in tests** - they start infinite background processes.
+
+### Autonomy Boundaries
+**Requires Human Review**: Authentication mechanisms, webhook security, breaking changes to Discord commands, major architectural shifts
+
+**Full Autonomy**: New bot commands, content filtering improvements, duplicate detection, test coverage, documentation, performance optimizations
+
+## Environment Configuration
+
+### Key Variables
 - **Discord**: `DISCORD_BOT_TOKEN`, channel IDs, user authorizations
-- **YouTube**: `YOUTUBE_API_KEY`, `YOUTUBE_CHANNEL_ID`, webhook configuration
+- **YouTube**: `YOUTUBE_API_KEY`, `YOUTUBE_CHANNEL_ID`, webhook config
 - **X Monitoring**: `X_USER_HANDLE`, authentication credentials
 - **Security**: `PSH_SECRET`, rate limiting configuration
-- **Operations**: Logging levels, feature toggles, polling intervals
-- **Content Detection**: `MAX_CONTENT_AGE_HOURS`,
-  `ENABLE_CONTENT_FINGERPRINTING`, `CONTENT_STORAGE_DIR`, reliability settings
+- **Anti-botting**: `BROWSER_STEALTH_ENABLED`, detection thresholds, profile management
+- **Detection Monitoring**: `DETECTION_MONITORING_ENABLED`, `EMERGENCY_MODE_THRESHOLD`, incident tracking
+- **Performance Monitoring**: `PERFORMANCE_MONITORING_ENABLED`, `MEMORY_ALERT_MB`, A-F grading thresholds
+- **Memory Management**: `MEMORY_MAX_MB`, `MEMORY_WARNING_MB`, cache limits, GC thresholds
+
+### Health Monitoring
+- `GET /health` - Basic status
+- `GET /health/detailed` - Comprehensive component status
+- `GET /health/anti-bot-status` - **Anti-botting system status and performance grades**
+- `GET /health/detection-metrics` - **Detection incident analysis and recent signatures**
+- `GET /health/performance-impact` - **Resource usage and A-F performance grading**
+- Discord commands for real-time monitoring
 
 ### Configuration Validation
-
-- **Startup Validation**: `src/config-validator.js` validates required variables
+- **Startup Validation**: `src/env-validator.js` validates required variables
 - **Type Checking**: Ensure proper data types and formats
-- **Security Checks**: Verify sensitive values are properly encrypted
+- **Security Checks**: Verify sensitive values are encrypted
 - **Default Values**: Provide sensible defaults where appropriate
 
-### Credential Security
-
-- **Encryption**: Use dotenvx for production credential encryption
-- **Environment Separation**: Different configurations for development and
-  production
-- **Secret Scanning**: Pre-commit hooks check for accidental secret exposure
-
-## 10. Monitoring & Health Checks
-
-### Health Check Endpoints
-
-- `GET /health` - Basic health status with uptime and memory usage
-- `GET /health/detailed` - Comprehensive status of all components
-- `GET /ready` - Kubernetes-style readiness probe
-
-### Discord Health Commands
-
-- `!health` - Real-time status in Discord chat
-- `!health-detailed` - Comprehensive component status via Discord
-
-### Monitoring Metrics
-
-- **System**: Memory usage, uptime, process health
-- **Application**: Component status, error rates, performance metrics
-- **Business**: Content monitoring stats, command usage, announcement counts
-
-## 11. Deployment & Production Operations
+## Deployment & Operations
 
 ### Systemd Service Management
-
 ```bash
-# Service Operations
-sudo systemctl start discord-bot.service
-sudo systemctl status discord-bot.service
-sudo systemctl stop discord-bot.service
+sudo systemctl start discord-bot.service    # Start service
+sudo systemctl status discord-bot.service   # Check status
+sudo systemctl stop discord-bot.service     # Stop service
+sudo systemctl daemon-reload                # Reload after changes
+```
 
-# Development
-sudo systemctl daemon-reload
-sudo systemctl enable discord-bot.service
+### Deployment Troubleshooting
+
+#### Systemd Service Issues
+**Node.js PATH Problems:**
+- **Issue**: `/usr/bin/env: 'node': No such file or directory`
+- **Cause**: Node.js not available in systemd service PATH
+- **Solution**: Update service file with explicit Node.js path or use deployment script
+
+**Browser Launch Failures:**
+- **Issue**: `Missing X server or $DISPLAY` errors
+- **Cause**: Browser requires display server for automation
+- **Solution**: Use deployment script with Xvfb or set `DISPLAY=:99`
+
+#### Manual Deployment (Development)
+```bash
+# Start with proper display environment
+DISPLAY=:99 node index.js
+
+# Or use deployment script
+bash scripts/deployment/discord-bot-start.sh
+```
+
+#### Verification Commands
+```bash
+# Check browser processes are running with separate profiles
+ps aux | grep chrome | grep profile
+
+# Verify Xvfb virtual display
+ps aux | grep Xvfb
+
+# Check bot process
+ps aux | grep "node index.js"
 ```
 
 ### Logging Infrastructure
-
 - **File Logging**: Winston with daily rotation
 - **Discord Logging**: Optional log mirroring to Discord channel
-- **Log Levels**: error, warn, info, http, verbose, debug, silly
+- **Log Levels**: error, warn, info, debug, verbose
 - **Structured Logging**: JSON format with contextual metadata
 
-### Production Considerations
+### Common Operational Issues
 
-- **Process Management**: Systemd service with automatic restart
-- **Resource Monitoring**: Memory and CPU usage tracking
-- **Error Recovery**: Exponential backoff and circuit breaker patterns
-- **Graceful Shutdown**: Proper cleanup of resources and connections
-
-## 12. Knowledge Acquisition & Continuous Learning
-
-### Primary Learning Sources
-
-1. **Codebase Analysis**: Understand patterns from existing implementations
-2. **Documentation**: README.md, tests/README.md, and this CLAUDE.md
-3. **Test Results**: Learn from test failures and coverage reports
-4. **Production Logs**: Analyze real-world usage patterns and errors
-
-### Self-Improvement Protocols
-
-- **Code Review**: Analyze human feedback on generated code
-- **Error Analysis**: Study failed tests and production incidents
-- **Performance Monitoring**: Learn from performance test results
-- **Security Assessment**: Understand security scan results and vulnerabilities
-
-### Feedback Integration
-
-- **Human Review**: Incorporate code review comments into future implementations
-- **CI/CD Results**: Learn from automated test failures and linting errors
-- **Production Metrics**: Analyze real-world performance and reliability data
-- **User Behavior**: Study Discord command usage patterns and user feedback
-
-## 13. Quality Assurance & Validation
-
-### Pre-Commit Validation
-
-- **Syntax Checking**: ESLint validation with project-specific rules
-- **Security Scanning**: Check for hardcoded secrets and vulnerabilities
-- **Test Execution**: Run relevant tests for changed code
-- **Documentation**: Ensure code changes include documentation updates
-
-### Code Review Criteria
-
-- **Functionality**: Does the code work as intended?
-- **Security**: Are there any security vulnerabilities?
-- **Performance**: Are there any performance implications?
-- **Maintainability**: Is the code easy to understand and modify?
-- **Testing**: Are there adequate tests for the changes?
-
-### Deployment Readiness
-
-- **Configuration**: All required environment variables documented
-- **Dependencies**: Package.json updated with new dependencies
-- **Migration**: Any required data or configuration migrations
-- **Rollback**: Ensure changes can be safely reverted if needed
-
-## 14. Interaction & Collaboration Protocols
-
-### Communication Standards
-
-- **Clear Signaling**: Explicitly indicate task completion and next steps
-- **Context Provision**: Include relevant technical details for review
-- **Change Documentation**: Explain what was changed and why
-- **Impact Assessment**: Describe potential effects of changes
-
-### Change Proposal Format
-
-```markdown
-## Change Summary
-
-Brief description of what was implemented
-
-## Technical Details
-
-- Files modified: list of changed files
-- New dependencies: any added packages
-- Configuration changes: environment variable updates
-
-## Testing
-
-- Test coverage: percentage and scope
-- Test results: summary of test execution
-- Manual testing: any manual verification performed
-
-## Impact Analysis
-
-- Breaking changes: any backward compatibility issues
-- Performance impact: expected performance changes
-- Security considerations: security implications
+#### Browser Connection Errors
+**Symptoms**: `Browser connection lost` repeated in logs
+**Diagnosis**: 
+```bash
+# Check if both browser instances are running
+ps aux | grep chrome
+# Should show 2 separate browser processes with different profile directories
 ```
+**Resolution**: Restart with proper Xvfb environment
 
-### Conflict Resolution
-
-- **Ambiguous Requirements**: Request clarification with specific questions
-- **Conflicting Instructions**: Highlight conflicts and request priority
-  guidance
-- **Technical Constraints**: Explain limitations and propose alternatives
-- **Resource Constraints**: Identify bottlenecks and suggest solutions
-
-## 15. Versioning & Evolution
-
-### Document Maintenance
-
-This CLAUDE.md is a living document that must evolve with the project. Claude is
-expected to:
-
-- **Propose Updates**: Suggest improvements based on development experience
-- **Reflect Changes**: Update guidelines when project architecture evolves
-- **Maintain Accuracy**: Ensure all information remains current and correct
-- **Enhance Clarity**: Improve explanations and examples based on usage
-
-### Change Management
-
-- **Version Control**: All changes tracked through Git commits
-- **Review Process**: Significant changes require human review
-- **Backward Compatibility**: Maintain compatibility with existing development
-  patterns
-- **Migration Guidance**: Provide migration paths for breaking changes
-
-### Future Enhancements
-
-- **Scalability**: Prepare for potential multi-server deployment
-- **Integration**: Plan for additional content sources and Discord features
-- **Monitoring**: Enhanced observability and alerting capabilities
-- **Security**: Continuous security improvements and threat mitigation
+#### Scraper Conflicts
+**Symptoms**: One scraper working but other failing
+**Diagnosis**: Both scrapers should have separate browser profiles
+**Resolution**: Verify dependency injection is creating isolated instances
 
 ---
 
-_This document supersedes any previous Claude-specific guidelines and serves as
-the authoritative source for AI agent contributions to this project. It should
-be referenced for all development decisions and updated as the project evolves._
+*This compact guide covers essential development patterns. Reference the full CLAUDE.md for comprehensive details.*

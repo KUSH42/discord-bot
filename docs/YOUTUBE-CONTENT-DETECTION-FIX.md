@@ -244,7 +244,7 @@ or lightweight DB await this.writeToStorage('content_states', videoId, state); }
 
     async cleanup(olderThanDays = 7) {
       // Remove old entries to prevent storage bloat
-      const cutoff = Date.now() - (olderThanDays * 24 * 60 * 60 * 1000);
+      const cutoff = timestampUTC() - (olderThanDays * 24 * 60 * 60 * 1000);
       await this.removeEntriesOlderThan('content_states', cutoff);
     }
 
@@ -301,7 +301,7 @@ this.lockTimeout = 30000; // 30 seconds }
 
 Goal: Ensure webhook notifications are properly received and processed
 
-Implementation: // Enhanced: src/application/monitor-application.js class
+Implementation: // Enhanced: src/application/yt-monitor-application.js class
 EnhancedMonitorApplication { async processWebhookNotification(xmlBody) { const
 notificationId = this.generateNotificationId(xmlBody);
 

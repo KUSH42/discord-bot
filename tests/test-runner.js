@@ -8,6 +8,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { timestampUTC } from '../src/utilities/utc-time.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,11 +59,12 @@ function runCommand(command, args, options = {}) {
 
 async function runTests(testType, extraArgs = []) {
   const commands = {
-    unit: ['npx', 'jest', 'tests/unit', ...extraArgs],
-    integration: ['npx', 'jest', 'tests/integration', ...extraArgs],
+    // TODO: fix for different nodeVersions
+    unit: ['npx', 'jest', '--config', 'jest.unit.config.js', `test-results/unit-tests-node20`, ...extraArgs],
+    integration: ['npx', 'jest', '--config', 'jest.unit.config.js', ...extraArgs],
     e2e: ['npx', 'jest', '--config', 'jest.e2e.config.js', ...extraArgs],
     security: ['npx', 'jest', '--config', 'jest.security.config.js', ...extraArgs],
-    performance: ['npx', 'jest', 'tests/performance', ...extraArgs],
+    performance: ['npx', 'jest', '--config', 'jest.performance.config.js', ...extraArgs],
     all: ['npx', 'jest', ...extraArgs],
     coverage: ['npx', 'jest', '--coverage', ...extraArgs],
     watch: ['npx', 'jest', '--watch', ...extraArgs],
@@ -145,9 +147,9 @@ async function main() {
     log(`Arguments: ${extraArgs.join(' ')}`, 'magenta');
     log('', 'reset');
 
-    const startTime = Date.now();
+    const startTime = timestampUTC();
     await runTests(testType, extraArgs);
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    const duration = ((timestampUTC() - startTime) / 1000).toFixed(2);
 
     log(`\\n✅ Tests completed successfully in ${duration}s`, 'green');
   } catch (error) {

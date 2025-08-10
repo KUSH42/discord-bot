@@ -4,6 +4,17 @@
  */
 
 import { jest } from '@jest/globals';
+import { timestampUTC } from '../../src/utilities/utc-time.js';
+
+// Import specialized test utilities
+import { createEnhancedLoggerMocks, createMockContentCoordinator } from './enhanced-logger-factory.js';
+import { timerTestUtils } from './timer-test-utils.js';
+import { createPlaywrightMocks, mockPlaywrightModule } from './playwright-mocks.js';
+import {
+  createXScraperApplicationMocks,
+  createMonitorApplicationMocks,
+  createContentAnnouncerMocks,
+} from './application-mocks.js';
 
 // Test timing utilities
 export const timing = {
@@ -24,8 +35,8 @@ export const timing = {
 
   // Wait for a condition to be true
   waitFor: async (condition, timeout = 5000, interval = 100) => {
-    const start = Date.now();
-    while (Date.now() - start < timeout) {
+    const start = timestampUTC();
+    while (timestampUTC() - start < timeout) {
       if (await condition()) {
         return true;
       }
@@ -216,24 +227,24 @@ export const assertions = {
 
   // Assert that async operations complete within timeout
   assertCompletesWithin: async (asyncFn, timeout, description = 'Operation') => {
-    const start = Date.now();
+    const start = timestampUTC();
     await asyncFn();
-    const duration = Date.now() - start;
+    const duration = timestampUTC() - start;
     expect(duration).toBeLessThan(timeout);
   },
 
   // Assert rate limiting behavior
   assertRateLimit: async (fn, maxRequests, windowMs, description = 'Rate limit') => {
     const results = [];
-    const start = Date.now();
+    const start = timestampUTC();
 
     // Make requests rapidly
     for (let i = 0; i < maxRequests + 5; i++) {
       try {
         const result = await fn();
-        results.push({ success: true, result, timestamp: Date.now() });
+        results.push({ success: true, result, timestamp: timestampUTC() });
       } catch (error) {
-        results.push({ success: false, error, timestamp: Date.now() });
+        results.push({ success: false, error, timestamp: timestampUTC() });
       }
     }
 
@@ -469,7 +480,7 @@ export const network = {
 
     return {
       checkLimit: () => {
-        const now = Date.now();
+        const now = timestampUTC();
         const windowStart = now - windowMs;
 
         // Remove old requests
@@ -531,6 +542,18 @@ Coverage:
   },
 };
 
+// Export specialized utilities
+export {
+  createEnhancedLoggerMocks,
+  createMockContentCoordinator,
+  timerTestUtils,
+  createPlaywrightMocks,
+  mockPlaywrightModule,
+  createXScraperApplicationMocks,
+  createMonitorApplicationMocks,
+  createContentAnnouncerMocks,
+};
+
 export default {
   timing,
   memory,
@@ -541,4 +564,19 @@ export default {
   logging,
   network,
   reporting,
+  // Add references to new utilities
+  enhanced: {
+    createLoggerMocks: createEnhancedLoggerMocks,
+    createContentCoordinator: createMockContentCoordinator,
+  },
+  timers: timerTestUtils,
+  playwright: {
+    createMocks: createPlaywrightMocks,
+    mockModule: mockPlaywrightModule,
+  },
+  applications: {
+    createScraperMocks: createXScraperApplicationMocks,
+    createMonitorMocks: createMonitorApplicationMocks,
+    createAnnouncerMocks: createContentAnnouncerMocks,
+  },
 };

@@ -1,3 +1,5 @@
+import { nowUTC } from '../utilities/utc-time.js';
+
 /**
  * Livestream State Machine
  * Manages proper tracking of livestream state transitions
@@ -62,7 +64,7 @@ export class LivestreamStateMachine {
     try {
       await this.contentStateManager.updateContentState(videoId, {
         state: newState,
-        stateTransitionTime: new Date(),
+        stateTransitionTime: nowUTC(),
         transitionMetadata: metadata,
       });
 

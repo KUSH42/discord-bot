@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { DiscordClientService } from '../../../src/services/implementations/discord-client-service.js';
+import { createMockDependenciesWithEnhancedLogging } from '../../utils/enhanced-logging-mocks.js';
 
 describe('Discord Client Service', () => {
   let discordClientService;
@@ -9,12 +10,9 @@ describe('Discord Client Service', () => {
   let mockChannel;
 
   beforeEach(() => {
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      silly: jest.fn(),
-    };
+    // Create enhanced logging mocks
+    const enhancedLoggingMocks = createMockDependenciesWithEnhancedLogging();
+    mockLogger = enhancedLoggingMocks.logger;
 
     mockSend = jest.fn();
     mockChannel = {
@@ -29,9 +27,8 @@ describe('Discord Client Service', () => {
       destroy: jest.fn().mockResolvedValue(undefined),
     };
 
-    // Correctly instantiate the service with the mock client
-    discordClientService = new DiscordClientService(mockClient);
-    discordClientService.logger = mockLogger; // Manually attach logger for testing
+    // Correctly instantiate the service with the mock client and logger
+    discordClientService = new DiscordClientService(mockClient, mockLogger);
   });
 
   afterEach(() => {
@@ -315,13 +312,16 @@ describe('Discord Client Service', () => {
       // This should not throw, but should log error
       expect(() => wrappedHandler(mockMessage)).not.toThrow();
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Error in message handler:', {
-        error: errorMessage,
-        stack: expect.any(String),
-        messageContent: 'Test message',
-        channelId: 'test-channel',
-        userId: 'user-123',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Error in message handler:',
+        expect.objectContaining({
+          error: errorMessage,
+          stack: expect.any(String),
+          messageContent: 'Test message',
+          channelId: 'test-channel',
+          userId: 'user-123',
+        })
+      );
     });
 
     it('should register ready handlers', () => {

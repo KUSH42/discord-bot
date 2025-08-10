@@ -405,6 +405,15 @@ describe('YouTubeApiService', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should handle API errors', async () => {
+      const apiError = new Error('Playlist API failed');
+      mockPlaylistsList.mockRejectedValue(apiError);
+
+      await expect(youtubeService.getPlaylistDetails(playlistId)).rejects.toThrow(
+        `Failed to fetch playlist details for ${playlistId}: Playlist API failed`
+      );
+    });
   });
 
   describe('getPlaylistVideos', () => {
@@ -439,6 +448,18 @@ describe('YouTubeApiService', () => {
       });
     });
 
+    it('should use default maxResults when not specified', async () => {
+      mockPlaylistItemsList.mockResolvedValue({ data: mockPlaylistVideosResponse });
+
+      await youtubeService.getPlaylistVideos(playlistId);
+
+      expect(mockPlaylistItemsList).toHaveBeenCalledWith({
+        part: 'snippet',
+        playlistId,
+        maxResults: 50,
+      });
+    });
+
     it('should limit maxResults to 50', async () => {
       mockPlaylistItemsList.mockResolvedValue({ data: { items: [] } });
 
@@ -449,6 +470,15 @@ describe('YouTubeApiService', () => {
         playlistId,
         maxResults: 50,
       });
+    });
+
+    it('should handle API errors', async () => {
+      const apiError = new Error('Playlist videos API failed');
+      mockPlaylistItemsList.mockRejectedValue(apiError);
+
+      await expect(youtubeService.getPlaylistVideos(playlistId)).rejects.toThrow(
+        `Failed to fetch playlist videos for ${playlistId}: Playlist videos API failed`
+      );
     });
   });
 
@@ -586,6 +616,28 @@ describe('YouTubeApiService', () => {
     it('should throw error for invalid video ID', async () => {
       await expect(youtubeService.getVideoComments('')).rejects.toThrow('Invalid video ID:');
     });
+
+    it('should handle API errors', async () => {
+      const apiError = new Error('Comments API failed');
+      mockCommentThreadsList.mockRejectedValue(apiError);
+
+      await expect(youtubeService.getVideoComments(validVideoId)).rejects.toThrow(
+        `Failed to fetch comments for ${validVideoId}: Comments API failed`
+      );
+    });
+
+    it('should use default maxResults when not specified', async () => {
+      mockCommentThreadsList.mockResolvedValue({ data: mockCommentsResponse });
+
+      await youtubeService.getVideoComments(validVideoId);
+
+      expect(mockCommentThreadsList).toHaveBeenCalledWith({
+        part: 'snippet',
+        videoId: validVideoId,
+        maxResults: 20,
+        order: 'time',
+      });
+    });
   });
 
   describe('getChannelUploadPlaylist', () => {
@@ -620,6 +672,20 @@ describe('YouTubeApiService', () => {
 
       await expect(youtubeService.getChannelUploadPlaylist(validChannelId)).rejects.toThrow(
         `Channel ${validChannelId} not found`
+      );
+    });
+
+    it('should throw error for invalid channel ID', async () => {
+      await expect(youtubeService.getChannelUploadPlaylist('')).rejects.toThrow('Invalid channel ID:');
+      await expect(youtubeService.getChannelUploadPlaylist(null)).rejects.toThrow('Invalid channel ID:');
+    });
+
+    it('should handle API errors', async () => {
+      const apiError = new Error('Upload playlist API failed');
+      mockChannelsList.mockRejectedValue(apiError);
+
+      await expect(youtubeService.getChannelUploadPlaylist(validChannelId)).rejects.toThrow(
+        `Failed to get upload playlist for ${validChannelId}: Upload playlist API failed`
       );
     });
   });
@@ -1127,6 +1193,89 @@ describe('YouTubeApiService', () => {
     });
   });
 
+  describe('validation methods', () => {
+    describe('validateVideoId', () => {
+      it('should validate correct video IDs', () => {
+        expect(youtubeService.validateVideoId('dQw4w9WgXcQ')).toBe(true);
+        expect(youtubeService.validateVideoId('_9bZkp7q19w')).toBe(true);
+        expect(youtubeService.validateVideoId('xvFZjo5PgG0')).toBe(true);
+      });
+
+      it('should reject invalid video IDs', () => {
+        expect(youtubeService.validateVideoId('')).toBe(false);
+        expect(youtubeService.validateVideoId('too-short')).toBe(false);
+        expect(youtubeService.validateVideoId('way-too-long-to-be-valid')).toBe(false);
+        expect(youtubeService.validateVideoId('invalid@chars')).toBe(false);
+        expect(youtubeService.validateVideoId(null)).toBe(false);
+        expect(youtubeService.validateVideoId(undefined)).toBe(false);
+        expect(youtubeService.validateVideoId(123)).toBe(false);
+      });
+    });
+
+    describe('validateChannelId', () => {
+      it('should validate correct channel IDs', () => {
+        expect(youtubeService.validateChannelId('UC_x5XG1OV2P6uZZ5FSM9Ttw')).toBe(true);
+        expect(youtubeService.validateChannelId('UCuAXFkgsw1L7xaCfnd5JJOw')).toBe(true);
+      });
+
+      it('should reject invalid channel IDs', () => {
+        expect(youtubeService.validateChannelId('')).toBe(false);
+        expect(youtubeService.validateChannelId('invalid-format')).toBe(false);
+        expect(youtubeService.validateChannelId('UC-too-short')).toBe(false);
+        expect(youtubeService.validateChannelId('UC_way_too_long_to_be_valid_channel_id')).toBe(false);
+        expect(youtubeService.validateChannelId('XC_x5XG1OV2P6uZZ5FSM9Ttw')).toBe(false); // Wrong prefix
+        expect(youtubeService.validateChannelId(null)).toBe(false);
+        expect(youtubeService.validateChannelId(undefined)).toBe(false);
+        expect(youtubeService.validateChannelId(123)).toBe(false);
+      });
+    });
+
+    describe('extractVideoId', () => {
+      it('should extract video ID from various URL formats', () => {
+        expect(youtubeService.extractVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+        expect(youtubeService.extractVideoId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+        expect(youtubeService.extractVideoId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+        expect(youtubeService.extractVideoId('https://www.youtube.com/v/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+        expect(youtubeService.extractVideoId('dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ'); // Already a video ID
+      });
+
+      it('should return null for invalid URLs', () => {
+        expect(youtubeService.extractVideoId('')).toBe(null);
+        expect(youtubeService.extractVideoId('not-a-valid-video-id')).toBe(null);
+        expect(youtubeService.extractVideoId('https://example.com')).toBe(null);
+        expect(youtubeService.extractVideoId(null)).toBe(null);
+        expect(youtubeService.extractVideoId(undefined)).toBe(null);
+        expect(youtubeService.extractVideoId(123)).toBe(null);
+      });
+    });
+
+    describe('extractChannelId', () => {
+      it('should extract channel ID from various URL formats', () => {
+        const channelId = 'UC_x5XG1OV2P6uZZ5FSM9Ttw';
+        expect(youtubeService.extractChannelId(`https://www.youtube.com/channel/${channelId}`)).toBe(channelId);
+        expect(youtubeService.extractChannelId('https://www.youtube.com/c/testchannel')).toBe('testchannel');
+        expect(youtubeService.extractChannelId('https://www.youtube.com/user/testuser')).toBe('testuser');
+        expect(youtubeService.extractChannelId('https://www.youtube.com/@testhandle')).toBe('testhandle');
+        expect(youtubeService.extractChannelId(channelId)).toBe(channelId); // Already a channel ID
+      });
+
+      it('should return null for invalid URLs', () => {
+        expect(youtubeService.extractChannelId('')).toBe(null);
+        expect(youtubeService.extractChannelId('invalid-url')).toBe(null);
+        expect(youtubeService.extractChannelId('https://example.com')).toBe(null);
+        expect(youtubeService.extractChannelId(null)).toBe(null);
+        expect(youtubeService.extractChannelId(undefined)).toBe(null);
+        expect(youtubeService.extractChannelId(123)).toBe(null);
+      });
+    });
+
+    describe('dispose', () => {
+      it('should dispose resources without error', async () => {
+        await expect(youtubeService.dispose()).resolves.toBeUndefined();
+      });
+    });
+  });
+
   describe('error handling', () => {
     it('should handle network errors gracefully', async () => {
       const networkError = new Error('ECONNREFUSED');
@@ -1148,6 +1297,46 @@ describe('YouTubeApiService', () => {
       mockVideosList.mockResolvedValue({ data: null });
 
       await expect(youtubeService.getVideoDetails('dQw4w9WgXcQ')).rejects.toThrow();
+    });
+
+    it('should handle empty search options gracefully', async () => {
+      const mockEmptySearchResponse = { items: [] };
+      mockSearchList.mockResolvedValue({ data: mockEmptySearchResponse });
+
+      const result = await youtubeService.searchVideos('test', {});
+
+      expect(result).toEqual([]);
+      expect(mockSearchList).toHaveBeenCalledWith({
+        part: 'snippet',
+        q: 'test',
+        type: 'video',
+        maxResults: 10,
+        order: 'relevance',
+      });
+    });
+
+    it('should handle search with all options', async () => {
+      const mockSearchResponse = { items: [] };
+      mockSearchList.mockResolvedValue({ data: mockSearchResponse });
+
+      const options = {
+        maxResults: 5,
+        order: 'date',
+        channelId: 'UC123',
+        publishedAfter: '2023-01-01T00:00:00Z',
+      };
+
+      await youtubeService.searchVideos('test', options);
+
+      expect(mockSearchList).toHaveBeenCalledWith({
+        part: 'snippet',
+        q: 'test',
+        type: 'video',
+        maxResults: 5,
+        order: 'date',
+        channelId: 'UC123',
+        publishedAfter: '2023-01-01T00:00:00Z',
+      });
     });
   });
 });

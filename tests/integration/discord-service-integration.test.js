@@ -40,11 +40,15 @@ describe('Discord Service Integration', () => {
       info: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      verbose: jest.fn(),
+      warn: jest.fn(),
       silly: jest.fn(),
       child: jest.fn().mockReturnValue({
         info: jest.fn(),
         error: jest.fn(),
         debug: jest.fn(),
+        verbose: jest.fn(),
+        warn: jest.fn(),
         silly: jest.fn(),
         child: jest.fn().mockReturnThis(),
       }),
@@ -182,15 +186,16 @@ describe('Discord Service Integration', () => {
       const wrappedHandler = mockClient.on.mock.calls.find(call => call[0] === 'messageCreate')[1];
       const messageContent = 'test message';
 
-      // Call the wrapped handler
-      wrappedHandler({ content: messageContent, channelId: 'test-channel', author: { id: 'test-user' } });
-
-      // Assert that the handler was called, and check that no error was thrown
-      expect(mockHandler).toHaveBeenCalledWith({
+      // Call the wrapped handler with a non-bot message
+      const testMessage = {
         content: messageContent,
         channelId: 'test-channel',
-        author: { id: 'test-user' },
-      });
+        author: { id: 'test-user', bot: false }, // Important: set bot: false to pass the filter
+      };
+      wrappedHandler(testMessage);
+
+      // Assert that the handler was called, and check that no error was thrown
+      expect(mockHandler).toHaveBeenCalledWith(testMessage);
 
       // Assert that the logger was called with the correct error information
       expect(mockLogger.error).toHaveBeenCalledWith('Error in message handler:', {

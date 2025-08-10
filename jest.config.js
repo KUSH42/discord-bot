@@ -1,4 +1,5 @@
 export default {
+  rootDir: './', // Set root to project root
   testEnvironment: 'node',
   transform: {
     '^.+.js$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],
@@ -22,35 +23,35 @@ export default {
     '!src/setup/**',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html', 'clover'],
+  coverageReporters: ['text', 'json', 'html'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
+
+  // Test result reporters for CI integration
+  reporters: [
+    'default',
+    // Temporarily disabled jest-junit reporter
+    // [
+    //   'jest-junit',
+    //   {
+    //     outputDirectory: 'test-results',
+    //     outputName: 'all-tests.xml',
+    //     classNameTemplate: '{classname}',
+    //     titleTemplate: '{title}',
+    //     ancestorSeparator: ' › ',
+    //     usePathForSuiteName: true,
+    //     addFileAttribute: true,
+    //     includeConsoleOutput: true,
+    //   },
+    // ],
+  ],
   // Re-enabled coverage thresholds after fixing hanging tests
   coverageThreshold: {
     global: {
-      statements: 20, // Reduced from 25 to be more achievable
-      branches: 15, // Reduced from 20
-      functions: 20, // Reduced from 25
-      lines: 20, // Reduced from 25
+      statements: 25, // Matches CLAUDE.md project requirements
+      branches: 20, // Matches CLAUDE.md project requirements
+      functions: 25, // Matches CLAUDE.md project requirements
+      lines: 25, // Matches CLAUDE.md project requirements
     },
-    'src/core/': {
-      statements: 40, // Reduced from 50
-      branches: 30, // Reduced from 40
-      functions: 45, // Reduced from 55
-      lines: 40, // Reduced from 50
-    },
-    // Temporarily disabled high coverage targets for specific files until tests stabilize
-    // 'src/services/implementations/youtube-api-service.js': {
-    //   statements: 90,
-    //   branches: 85,
-    //   functions: 90,
-    //   lines: 90,
-    // },
-    // 'src/core/content-classifier.js': {
-    //   statements: 85,
-    //   branches: 75,
-    //   functions: 90,
-    //   lines: 85,
-    // },
   },
   testMatch: ['**/tests/**/*.test.js', '**/tests/**/*.spec.js', '**/__tests__/**/*.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],

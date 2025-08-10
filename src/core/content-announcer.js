@@ -1,15 +1,19 @@
 import { splitMessage } from '../discord-utils.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+import { nowUTC, toISOStringUTC } from '../utilities/utc-time.js';
 
 /**
  * Pure business logic for announcing content to Discord channels
  * Handles message formatting and channel routing based on content type
  */
 export class ContentAnnouncer {
-  constructor(discordService, config, stateManager, logger) {
+  constructor(discordService, config, stateManager, baseLogger, debugFlagManager, metricsManager) {
     this.discord = discordService;
     this.config = config;
     this.state = stateManager;
-    this.logger = logger;
+
+    // Create enhanced logger for this module
+    this.logger = createEnhancedLogger('content-announcer', baseLogger, debugFlagManager, metricsManager);
 
     // Channel mapping based on content types
     this.channelMap = {
@@ -62,6 +66,19 @@ export class ContentAnnouncer {
    * @returns {Promise<Object>} Announcement result
    */
   async announceContent(content, options = {}) {
+    // Start tracked operation with automatic timing and correlation
+    const operation = this.logger.startOperation('announceContent', {
+      platform: content?.platform,
+      type: content?.type,
+      contentId: content?.id,
+      url: content?.url,
+      title: content?.title?.substring(0, 120),
+      author: content?.author,
+      publishedAt: content?.publishedAt,
+      isOld: content?.isOld,
+      options,
+    });
+
     const result = {
       success: false,
       channelId: null,
@@ -72,46 +89,90 @@ export class ContentAnnouncer {
 
     try {
       // Validate input
+      operation.progress('Validating content structure');
       const validation = this.validateContent(content);
       if (!validation.success) {
         result.reason = validation.error;
+
+        // For recoverable errors, log as warning instead of error
+        if (validation.recoverable) {
+          operation.progress('Content validation failed but recoverable, skipping gracefully');
+          result.skipped = true;
+          operation.success('Content skipped due to recoverable validation issue', {
+            validationError: validation.error,
+            recoverable: true,
+          });
+          return result;
+        }
+
+        operation.error(new Error(validation.error), 'Content validation failed', {
+          validationError: validation.error,
+        });
         return result;
       }
 
       // Check if announcements are enabled
+      operation.progress('Checking if content should be announced');
       if (!this.shouldAnnounce(content, options)) {
+        const skipReason = this.getSkipReason(content, options);
         result.skipped = true;
-        result.reason = this.getSkipReason(content, options);
+        result.reason = skipReason;
+
+        // Log skip info for debugging
+        this.logger.debug('Content announcement skipped', {
+          reason: skipReason,
+          postingEnabled: this.state.get('postingEnabled', true),
+          announcementEnabled: this.state.get('announcementEnabled', true),
+          botStartTime: this.state.get('botStartTime'),
+        });
+
         return result;
       }
 
       // Get target channel
+      operation.progress('Determining target channel');
       const channelId = this.getChannelForContent(content);
       if (!channelId || !this._isValidDiscordId(channelId)) {
         const errorMessage = `Invalid or missing channel ID: ${channelId}`;
-        this.logger.error(errorMessage, { content });
         result.reason = errorMessage;
+        operation.error(new Error(errorMessage), 'Invalid channel configuration', {
+          channelId,
+          channelMapping: this.channelMap,
+        });
         return result;
       }
 
       result.channelId = channelId;
 
       // Format message
+      operation.progress('Formatting announcement message');
       const message = this.formatMessage(content, options);
 
       // Send announcement
+      operation.progress('Sending announcement to Discord');
       const sentMessage = await this.discord.sendMessage(channelId, message);
       result.messageId = sentMessage.id;
       result.success = true;
 
       // Send mirror message if configured
       if (this.shouldMirrorMessage(channelId, options)) {
+        operation.progress('Sending mirror message');
         await this.sendMirrorMessage(channelId, message, options);
       }
+
+      // Mark as successful with automatic timing and metrics
+      operation.success('Content announced successfully', {
+        messageId: sentMessage.id,
+        channelId,
+        messageLength: typeof message === 'string' ? message.length : 'embed',
+      });
 
       return result;
     } catch (error) {
       result.reason = error.message;
+      operation.error(error, 'Failed to announce content', {
+        channelId: result.channelId,
+      });
       return result;
     }
   }
@@ -126,8 +187,32 @@ export class ContentAnnouncer {
       return { success: false, error: 'Content must be an object' };
     }
 
+    // Graceful recovery for missing platform - log warning but try to infer
     if (!content.platform || typeof content.platform !== 'string') {
-      return { success: false, error: 'Content must have a platform' };
+      this.logger.warn('Content missing platform property, attempting to infer from URL', {
+        contentId: content.id,
+        url: content.url,
+        type: content.type,
+      });
+
+      // Try to infer platform from URL
+      if (content.url) {
+        if (content.url.includes('youtube.com') || content.url.includes('youtu.be')) {
+          content.platform = 'youtube';
+        } else if (content.url.includes('x.com') || content.url.includes('twitter.com')) {
+          content.platform = 'x';
+        }
+      }
+
+      // If still no platform, skip announcement with warning
+      if (!content.platform) {
+        this.logger.warn('Unable to determine platform for content, skipping announcement', {
+          contentId: content.id,
+          url: content.url,
+          type: content.type,
+        });
+        return { success: false, error: 'Content must have a platform' };
+      }
     }
 
     if (!content.type || typeof content.type !== 'string') {
@@ -186,8 +271,10 @@ export class ContentAnnouncer {
    * @returns {boolean} True if should announce
    */
   shouldAnnounceYouTubeContent(content) {
+    const announceOldTweets = this.config.getBoolean('ANNOUNCE_OLD_TWEETS', false);
+
     // Check if content is new enough
-    if (content.publishedAt && this.state.get('botStartTime')) {
+    if (!announceOldTweets && content.publishedAt && this.state.get('botStartTime')) {
       const publishedTime = new Date(content.publishedAt);
       const botStartTime = this.state.get('botStartTime');
 
@@ -235,7 +322,7 @@ export class ContentAnnouncer {
       const botStartTime = this.state.get('botStartTime');
 
       if (publishedTime < botStartTime) {
-        return 'Content was published before bot started';
+        return `Content was published before bot started (published: ${publishedTime.toISOString()}, bot started: ${botStartTime.toISOString()})`;
       }
     }
 
@@ -283,8 +370,18 @@ export class ContentAnnouncer {
    * @param {Object} options - Options
    * @returns {string|Object} Formatted message
    */
-  formatYouTubeMessage(content, options) {
+  formatYouTubeMessage(content, _options) {
     const { title, url, type, channelTitle } = content;
+
+    // Debug logging if channel title is missing
+    if (!channelTitle) {
+      this.logger.warn('YouTube content missing channelTitle', {
+        contentId: content.id,
+        url: content.url,
+        title: content.title?.substring(0, 100),
+        availableFields: Object.keys(content),
+      });
+    }
 
     let emoji = '📺';
     let typeText = 'video';
@@ -307,15 +404,16 @@ export class ContentAnnouncer {
         typeText = 'uploaded a new video';
     }
 
+    /*
     if (options.useEmbed && type === 'livestream') {
       return {
         embeds: [
           {
-            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Channel'} is now live!`,
+            title: `🔴 ${this.sanitizeContent(channelTitle) || 'Unknown Channel'} is now live!`,
             description: this.sanitizeContent(title),
             url,
             color: 0xff0000, // Red for live
-            timestamp: new Date().toISOString(),
+            timestamp: nowUTC().toISOString(),
             fields: [
               {
                 name: 'Watch now',
@@ -327,8 +425,11 @@ export class ContentAnnouncer {
         ],
       };
     }
+    */
 
-    return `${emoji} **${this.sanitizeContent(channelTitle) || 'Channel'}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
+    // Use better fallback that shows we're missing the channel name
+    const displayChannelTitle = this.sanitizeContent(channelTitle) || 'Unknown Channel';
+    return `${emoji} **${displayChannelTitle}** ${typeText}:\n**${this.sanitizeContent(title)}**\n${this.sanitizeContent(url)}`;
   }
 
   /**
@@ -338,9 +439,9 @@ export class ContentAnnouncer {
    * @returns {string} Formatted message
    */
   formatXMessage(content) {
-    const { author, url, type, retweetedBy } = content;
+    const { author, authorDisplayName, url, type, retweetedBy } = content;
     let emoji = '🐦';
-    let actionText = 'posted';
+    let actionText = 'tweeted';
 
     switch (type) {
       case 'reply':
@@ -357,7 +458,7 @@ export class ContentAnnouncer {
         break;
       default:
         emoji = '🐦';
-        actionText = 'posted';
+        actionText = 'tweeted';
     }
 
     let finalUrl = url;
@@ -367,9 +468,10 @@ export class ContentAnnouncer {
       finalUrl = this.convertToVxTwitter(url);
     }
 
-    let message = `${emoji} **${author}** ${actionText}:\n${finalUrl}`;
+    const displayName = authorDisplayName || author;
+    let message = `${emoji} **${displayName}** ${actionText}:\n${finalUrl}`;
     if (type === 'retweet' && retweetedBy) {
-      message = `${emoji} **${retweetedBy}** retweeted:\n**${author}**: ${finalUrl}`;
+      message = `${emoji} **${retweetedBy}** retweeted:\n**${displayName}**: ${finalUrl}`;
     }
 
     return message;
@@ -519,29 +621,50 @@ export class ContentAnnouncer {
    * @returns {Promise<Array<Object>>} Array of announcement results
    */
   async bulkAnnounce(contentItems, options = {}) {
+    // Create logger for batch operation with correlation ID
+    const batchLogger = this.logger.forOperation('bulkAnnounce');
+    const batchOperation = batchLogger.startOperation('bulkAnnounce', {
+      batchSize: contentItems.length,
+      delay: options.delay || 0,
+    });
+
     const results = [];
-    const delay = options.delay || 0; // Delay between announcements to avoid rate limits
+    const delay = options.delay || 0;
 
-    for (const content of contentItems) {
-      try {
-        const result = await this.announceContent(content, options);
-        results.push({ content, result });
+    try {
+      for (const [index, content] of contentItems.entries()) {
+        batchOperation.progress(`Processing item ${index + 1}/${contentItems.length}`);
 
-        if (delay > 0 && results.length < contentItems.length) {
-          await new Promise(resolve => setTimeout(resolve, delay));
+        try {
+          const result = await this.announceContent(content, options);
+          results.push({ content, result });
+
+          if (delay > 0 && index < contentItems.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        } catch (error) {
+          results.push({
+            content,
+            result: {
+              success: false,
+              reason: error.message,
+            },
+          });
         }
-      } catch (error) {
-        results.push({
-          content,
-          result: {
-            success: false,
-            reason: error.message,
-          },
-        });
       }
-    }
 
-    return results;
+      const successCount = results.filter(r => r.result.success).length;
+      batchOperation.success('Bulk announcement completed', {
+        successCount,
+        failureCount: results.length - successCount,
+        successRate: Math.round((successCount / results.length) * 100),
+      });
+
+      return results;
+    } catch (error) {
+      batchOperation.error(error, 'Bulk announcement failed');
+      return results;
+    }
   }
 
   /**

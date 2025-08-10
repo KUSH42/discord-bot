@@ -1,19 +1,32 @@
+import { nowUTC } from '../utilities/utc-time.js';
+import { createEnhancedLogger } from '../utilities/enhanced-logger.js';
+
 /**
  * Unified Content State Management System
  * Replaces dual-logic inconsistency with single source of truth
  * Tracks content through its complete lifecycle
  */
 export class ContentStateManager {
-  constructor(configManager, persistentStorage, logger) {
+  constructor(configManager, persistentStorage, baseLogger, debugManager, metricsManager, stateManager = null) {
     this.configManager = configManager;
     this.storage = persistentStorage;
-    this.logger = logger;
+    this.logger = createEnhancedLogger('state', baseLogger, debugManager, metricsManager);
+    this.stateManager = stateManager;
 
     // In-memory cache for active content states
     this.contentStates = new Map(); // videoId -> ContentState
 
     // Track when the bot started to determine content freshness
     this.botStartTime = new Date();
+
+    // Track initialization status for comprehensive logging
+    this.isFullyInitialized = false;
+    this.initializationTime = null;
+
+    // Register with memory monitor if available
+    if (metricsManager && metricsManager.memoryMonitor) {
+      metricsManager.memoryMonitor.registerContentStore('contentStates', () => this.analyzeContentStates());
+    }
 
     // Initialize from persistent storage
     this.initializeFromStorage();
@@ -23,13 +36,21 @@ export class ContentStateManager {
    * Initialize content states from persistent storage
    */
   async initializeFromStorage() {
+    const operation = this.logger.startOperation('initializeFromStorage');
+
     try {
+      operation.progress('Loading stored content states');
       const storedStates = await this.storage.getAllContentStates();
+
+      let loadedCount = 0;
+      let skippedCount = 0;
+      const maxAge = this.getMaxContentAgeMs();
+
+      operation.progress('Processing stored states', { totalStates: Object.keys(storedStates || {}).length });
 
       for (const [contentId, state] of Object.entries(storedStates || {})) {
         // Only load recent states to prevent memory bloat
-        const age = Date.now() - new Date(state.lastUpdated).getTime();
-        const maxAge = this.getMaxContentAgeMs();
+        const age = nowUTC().getTime() - new Date(state.lastUpdated).getTime();
 
         if (age <= maxAge * 2) {
           // Keep states up to 2x max age for safety
@@ -38,18 +59,35 @@ export class ContentStateManager {
             firstSeen: new Date(state.firstSeen),
             lastUpdated: new Date(state.lastUpdated),
           });
+          loadedCount++;
+        } else {
+          skippedCount++;
         }
       }
 
-      this.logger.info('Content state manager initialized', {
-        loadedStates: this.contentStates.size,
+      operation.success('Content state manager initialized', {
+        loadedStates: loadedCount,
+        skippedStates: skippedCount,
         botStartTime: this.botStartTime.toISOString(),
+        maxAgeHours: maxAge / (60 * 60 * 1000),
       });
     } catch (error) {
-      this.logger.warn('❌ Failed to initialize from storage, starting fresh', {
-        error: error.message,
-      });
+      operation.error(error, 'Failed to initialize from storage, starting fresh');
     }
+  }
+
+  /**
+   * Mark the system as fully initialized (all submodules started, histories populated)
+   * This enables comprehensive content evaluation logging
+   */
+  markFullyInitialized() {
+    this.isFullyInitialized = true;
+    this.initializationTime = new Date();
+
+    this.logger.info('Content state manager marked as fully initialized - comprehensive logging enabled', {
+      initializationTime: this.initializationTime.toISOString(),
+      botStartTime: this.botStartTime.toISOString(),
+    });
   }
 
   /**
@@ -65,41 +103,56 @@ export class ContentStateManager {
    * @param {Object} [initialState.metadata] - Additional metadata
    */
   async addContent(contentId, initialState) {
-    if (!contentId || typeof contentId !== 'string') {
-      throw new Error('Content ID must be a non-empty string');
-    }
-
-    const now = new Date();
-    const publishedAt = initialState.publishedAt ? new Date(initialState.publishedAt) : now;
-
-    const contentState = {
-      id: contentId,
-      type: initialState.type || 'unknown',
-      state: initialState.state || 'published',
-      firstSeen: now,
-      lastUpdated: now,
-      publishedAt,
-      announced: false,
-      source: initialState.source || 'unknown',
-      url: initialState.url || null,
-      title: initialState.title || null,
-      metadata: initialState.metadata || {},
-    };
-
-    // Store in memory cache
-    this.contentStates.set(contentId, contentState);
-
-    // Persist to storage
-    await this.persistContentState(contentId, contentState);
-
-    this.logger.debug('Content added to state management', {
+    const operation = this.logger.startOperation('addContent', {
       contentId,
-      type: contentState.type,
-      state: contentState.state,
-      source: contentState.source,
+      type: initialState.type,
+      source: initialState.source,
     });
 
-    return contentState;
+    try {
+      if (!contentId || typeof contentId !== 'string') {
+        throw new Error('Content ID must be a non-empty string');
+      }
+
+      operation.progress('Creating content state object');
+      const now = new Date();
+      const publishedAt = initialState.publishedAt ? new Date(initialState.publishedAt) : now;
+
+      const contentState = {
+        id: contentId,
+        type: initialState.type || 'unknown',
+        state: initialState.state || 'published',
+        firstSeen: now,
+        lastUpdated: now,
+        publishedAt,
+        announced: false,
+        source: initialState.source || 'unknown',
+        url: initialState.url || null,
+        title: initialState.title || null,
+        metadata: initialState.metadata || {},
+      };
+
+      operation.progress('Storing in memory cache');
+      // Store in memory cache
+      this.contentStates.set(contentId, contentState);
+
+      operation.progress('Persisting to storage');
+      // Persist to storage
+      await this.persistContentState(contentId, contentState);
+
+      operation.success('Content added to state management', {
+        contentId,
+        type: contentState.type,
+        state: contentState.state,
+        source: contentState.source,
+        totalStates: this.contentStates.size,
+      });
+
+      return contentState;
+    } catch (error) {
+      operation.error(error, 'Failed to add content to state management', { contentId });
+      throw error;
+    }
   }
 
   /**
@@ -188,20 +241,55 @@ export class ContentStateManager {
     // Content is new if it's within the maximum age threshold
     const isWithinAgeLimit = contentAge <= maxAge;
 
-    // Also check against bot start time for content that existed before bot started
-    const isAfterBotStart = publishTime >= this.botStartTime;
+    // Check against bot start time, but allow recent content even if published before bot start
+    // This prevents announcing very old content while still allowing recent content from before restart
+    const botStartTime = this.getBotStartTime();
+    const isAfterBotStart = publishTime >= botStartTime;
+    const timeSinceBotStart = detectionTime.getTime() - botStartTime.getTime();
+    const botStartGracePeriod = 5 * 60 * 1000; // 5 minutes grace period
 
-    this.logger.debug('New content evaluation', {
+    // Allow content if:
+    // 1. Published after bot started, OR
+    // 2. Bot just started (within grace period) and content is within age limit
+    const shouldAllow = isAfterBotStart || (timeSinceBotStart <= botStartGracePeriod && isWithinAgeLimit);
+
+    // Always log basic debug info, but add comprehensive logging after initialization
+    const logData = {
       contentId,
       publishedAt: publishTime.toISOString(),
       contentAge: Math.round(contentAge / 1000), // seconds
       maxAge: Math.round(maxAge / 1000), // seconds
       isWithinAgeLimit,
       isAfterBotStart,
-      botStartTime: this.botStartTime.toISOString(),
-    });
+      timeSinceBotStart: Math.round(timeSinceBotStart / 1000), // seconds
+      botStartTime: botStartTime.toISOString(),
+      shouldAllow,
+    };
 
-    return isWithinAgeLimit && isAfterBotStart;
+    if (this.isFullyInitialized) {
+      // Comprehensive logging after full initialization - this helps catch issues like the one we just fixed
+      const decision = shouldAllow ? '✅ ALLOW' : '❌ REJECT';
+      const reason = !isWithinAgeLimit
+        ? 'content too old'
+        : !isAfterBotStart && timeSinceBotStart > 5 * 60 * 1000
+          ? 'published before bot start (outside grace period)'
+          : shouldAllow
+            ? 'within criteria'
+            : 'unknown';
+
+      this.logger.debug(`Content evaluation: ${decision} - ${reason}`, {
+        ...logData,
+        initializationTime: this.initializationTime?.toISOString(),
+        isFullyInitialized: this.isFullyInitialized,
+        gracePeriodMs: 5 * 60 * 1000,
+        reason,
+      });
+    } else {
+      // Basic logging during initialization
+      this.logger.debug('New content evaluation (pre-initialization)', logData);
+    }
+
+    return shouldAllow;
   }
 
   /**
@@ -262,36 +350,51 @@ export class ContentStateManager {
    * @param {number} [olderThanHours] - Remove content older than this (defaults to config)
    */
   async cleanup(olderThanHours) {
-    const maxAge = olderThanHours ? olderThanHours * 60 * 60 * 1000 : this.getMaxContentAgeMs() * 2; // Default to 2x max age
+    const operation = this.logger.startOperation('cleanup', { olderThanHours });
 
-    const cutoffTime = Date.now() - maxAge;
-    const toRemove = [];
-
-    for (const [contentId, state] of this.contentStates.entries()) {
-      if (state.lastUpdated.getTime() < cutoffTime) {
-        toRemove.push(contentId);
-      }
-    }
-
-    // Remove from memory
-    toRemove.forEach(id => this.contentStates.delete(id));
-
-    // Remove from persistent storage
     try {
-      await this.storage.removeContentStates(toRemove);
-    } catch (error) {
-      this.logger.warn('Failed to remove content states from storage', {
-        error: error.message,
-        removedFromMemory: toRemove.length,
-      });
-    }
+      const maxAge = olderThanHours ? olderThanHours * 60 * 60 * 1000 : this.getMaxContentAgeMs() * 2; // Default to 2x max age
+      const cutoffTime = nowUTC().getTime() - maxAge;
 
-    if (toRemove.length > 0) {
-      this.logger.info('Content state cleanup completed', {
-        removedCount: toRemove.length,
-        remainingCount: this.contentStates.size,
+      operation.progress('Identifying old content states', {
+        totalStates: this.contentStates.size,
         maxAgeHours: maxAge / (60 * 60 * 1000),
       });
+
+      const toRemove = [];
+      for (const [contentId, state] of this.contentStates.entries()) {
+        if (state.lastUpdated.getTime() < cutoffTime) {
+          toRemove.push(contentId);
+        }
+      }
+
+      if (toRemove.length === 0) {
+        operation.success('No content states to cleanup', { totalStates: this.contentStates.size });
+        return;
+      }
+
+      operation.progress('Removing from memory', { toRemove: toRemove.length });
+      // Remove from memory
+      toRemove.forEach(id => this.contentStates.delete(id));
+
+      operation.progress('Removing from persistent storage');
+      // Remove from persistent storage
+      try {
+        await this.storage.removeContentStates(toRemove);
+        operation.success('Content state cleanup completed', {
+          removedCount: toRemove.length,
+          remainingCount: this.contentStates.size,
+          maxAgeHours: maxAge / (60 * 60 * 1000),
+        });
+      } catch (storageError) {
+        operation.error(storageError, 'Failed to remove content states from storage', {
+          removedFromMemory: toRemove.length,
+          remainingInMemory: this.contentStates.size,
+        });
+      }
+    } catch (error) {
+      operation.error(error, 'Content state cleanup failed');
+      throw error;
     }
   }
 
@@ -305,6 +408,20 @@ export class ContentStateManager {
   }
 
   /**
+   * Get bot start time from state manager if available, otherwise use internal time
+   * @returns {Date} Bot start time
+   */
+  getBotStartTime() {
+    if (this.stateManager) {
+      const stateManagerBotStartTime = this.stateManager.get('botStartTime');
+      if (stateManagerBotStartTime) {
+        return new Date(stateManagerBotStartTime);
+      }
+    }
+    return this.botStartTime;
+  }
+
+  /**
    * Persist content state to storage
    * @param {string} contentId - Content identifier
    * @param {Object} state - Content state to persist
@@ -313,9 +430,9 @@ export class ContentStateManager {
     try {
       await this.storage.storeContentState(contentId, {
         ...state,
-        firstSeen: state.firstSeen.toISOString(),
-        lastUpdated: state.lastUpdated.toISOString(),
-        publishedAt: state.publishedAt.toISOString(),
+        firstSeen: state.firstSeen,
+        lastUpdated: state.lastUpdated,
+        publishedAt: state.publishedAt,
       });
     } catch (error) {
       this.logger.warn('Failed to persist content state', {
@@ -351,6 +468,52 @@ export class ContentStateManager {
       bySource,
       botStartTime: this.botStartTime.toISOString(),
       maxContentAge: this.getMaxContentAgeMs() / (60 * 60 * 1000), // hours
+    };
+  }
+
+  /**
+   * Analyze content states for memory monitoring
+   * @returns {Object} Memory analysis data
+   */
+  analyzeContentStates() {
+    const states = Array.from(this.contentStates.values());
+    const now = nowUTC();
+
+    // Calculate memory usage estimate
+    const memoryEstimate = JSON.stringify(states).length / 1024 / 1024; // MB
+
+    // Find oldest item
+    let oldestItemHours = 0;
+    if (states.length > 0) {
+      const oldestTimestamp = Math.min(...states.map(s => s.lastUpdated.getTime()));
+      oldestItemHours = (now.getTime() - oldestTimestamp) / (60 * 60 * 1000);
+    }
+
+    // Count by type and state
+    const byType = {};
+    const byState = {};
+    const bySource = {};
+
+    states.forEach(state => {
+      byType[state.type] = (byType[state.type] || 0) + 1;
+      byState[state.state] = (byState[state.state] || 0) + 1;
+      bySource[state.source] = (bySource[state.source] || 0) + 1;
+    });
+
+    return {
+      totalItems: states.length,
+      totalSizeMB: Math.round(memoryEstimate * 100) / 100,
+      oldestItemHours: Math.round(oldestItemHours * 100) / 100,
+      itemTypes: {
+        ...byType,
+        announced: states.filter(s => s.announced).length,
+        unannounced: states.filter(s => !s.announced).length,
+      },
+      breakdown: {
+        byType,
+        byState,
+        bySource,
+      },
     };
   }
 
