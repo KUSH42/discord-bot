@@ -25,17 +25,17 @@ export default {
   collectCoverage: true,
   collectCoverageFrom: [
     'src/**/*.js',
-    '!node_modules/**',
-    '!coverage/**',
-    '!jest.*.config.js',
-    '!scripts/**',
-    '!tests/**',
-    '!src/services/interfaces/**',
-    '!src/setup/**',
-    // Exclude main entry points that start infinite processes
+    // Exclude main entry points that start infinite processes and cause genhtml errors
     '!index.js',
     '!src/x-scraper.js',
     '!src/youtube-monitor.js',
+    '!node_modules/**',
+    '!coverage/**',
+    '!jest.config.js',
+    '!scripts/setup-encryption.js',
+    '!tests/**',
+    '!src/services/interfaces/**',
+    '!src/setup/**',
   ],
 
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],

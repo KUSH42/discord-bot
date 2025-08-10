@@ -11,6 +11,20 @@ export default {
   maxWorkers: 1,
   cache: false,
   collectCoverage: true,
+  collectCoverageFrom: [
+    'src/**/*.js',
+    // Exclude main entry points that start infinite processes and cause genhtml errors
+    '!index.js',
+    '!src/x-scraper.js',
+    '!src/youtube-monitor.js',
+    '!node_modules/**',
+    '!coverage/**',
+    '!jest.config.js',
+    '!scripts/setup-encryption.js',
+    '!tests/**',
+    '!src/services/interfaces/**',
+    '!src/setup/**',
+  ],
   coverageReporters: ['json', 'text-summary'],
   coverageProvider: 'v8', // Use V8 coverage instead of Babel for better consistency
 
